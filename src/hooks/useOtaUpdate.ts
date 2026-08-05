@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import * as Updates from 'expo-updates';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { shouldPromptForUpdate } from '@/lib/otaPolicy';
 
 const DISMISS_KEY = 'ota:update-dismissed-at';
+const FIRST_LAUNCH_KEY = 'ota:first-launch-done';
 const DISMISS_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
 
 type Phase =
@@ -42,6 +44,16 @@ export function useOtaUpdate() {
           return;
         }
 
+        // Primeira execução após uma instalação limpa? O binário da loja fica
+        // atrás do topo do canal OTA, então há update logo de cara — mas não
+        // interrompemos quem acabou de instalar com um modal de "atualizar".
+        // Marcamos o flag já aqui pra essa condição valer só uma vez.
+        const firstLaunchDone = await AsyncStorage.getItem(FIRST_LAUNCH_KEY);
+        const isFirstLaunch = !firstLaunchDone;
+        if (isFirstLaunch) {
+          await AsyncStorage.setItem(FIRST_LAUNCH_KEY, String(Date.now()));
+        }
+
         setPhase('checking');
         const check = await Updates.checkForUpdateAsync();
         if (cancelled) return;
@@ -53,7 +65,10 @@ export function useOtaUpdate() {
         setPhase('downloading');
         await Updates.fetchUpdateAsync();
         if (cancelled) return;
-        setPhase('ready');
+
+        // Baixado. Execução normal → sobe o modal. Primeira execução → fica
+        // silencioso: o expo aplica o update no próximo cold start sozinho.
+        setPhase(shouldPromptForUpdate({ isFirstLaunch }) ? 'ready' : 'idle');
       } catch (err) {
         if (cancelled) return;
         setPhase('error');
