@@ -42,7 +42,7 @@ type ChatRequest = {
 };
 
 const DAILY_USER_MESSAGE_LIMIT = 10;
-const DAILY_SANITY_CHECK_LIMIT = 5;
+const DAILY_SANITY_CHECK_LIMIT = 8;
 const MAX_MESSAGE_CHARS = 255;
 const HISTORY_MESSAGES = 10;
 
