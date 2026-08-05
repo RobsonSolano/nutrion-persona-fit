@@ -28,6 +28,7 @@ import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useDailySanityUsage } from '@/hooks/useAiUsage';
 import { useAiPersonalLocked } from '@/hooks/useEntitlement';
+import { DailyLimitError } from '@/lib/dailyLimit';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -40,6 +41,15 @@ import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
 import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
+
+// Aviso amigável de cota diária esgotada — mesmo texto no check proativo
+// (antes de tentar) e no reativo (429 daily_limit vindo do servidor).
+const sanityDoneAlert = (limit: number) =>
+  ({
+    title: 'Análises de hoje concluídas ✅',
+    message: `Você já usou suas ${limit} análises de prato de hoje. Elas renovam amanhã — te espero lá! 🙌`,
+    type: 'info',
+  }) as const;
 
 export default function SanityCheckScreen() {
   const router = useRouter();
@@ -79,11 +89,7 @@ export default function SanityCheckScreen() {
       return;
     }
     if (sanityUsage.limitReached) {
-      alert.showAlert({
-        title: 'Limite diário',
-        message: `Você já analisou ${sanityUsage.limit} pratos hoje. Volta amanhã!`,
-        type: 'info',
-      });
+      alert.showAlert(sanityDoneAlert(sanityUsage.limit));
       return;
     }
 
@@ -106,15 +112,12 @@ export default function SanityCheckScreen() {
       setStage('input');
       // Gating do billing-core: 402 needs_upgrade → paywall, sem erro.
       if (handleNeedsUpgrade(err)) return;
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
-      // Cota esgotada não é retryable — só fecha.
-      const isQuotaError = /limite/i.test(message);
-      if (!isQuotaError) {
-        captureError(err, { feature: 'sanity_check' });
+      // Cota diária estourada (race com o check proativo): aviso amigável, não erro.
+      if (err instanceof DailyLimitError) {
+        alert.showAlert(sanityDoneAlert(err.limit ?? sanityUsage.limit));
+        return;
       }
+      captureError(err, { feature: 'sanity_check' });
       alert.showError(err);
     }
   }
