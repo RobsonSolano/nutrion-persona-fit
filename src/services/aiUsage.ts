@@ -2,7 +2,9 @@ import { supabase } from './supabase';
 
 export type AiFeature = 'sanity_check' | 'onboarding_plan';
 
-export const DAILY_SANITY_CHECK_LIMIT = 5;
+// Espelha DAILY_SANITY_CHECK_LIMIT do servidor (chat-ai) — usado no check proativo
+// e no badge {used}/{limit}. Manter em sincronia com a edge function.
+export const DAILY_SANITY_CHECK_LIMIT = 8;
 // 2 = onboarding inicial + 1 refazer no mesmo dia. Limite acumulado por dia.
 export const DAILY_ONBOARDING_LIMIT = 2;
 
