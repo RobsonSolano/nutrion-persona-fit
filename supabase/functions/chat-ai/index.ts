@@ -10,6 +10,7 @@ import {
   formatReferencesForPrompt,
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
+import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
   extrairJsonDoTexto,
   itemsComoTexto,
@@ -120,11 +121,13 @@ Sua única tarefa é estimar macros de uma refeição e devolver um objeto JSON 
 
 Diretrizes:
 - Sempre responda em português brasileiro DENTRO do campo "feedback" do JSON.
-- Use bom senso e tabelas nutricionais brasileiras (TACO/USDA) pra estimar.
+- Use a REFERÊNCIA NUTRICIONAL fornecida abaixo como base dos números. Ela traz kcal e macros por 100 g na forma em que o alimento é servido. Para o que não estiver lá, estime por analogia com o item mais parecido dela.
 - Preencha "items" com CADA alimento do prato: name, qty_g, kcal, protein_g, carbs_g, fats_g — nunca null, nunca string, nunca vazio, mesmo que a estimativa seja aproximada. É o "items" que o app usa para calcular o total.
 - Preencha "macros" também, com sua melhor estimativa do total, mas ele é só um cross-check secundário: o app soma os itens e ignora "macros" sempre que "items" trouxer números. Não gaste esforço fazendo "macros" bater com a soma — priorize a precisão de cada item.
 - "feedback" deve ser empático e curto (1-2 frases) — celebre acertos, sugira ajustes sem culpar.
-- Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.`;
+- Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.
+
+${formatTacoForPrompt()}`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -407,6 +410,9 @@ serve(async (req: Request) => {
     // serve pro chat. No sanity_check usamos um persona enxuto que NÃO
     // instrui markdown — caso contrário o modelo prioriza o "texto fluido"
     // do system e ignora o pedido de JSON estrito do user message.
+    // A referência TACO viaja dentro do SANITY_PERSONA_PROMPT (estática, montada
+    // uma vez no módulo) — não entra no chat, onde gastaria ~800 tokens sem
+    // servir à conversa.
     const personaPrompt = isChatMode ? PERSONA_PROMPT : SANITY_PERSONA_PROMPT;
     const messages: { role: string; content: unknown }[] = [
       {
@@ -801,6 +807,11 @@ function resolveSanityOutput(aiText: string): {
   };
 }
 
+// Mesma frase nos dois ramos de buildSanityPrompt (com e sem foto). Const única
+// pra que as duas não divirjam numa edição futura.
+const REGRA_FORMA_PREPARADA =
+  'aplicando os valores por 100 g da REFERÊNCIA NUTRICIONAL do system. Use sempre a linha da forma PREPARADA (cozido/grelhado/assado), nunca do alimento cru.';
+
 function buildSanityPrompt(body: ChatRequest) {
   const hasPhoto = !!body.imageBase64;
   const weightLine = body.scaleWeightG
@@ -815,7 +826,7 @@ function buildSanityPrompt(body: ChatRequest) {
       'Tarefas:',
       '1. Identifique os itens visíveis na foto.',
       '2. Verifique consistência entre descrição, peso e volume visual.',
-      '3. Para CADA item, estime a quantidade em GRAMAS e os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), usando tabelas nutricionais brasileiras (TACO/USDA).',
+      `3. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA}`,
       '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
       'IMPORTANTE: cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
       'Responda APENAS em JSON puro, sem markdown, sem ```:',
@@ -829,7 +840,7 @@ function buildSanityPrompt(body: ChatRequest) {
     weightLine,
     'Tarefas:',
     '1. Liste os itens da refeição a partir da descrição (em "items").',
-    '2. Para CADA item, estime a quantidade em GRAMAS e os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), usando tabelas nutricionais brasileiras (TACO/USDA). Se faltar quantidade explícita, assuma a porção típica brasileira daquele alimento.',
+    `2. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA} Se faltar quantidade explícita, assuma a porção típica brasileira daquele alimento.`,
     '3. Dê feedback empático curto (1-2 frases) sobre a refeição.',
     'IMPORTANTE: NUNCA recuse a estimativa. Cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
     'Use "consistency":"ok" (não há foto pra divergir).',

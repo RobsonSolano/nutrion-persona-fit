@@ -52,8 +52,45 @@ fazer o sintoma desaparecer em pratos com arroz e feijão — a âncora em valor
 **Ofertas em aberto (escopo que o dev delimitou, não aplicadas):** usar `scaleWeightG` como restrição
 real no prompt (soma dos `qty_g` ≈ peso da balança) — é o item #1 da lista, fora desta leva.
 
-**Onda 4 (em andamento):** referência TACO no prompt, rota A (constante em `_shared/tacoReference.ts`,
-sem tabela no banco e sem matching fuzzy). Licença liberada pelo dev em 2026-08-25 ("dado público").
+**Onda 4 (implementada):** referência TACO no prompt, rota A (constante em
+`_shared/tacoReference.ts`, sem tabela no banco e sem matching fuzzy — a rota B, com 587 itens e
+busca fuzzy no Postgres, segue disponível se a medição pedir). Licença liberada pelo dev
+("dado público"); fonte creditada no arquivo.
+
+**57 alimentos**, ~900 tokens de prompt. Fonte: planilha oficial do NEPA (TACO 3), parseada por
+referência de célula. O PDF da 4ª edição foi abandonado como fonte primária por **corrupção de
+layout** (linhas com dois alimentos colados, números certos ligados ao nome errado) — mas serviu de
+**fonte independente para validação cruzada**.
+
+**Auditoria cruzada (agente, 2026-08-25):** os 52 itens originais conferem com o PDF da 4ª edição
+**sem nenhuma divergência**; Atwater (`kcal ≈ 4p+4c+9g`) passa em todos, pior caso real −19,4%
+(folhas, onde fibra pesa mais num kcal absoluto pequeno); zero violações da regra de curadoria.
+A tolerância do teste de Atwater (25%) foi calibrada por essa medição, não escolhida no chute.
+
+**Correção de um dado da auditoria:** o agente afirmou que `Presunto, com capa de gordura` tem
+"377 kcal e 34,5 g de gordura, 4x mais". O valor real na TACO é **128 kcal / 6,8 g** (1,4x). O item
+foi renomeado para deixar a forma explícita, mas o risco era muito menor que o descrito.
+
+**Lacunas fechadas após a auditoria (+5 itens):** Batata-doce cozida (77 · crua é 118, armadilha de
+1,5x), Lentilha cozida (93 · crua 339, 3,6x), Macarrão ao molho bolonhesa (120), Porco lombo assado
+(210 · cru 176), Abacate cru (96 — a fruta mais densa; sem ela o modelo generalizava por analogia
+com frutas de 14-98 kcal).
+
+**Macarrão puro cozido não existe na TACO** (só cru, 371). Em vez de inventar número de outra fonte,
+o bloco ganhou a **regra de rendimento**: grão e massa rendem 2,5-3x o peso seco ao cozinhar, então
+divida o valor do seco por esse fator. Resolve genericamente o que falta (macarrão, grão-de-bico).
+
+**Guarda-corpos automatizados na tabela:** teste que falha se alguém adicionar grão/massa/leguminosa
+crua; teste de Atwater; teste que exige que todos os itens apareçam no bloco formatado (um `.slice()`
+futuro não passa); teste de duplicidade de nome.
+
+**Validado:** vitest **159/159**, `deno check` OK, typecheck sem erro novo. Lint das edge functions
+acusa `import/no-unresolved` em `std/http/server.ts` — **pré-existente e sistêmico** (o mesmo erro
+aparece em `onboarding-plan` e `revenuecat-webhook`, não tocadas): o eslint do projeto não resolve
+import maps do Deno.
+
+**Pendente de verificação real:** nada disso foi exercitado contra o Groq. Só `fn:deploy` + um teste
+de prato real (arroz + feijão + carne) mostra se o exagero caiu. É o próximo passo.
 
 ### ota-release-notes (2026-08-25) — implementado (branch `feature/ota-release-notes`)
 

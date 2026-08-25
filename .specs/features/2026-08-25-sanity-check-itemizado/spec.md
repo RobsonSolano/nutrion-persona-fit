@@ -114,6 +114,39 @@ instrução vaga para "usar bom senso".
 - Tabela TACO no banco com busca fuzzy (rota B).
 - Exibir a lista itemizada no `MealForm.tsx` (hoje ele não mostra `items`; manter assim).
 
+## Onda 4 — como os dados foram obtidos (registro de procedência)
+
+**Fonte final: a planilha oficial em Excel do NEPA (TACO 3), não o PDF.** A extração começou pelo
+PDF da 4ª edição e chegou a 549 alimentos validados, mas o PDF tem **corrupção de layout**: algumas
+linhas saem com dois alimentos colados (ex.: `Tomate, extrato 159 Tomate, molho industrializado`).
+Os números passavam na validação de integridade, porém ficavam associados ao **nome errado** — erro
+silencioso que envenenaria a referência. A planilha, parseada por **referência de célula** (não por
+ordem de aparição), não tem esse risco.
+
+**Validação de integridade usada nas duas fontes:** a tabela traz energia em kcal **e** em kJ, então
+toda linha aceita tem de satisfazer `kJ ≈ kcal × 4,184` (±2%). Isso detecta desalinhamento de coluna
+em vez de deixar passar número errado. Das 1.547 linhas candidatas do PDF, 958 foram rejeitadas por
+esse critério (são as outras partes da tabela — minerais, vitaminas, ácidos graxos — sem par de
+energia). Na planilha: 589 alimentos aprovados.
+
+**Regra de curadoria (52 itens):** só entra alimento cuja forma listada é a forma **servida**.
+- **Descartado de propósito:** `Macarrão, trigo, cru` (371 kcal) — a TACO não tem macarrão cozido, e
+  oferecer o valor cru faria o modelo aplicá-lo a macarrão cozido (~157), **criando** o bug que esta
+  feature corrige.
+- **Mantido com nome explícito:** `Leite, de vaca, integral, pó` (497) — a TACO não tem leite
+  líquido. Se o nome fosse só "leite", o modelo aplicaria 8x o valor do leite fluido.
+- **Omitido:** `Feijoada` — existe só na 4ª edição (PDF), e misturar fontes por um item não compensa;
+  o modelo estima pelos componentes, que estão na lista.
+- Há **teste automatizado** (`tacoReference.test.ts`) que falha se alguém adicionar grão, massa,
+  leguminosa ou tubérculo na forma crua.
+
+**Corte de 75 para 52 itens, por impacto:** o bloco entra em **toda** chamada do sanity check, então
+o custo de token é recorrente e pressiona o TPM do Groq. Ficaram os alimentos onde a inflação nasce
+(grão, massa, carne, óleo — óleo/azeite a 884 kcal/100 g é erro caro); fruta e folha ficaram só com
+as mais frequentes, porque não têm armadilha de preparo e o modelo já as estima razoavelmente.
+Os macros foram arredondados para uma decimal (vinham como `1.0003333333333333`, puro ruído que
+custava token): o bloco caiu de **~1800 para ~800 tokens**.
+
 ## Licença dos dados TACO — RESOLVIDO
 
 **Decisão do dev (2026-08-25): pode usar, é dado público.** A planilha oficial (TACO 3, 587
