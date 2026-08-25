@@ -2,6 +2,120 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### sanity-check-itemizado (2026-08-25) — onda 3 implementada (branch `feature/sanity-itemizado`)
+
+Spec: `.specs/features/2026-08-25-sanity-check-itemizado/spec.md` (SAN-01..SAN-11).
+Origem: item #2 da leva do `BACKLOG.md`. **Baseline Test Gate:** 110/110 GREEN em `develop`.
+
+**Problema:** sanity check devolvia calorias infladas. Três causas: o modelo estimava o total num
+único salto (`items` era só `string[]`); ninguém conferia a conta (o servidor repassava o texto cru
+e o total do modelo era aceito como verdade); e não existia referência nutricional real — as
+menções a "TACO/USDA" no prompt eram instrução de texto, não dados.
+
+**Onda 3 (esta):** `items` virou lista de objetos com gramagem e macros por item, e o **servidor
+soma em código** (`chat-ai/sanityMath.ts`, TS puro, 26 testes) ignorando o total do modelo. Fallback
+para o total dele quando os itens vêm sem número, registrado em `ai_usage_log.error_code`.
+
+**Decisão de rollout (SAN-11), importante:** a function e o app publicam por caminhos independentes
+(`fn:deploy` vs. OTA/store). O campo `text` continua trazendo `items` como **array de strings** e os
+macros **já reconciliados** — então o app hoje em closed testing passa a receber o total corrigido
+**sem precisar de update e sem crashar**. Os objetos ricos vão num campo novo do envelope (`sanity`),
+que só o app atualizado lê. Sem isso, subir a function primeiro quebraria `app/sanity-check.tsx:463`
+(objeto como filho de `<Text>`).
+
+**Achados do review que viraram correção (4 agentes: reuso, simplificação, corretude, prompt):**
+- **Regressão da regex de fallback** (achada por 2 agentes independentes): `extractMacrosFromRaw`
+  buscava `"kcal"` sem flag global; com `items` vindo antes de `macros` e cada item tendo `kcal`
+  próprio, capturava o primeiro item (195, o arroz) como se fosse o total (507). Corrigido buscando
+  a partir do bloco `"macros"`, agora com teste do cenário exato.
+- **Contradição entre camadas do prompt:** o user message passou a dizer "o total é somado pelo app",
+  mas o `SANITY_PERSONA_PROMPT` (system) continuava mandando "SEMPRE preencha macros, NUNCA omita" e
+  nem mencionava `items` como objeto. As duas camadas foram alinhadas.
+- **Bug latente de coerção:** havia duas funções de coerção numérica no MESMO bundle (`coerceNumber`
+  no service e `coerceNumero` na lib nova), divergindo em negativos. Como `food_logs` tem
+  `check (calories >= 0)`, um "-50 kcal" alucinado estouraria no INSERT na cara do usuário.
+  Unificado em `src/lib/sanityParse.ts`, preservando os aliases (`calorias`, `proteina_g`…).
+- Removido o campo `reason` de `Reconciliado` (documentado como telemetria, mas o caller nunca lia);
+  extraído `resolveSanityOutput` (matou 3 `let` no meio do `serve()`); chip só mostra gramagem `> 0`.
+
+**Pulados de propósito:** extrair o parser de JSON para `_shared/` (mexeria na geração de plano do
+onboarding, fora do diff); tornar `sumItems` interna (exigiria apagar 5 testes da operação central);
+`reasoning_effort:'low'` no caminho de foto (hipótese sem medição — o `'none'` está lá por
+truncamento real já observado).
+
+**Validado:** vitest **149/149**, `deno check` da function OK, lint 0 erros, typecheck sem erro novo.
+
+**Expectativa honesta:** a onda 3 sozinha corrige o "chute do total num salto", mas **não** deve
+fazer o sintoma desaparecer em pratos com arroz e feijão — a âncora em valor de alimento **cru**
+(3-5x o cozido) só é atacada na onda 4.
+
+**Ofertas em aberto (escopo que o dev delimitou, não aplicadas):** usar `scaleWeightG` como restrição
+real no prompt (soma dos `qty_g` ≈ peso da balança) — é o item #1 da lista, fora desta leva.
+
+**Onda 4 (implementada):** referência TACO no prompt, rota A (constante em
+`_shared/tacoReference.ts`, sem tabela no banco e sem matching fuzzy — a rota B, com 587 itens e
+busca fuzzy no Postgres, segue disponível se a medição pedir). Licença liberada pelo dev
+("dado público"); fonte creditada no arquivo.
+
+**57 alimentos**, ~900 tokens de prompt. Fonte: planilha oficial do NEPA (TACO 3), parseada por
+referência de célula. O PDF da 4ª edição foi abandonado como fonte primária por **corrupção de
+layout** (linhas com dois alimentos colados, números certos ligados ao nome errado) — mas serviu de
+**fonte independente para validação cruzada**.
+
+**Auditoria cruzada (agente, 2026-08-25):** os 52 itens originais conferem com o PDF da 4ª edição
+**sem nenhuma divergência**; Atwater (`kcal ≈ 4p+4c+9g`) passa em todos, pior caso real −19,4%
+(folhas, onde fibra pesa mais num kcal absoluto pequeno); zero violações da regra de curadoria.
+A tolerância do teste de Atwater (25%) foi calibrada por essa medição, não escolhida no chute.
+
+**Correção de um dado da auditoria:** o agente afirmou que `Presunto, com capa de gordura` tem
+"377 kcal e 34,5 g de gordura, 4x mais". O valor real na TACO é **128 kcal / 6,8 g** (1,4x). O item
+foi renomeado para deixar a forma explícita, mas o risco era muito menor que o descrito.
+
+**Lacunas fechadas após a auditoria (+5 itens):** Batata-doce cozida (77 · crua é 118, armadilha de
+1,5x), Lentilha cozida (93 · crua 339, 3,6x), Macarrão ao molho bolonhesa (120), Porco lombo assado
+(210 · cru 176), Abacate cru (96 — a fruta mais densa; sem ela o modelo generalizava por analogia
+com frutas de 14-98 kcal).
+
+**Macarrão puro cozido não existe na TACO** (só cru, 371). Em vez de inventar número de outra fonte,
+o bloco ganhou a **regra de rendimento**: grão e massa rendem 2,5-3x o peso seco ao cozinhar, então
+divida o valor do seco por esse fator. Resolve genericamente o que falta (macarrão, grão-de-bico).
+
+**Guarda-corpos automatizados na tabela:** teste que falha se alguém adicionar grão/massa/leguminosa
+crua; teste de Atwater; teste que exige que todos os itens apareçam no bloco formatado (um `.slice()`
+futuro não passa); teste de duplicidade de nome.
+
+**Validado:** vitest **159/159**, `deno check` OK, typecheck sem erro novo. Lint das edge functions
+acusa `import/no-unresolved` em `std/http/server.ts` — **pré-existente e sistêmico** (o mesmo erro
+aparece em `onboarding-plan` e `revenuecat-webhook`, não tocadas): o eslint do projeto não resolve
+import maps do Deno.
+
+**Verificação real (2026-08-25, após `supabase functions deploy chat-ai` — chat-ai v66):**
+prato de arroz branco + feijão carioca + bife grelhado, no caminho de TEXTO (`MealForm` sem foto →
+`llama-3.3-70b`):
+
+| Teste | Porções | Total devolvido |
+|---|---|---|
+| Com gramas explícitas (150/80/120 g) | dadas no texto | **545 kcal** |
+| Sem gramas (modelo estimou a porção) | escolhidas por ele | **578 kcal** |
+
+Referência calculada com os próprios valores que subiram no prompt: 192 (arroz) + 61 (feijão) +
+263 (patinho) = **516 kcal**. O resultado com gramas ficou 5,6% acima — dentro do arredondamento e
+da escolha de corte da carne.
+
+**A evidência mais forte é negativa:** se a âncora no alimento CRU ainda estivesse atuando, só o
+arroz daria 537 kcal (358/100 g × 150 g) e o total passaria de 900. Vir 545 mostra que o modelo
+aplicou os valores da forma cozida — que é exatamente o que a onda 4 corrigiu.
+
+**Os dois testes juntos** também mostram que estimar a porção sozinho (578) não degradou o resultado
+frente a receber as gramas prontas (545) — 6% de diferença. No caminho de texto, porção não é o
+gargalo que se temia.
+
+**Limites do que foi verificado (não inflar a conclusão):** duas amostras, do mesmo prato, e **sem o
+"antes" medido** — consequência direta de a instrumentação (item #1) ter ficado fora da leva. É
+evidência de que o mecanismo funciona, não prova de que o sintoma relatado acabou. E o caminho de
+**FOTO** (`/sanity-check` → `llama-4-scout-17b`) segue **sem teste**: estimar gramagem de foto 2D
+sem referência de escala é o pedaço mais frágil, e nada nesta feature o atacou.
+
 ### ota-release-notes (2026-08-25) — implementado (branch `feature/ota-release-notes`)
 
 Spec: `.specs/features/2026-08-25-ota-release-notes/spec.md` (OTA-01…OTA-07). Origem: item #3 da

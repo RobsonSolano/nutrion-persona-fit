@@ -462,10 +462,14 @@ function ResultStage({
           <View className="flex-row flex-wrap gap-2">
             {result.items.map((item, i) => (
               <View
-                key={`${item}-${i}`}
+                key={`${item.name}-${i}`}
                 className="rounded-full border border-border bg-surface-muted px-3 py-1"
               >
-                <Text className="text-text-dim text-xs">{item}</Text>
+                <Text className="text-text-dim text-xs">
+                  {item.qty_g && item.qty_g > 0
+                    ? `${item.name} · ${Math.round(item.qty_g)} g`
+                    : item.name}
+                </Text>
               </View>
             ))}
           </View>
