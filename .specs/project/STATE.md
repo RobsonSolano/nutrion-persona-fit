@@ -2,6 +2,59 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### sanity-check-itemizado (2026-08-25) — onda 3 implementada (branch `feature/sanity-itemizado`)
+
+Spec: `.specs/features/2026-08-25-sanity-check-itemizado/spec.md` (SAN-01..SAN-11).
+Origem: item #2 da leva do `BACKLOG.md`. **Baseline Test Gate:** 110/110 GREEN em `develop`.
+
+**Problema:** sanity check devolvia calorias infladas. Três causas: o modelo estimava o total num
+único salto (`items` era só `string[]`); ninguém conferia a conta (o servidor repassava o texto cru
+e o total do modelo era aceito como verdade); e não existia referência nutricional real — as
+menções a "TACO/USDA" no prompt eram instrução de texto, não dados.
+
+**Onda 3 (esta):** `items` virou lista de objetos com gramagem e macros por item, e o **servidor
+soma em código** (`chat-ai/sanityMath.ts`, TS puro, 26 testes) ignorando o total do modelo. Fallback
+para o total dele quando os itens vêm sem número, registrado em `ai_usage_log.error_code`.
+
+**Decisão de rollout (SAN-11), importante:** a function e o app publicam por caminhos independentes
+(`fn:deploy` vs. OTA/store). O campo `text` continua trazendo `items` como **array de strings** e os
+macros **já reconciliados** — então o app hoje em closed testing passa a receber o total corrigido
+**sem precisar de update e sem crashar**. Os objetos ricos vão num campo novo do envelope (`sanity`),
+que só o app atualizado lê. Sem isso, subir a function primeiro quebraria `app/sanity-check.tsx:463`
+(objeto como filho de `<Text>`).
+
+**Achados do review que viraram correção (4 agentes: reuso, simplificação, corretude, prompt):**
+- **Regressão da regex de fallback** (achada por 2 agentes independentes): `extractMacrosFromRaw`
+  buscava `"kcal"` sem flag global; com `items` vindo antes de `macros` e cada item tendo `kcal`
+  próprio, capturava o primeiro item (195, o arroz) como se fosse o total (507). Corrigido buscando
+  a partir do bloco `"macros"`, agora com teste do cenário exato.
+- **Contradição entre camadas do prompt:** o user message passou a dizer "o total é somado pelo app",
+  mas o `SANITY_PERSONA_PROMPT` (system) continuava mandando "SEMPRE preencha macros, NUNCA omita" e
+  nem mencionava `items` como objeto. As duas camadas foram alinhadas.
+- **Bug latente de coerção:** havia duas funções de coerção numérica no MESMO bundle (`coerceNumber`
+  no service e `coerceNumero` na lib nova), divergindo em negativos. Como `food_logs` tem
+  `check (calories >= 0)`, um "-50 kcal" alucinado estouraria no INSERT na cara do usuário.
+  Unificado em `src/lib/sanityParse.ts`, preservando os aliases (`calorias`, `proteina_g`…).
+- Removido o campo `reason` de `Reconciliado` (documentado como telemetria, mas o caller nunca lia);
+  extraído `resolveSanityOutput` (matou 3 `let` no meio do `serve()`); chip só mostra gramagem `> 0`.
+
+**Pulados de propósito:** extrair o parser de JSON para `_shared/` (mexeria na geração de plano do
+onboarding, fora do diff); tornar `sumItems` interna (exigiria apagar 5 testes da operação central);
+`reasoning_effort:'low'` no caminho de foto (hipótese sem medição — o `'none'` está lá por
+truncamento real já observado).
+
+**Validado:** vitest **149/149**, `deno check` da function OK, lint 0 erros, typecheck sem erro novo.
+
+**Expectativa honesta:** a onda 3 sozinha corrige o "chute do total num salto", mas **não** deve
+fazer o sintoma desaparecer em pratos com arroz e feijão — a âncora em valor de alimento **cru**
+(3-5x o cozido) só é atacada na onda 4.
+
+**Ofertas em aberto (escopo que o dev delimitou, não aplicadas):** usar `scaleWeightG` como restrição
+real no prompt (soma dos `qty_g` ≈ peso da balança) — é o item #1 da lista, fora desta leva.
+
+**Onda 4 (em andamento):** referência TACO no prompt, rota A (constante em `_shared/tacoReference.ts`,
+sem tabela no banco e sem matching fuzzy). Licença liberada pelo dev em 2026-08-25 ("dado público").
+
 ### ota-release-notes (2026-08-25) — implementado (branch `feature/ota-release-notes`)
 
 Spec: `.specs/features/2026-08-25-ota-release-notes/spec.md` (OTA-01…OTA-07). Origem: item #3 da
