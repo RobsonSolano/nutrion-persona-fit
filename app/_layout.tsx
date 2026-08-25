@@ -27,6 +27,8 @@ import {
 } from '@/services/pushNotifications';
 import { GlobalAlertProvider } from '@/components/GlobalAlertProvider';
 import { ConfirmModal } from '@/components/ui';
+import OtaReleaseNotes from '@/components/OtaReleaseNotes';
+import { getOtaModalMessage } from '@/lib/otaReleaseNotes';
 import { Sparkles } from 'lucide-react-native';
 import { colors } from '@/lib/theme';
 
@@ -55,7 +57,10 @@ function Providers({ children }: { children: React.ReactNode }) {
         visible={ota.isReady}
         onClose={ota.dismiss}
         title="Atualização disponível"
-        message="Uma nova versão do app foi baixada. Aplicar agora reinicia o Persona Fit em alguns segundos."
+        message={getOtaModalMessage(ota.releaseNotes)}
+        content={
+          ota.releaseNotes && <OtaReleaseNotes notes={ota.releaseNotes} />
+        }
         icon={<Sparkles size={26} color={colors.accent} />}
         dismissable={!ota.isApplying}
         actions={[

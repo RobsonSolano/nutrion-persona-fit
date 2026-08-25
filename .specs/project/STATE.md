@@ -2,6 +2,78 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### ota-release-notes (2026-08-25) — implementado (branch `feature/ota-release-notes`)
+
+Spec: `.specs/features/2026-08-25-ota-release-notes/spec.md` (OTA-01…OTA-07). Origem: item #3 da
+leva priorizada no `BACKLOG.md` (leva = #2, #3, #4, #5).
+
+**Baseline Test Gate:** vitest 93/93 GREEN em `develop`. O `typecheck` segue com o **mesmo 1 erro
+pré-existente** já registrado nesta STATE (`src/lib/paywall.ts(6,17)`, `.expo/types` stale) — não é
+override novo, é a condição já acordada. Confirmado que `.expo/types/router.d.ts` é de 29/jun e
+`app/paywall.tsx` de 23/jul, o que explica o erro. Não tocamos em `paywall.ts`.
+
+**Entrega:** o modal de OTA passa a mostrar "o que há de novo" em 3 categorias (🚀 novidades →
+✨ melhorias → 🔧 ajustes), lidas de `extra.releaseNotes` do manifest do **update disponível**.
+Sem notas válidas, cai no texto genérico de antes — silenciosamente.
+
+**Decisões (e o porquê):**
+- **`Updates.updateMessage` NÃO EXISTE** no expo-updates 29.0.17 (a ideia original no backlog
+  apostava nisso). Conferido na API pública do pacote: o `--message` do `eas update` não é exposto
+  ao cliente. A fonte real é `check.manifest` do `checkForUpdateAsync()`.
+- **`ConfirmModal` ganhou `content?: ReactNode`, prop nova e opcional** — os 15 callers seguem
+  intactos. Trocar `message: string` por `ReactNode` foi rejeitado (superfície ampla, risco sem
+  ganho); e `message` vive dentro de um `<Text>`, onde uma `<View>` não pode entrar, então dois
+  slots com semânticas diferentes é o desenho certo, não overengineering.
+- **O parser declara o shape do manifest localmente em vez de importar os tipos do expo.** Assim o
+  parsing não ganha dependência de compilação no SDK: se o expo mudar o formato, nada quebra no
+  build — passa a devolver `null` e o modal usa o texto genérico.
+- **`getOtaModalMessage` e `seccoesVisiveis` moram na lib pura**, não no componente/layout. Motivo
+  concreto: o projeto **não tem teste de componente** (`vitest.config.ts` coleta só
+  `src/lib/**/*.test.ts` e `supabase/functions/**/*.test.ts`; não existe nenhum `*.test.tsx`). Pondo
+  a ordem das seções e a omissão de seção vazia na lib, esses comportamentos ficam cobertos por
+  vitest e o JSX vira um `.map` burro.
+
+**Achados do review que viraram correção:**
+- **CTA inalcançável (severidade média, introduzido por esta feature):** `ConfirmModal` não tem
+  `maxHeight` nem `ScrollView`, e `content` é o primeiro conteúdo de tamanho variável que ele
+  recebe. Um changelog longo (20-30 itens) empurraria "Atualizar agora" fora da tela. Resolvido com
+  `maxHeight: 260` + `ScrollView` **dentro do `OtaReleaseNotes`**, sem alterar o layout do modal
+  compartilhado — coerente com o JSDoc do slot ("quem passa `content` cuida do próprio layout").
+- **`trim()` não remove zero-width** (U+200B/U+200D/BOM não são `White_Space`): item colado de
+  Notion/Docs viraria um bullet invisível. Passou a limpar invisíveis antes de aparar.
+- **`Object.values(notas).every(...)` era frágil de forma prospectiva** — se `ReleaseNotes` ganhasse
+  um campo `string`, `.length` continuaria compilando e o "está tudo vazio" ficaria errado em
+  silêncio. Trocado por lista explícita dos 3 arrays.
+- **Rotulagem de teste corrigida:** dois testes alegavam cobrir OTA-01 (a garantia de que o manifest
+  lido é o do update disponível) mas testavam parsing sobre manifest montado à mão. Foram
+  re-rotulados e a spec ganhou OTA-06/OTA-07 para o que de fato existia só como decisão de código.
+
+**Cobertura — o que NÃO tem rede de proteção (aceito consciente, não "passou porque está verde"):**
+- **OTA-01 não tem teste.** Trocar `parseReleaseNotes(check.manifest)` por `Updates.manifest` em
+  `useOtaUpdate.ts` não quebraria nenhum teste. Só revisão de código e verificação manual pegam.
+- **OTA-04** é garantido apenas por `tsc --noEmit` — "compila", não "comportamento verificado".
+- **OTA-05** (preencher as notas antes de publicar) falha em silêncio por design.
+
+**Validado:** vitest **110/110** (15 arquivos; +17 testes nesta feature), lint **0 problemas** nos
+arquivos tocados, typecheck sem erro novo.
+
+**Pendências:**
+1. **Comportamento na 1ª publicação:** o modal é renderizado pelo bundle **em execução** e as notas
+   vêm do manifest do update **que chega**. Logo o primeiro OTA com esta feature ainda será
+   anunciado pelo texto genérico; as notas aparecem a partir do publish seguinte. Está comentado no
+   hook pra não ser confundido com bug.
+2. **`app.config.ts` tem `releaseNotes` com 3 arrays vazios** e só um comentário como guardrail.
+   Recomendação **não aplicada** (decisão do dev): um script amarrado a `update:preview` /
+   `update:production` (`package.json:21`) que avise quando as 3 listas estiverem vazias — o
+   esquecimento é silencioso, então nada no fluxo de release denuncia que a feature virou no-op
+   naquele update.
+3. **Verificação manual pendente** (exige build de preview: `Updates.isEnabled === false` em Expo
+   Go/dev, o hook é no-op): (a) 3 categorias preenchidas → ordem e bullets; (b) só uma categoria →
+   as outras omitidas sem cabeçalho órfão; (c) tudo vazio → texto genérico sem bloco fantasma;
+   (d) chave grafada errada → fallback silencioso; (e) 1ª execução após instalação limpa → modal
+   suprimido por `shouldPromptForUpdate`; (f) changelog longo → lista rola e os botões continuam
+   alcançáveis.
+
 ### consentimento-dados-saude (2026-07-21) — em andamento (branch `feature/assinatura`)
 
 **Baseline Test Gate — OVERRIDE [2] (2026-07-21):** vitest 41/41 GREEN, mas `typecheck` tem 1 erro
