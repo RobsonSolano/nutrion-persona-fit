@@ -89,8 +89,32 @@ acusa `import/no-unresolved` em `std/http/server.ts` — **pré-existente e sist
 aparece em `onboarding-plan` e `revenuecat-webhook`, não tocadas): o eslint do projeto não resolve
 import maps do Deno.
 
-**Pendente de verificação real:** nada disso foi exercitado contra o Groq. Só `fn:deploy` + um teste
-de prato real (arroz + feijão + carne) mostra se o exagero caiu. É o próximo passo.
+**Verificação real (2026-08-25, após `supabase functions deploy chat-ai` — chat-ai v66):**
+prato de arroz branco + feijão carioca + bife grelhado, no caminho de TEXTO (`MealForm` sem foto →
+`llama-3.3-70b`):
+
+| Teste | Porções | Total devolvido |
+|---|---|---|
+| Com gramas explícitas (150/80/120 g) | dadas no texto | **545 kcal** |
+| Sem gramas (modelo estimou a porção) | escolhidas por ele | **578 kcal** |
+
+Referência calculada com os próprios valores que subiram no prompt: 192 (arroz) + 61 (feijão) +
+263 (patinho) = **516 kcal**. O resultado com gramas ficou 5,6% acima — dentro do arredondamento e
+da escolha de corte da carne.
+
+**A evidência mais forte é negativa:** se a âncora no alimento CRU ainda estivesse atuando, só o
+arroz daria 537 kcal (358/100 g × 150 g) e o total passaria de 900. Vir 545 mostra que o modelo
+aplicou os valores da forma cozida — que é exatamente o que a onda 4 corrigiu.
+
+**Os dois testes juntos** também mostram que estimar a porção sozinho (578) não degradou o resultado
+frente a receber as gramas prontas (545) — 6% de diferença. No caminho de texto, porção não é o
+gargalo que se temia.
+
+**Limites do que foi verificado (não inflar a conclusão):** duas amostras, do mesmo prato, e **sem o
+"antes" medido** — consequência direta de a instrumentação (item #1) ter ficado fora da leva. É
+evidência de que o mecanismo funciona, não prova de que o sintoma relatado acabou. E o caminho de
+**FOTO** (`/sanity-check` → `llama-4-scout-17b`) segue **sem teste**: estimar gramagem de foto 2D
+sem referência de escala é o pedaço mais frágil, e nada nesta feature o atacou.
 
 ### ota-release-notes (2026-08-25) — implementado (branch `feature/ota-release-notes`)
 
