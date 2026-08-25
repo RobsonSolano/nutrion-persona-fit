@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Updates from 'expo-updates';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldPromptForUpdate } from '@/lib/otaPolicy';
+import { parseReleaseNotes, type ReleaseNotes } from '@/lib/otaReleaseNotes';
 
 const DISMISS_KEY = 'ota:update-dismissed-at';
 const FIRST_LAUNCH_KEY = 'ota:first-launch-done';
@@ -29,6 +30,7 @@ type Phase =
 export function useOtaUpdate() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [releaseNotes, setReleaseNotes] = useState<ReleaseNotes | null>(null);
 
   useEffect(() => {
     if (!Updates.isEnabled) return;
@@ -61,6 +63,12 @@ export function useOtaUpdate() {
           setPhase('unavailable');
           return;
         }
+
+        // As notas viajam no manifest do update DISPONÍVEL, então quem exibe é
+        // o bundle atual. Consequência: o primeiro update que trouxer esta
+        // feature ainda é anunciado pelo modal genérico — a partir do seguinte
+        // as notas aparecem.
+        setReleaseNotes(parseReleaseNotes(check.manifest));
 
         setPhase('downloading');
         await Updates.fetchUpdateAsync();
@@ -106,6 +114,7 @@ export function useOtaUpdate() {
     isReady: phase === 'ready',
     isApplying: phase === 'applying',
     error,
+    releaseNotes,
     apply,
     dismiss,
   };

@@ -84,6 +84,14 @@ const config: ExpoConfig = {
     // URL pública da Política de Privacidade (exigida pela Google Play / App Store).
     // Deve casar com legal_documents.privacidade (seed em 20260622020000_legal_docs.sql).
     privacyPolicyUrl: 'https://apppersonafit.vercel.app/legal/privacidade',
+    // "O que há de novo" exibido no modal de OTA. ATUALIZAR ANTES DE CADA
+    // `eas update` — o texto viaja no manifest daquela publicação. Se ficar
+    // desatualizado ou vazio, o modal cai no aviso genérico (sem erro).
+    releaseNotes: {
+      novidades: [],
+      melhorias: [],
+      ajustes: [],
+    },
   },
 };
 
