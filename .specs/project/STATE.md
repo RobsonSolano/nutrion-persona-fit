@@ -38,14 +38,18 @@ guarda automático (a ideia de um script no `update:*` continua não aplicada).
    onboarding.
 2. `eas build --platform android --profile production` → sai `versionCode 5`
    sozinho (`appVersionSource: remote` + `autoIncrement`).
-3. **Service account do Google Play** — não existe ainda. `google-services.json`
-   no repo é config do Firebase (login + push), coisa diferente. Exige criar a
-   service account no Google Cloud, habilitar a Play Android Developer API,
-   baixar o JSON e convidar o e-mail no Play Console com permissão de release.
-   **Nada disso é alcançável daqui** — são duas interfaces web. Alternativa:
-   rodar `eas submit` interativo uma vez, que o EAS guarda a chave.
-4. `eas submit --platform android --profile production`. Com managed publishing
-   ligado, a release fica em "pronta para publicar" esperando o clique.
+3. **Submit: MANUAL, por decisão do dev (2026-08-26).** `npx eas-cli credentials`
+   confirmou `Submissions: Google Service Account Key for Play Store Submissions
+   — None assigned yet`. Configurar exigiria habilitar a Play Android Developer
+   API no projeto `nutrion-d9acc`, criar service account, baixar JSON e convidar
+   o e-mail no Play Console — duas UIs web, fora do meu alcance. O dev avaliou
+   como trabalho demais para o retorno agora: **sobe o `.aab` à mão** no Play
+   Console → Closed testing → nova versão.
+
+   O `submit.production.android.track = "alpha"` fica no `eas.json` **dormente**,
+   pronto se um dia a service account existir. Não atrapalha nada.
+
+   Vale reabrir quando o submit virar rotina (várias releases por mês).
 
 ### Play Console — resizability feita, edge-to-edge não é acionável (2026-08-26)
 
