@@ -14,6 +14,8 @@ export type Profile = {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  /** Espelho de auth.users.email (trigger). Somente leitura. */
+  email: string | null;
   weight_kg: number | null;
   height_cm: number | null;
   goal_weight_kg: number | null;
