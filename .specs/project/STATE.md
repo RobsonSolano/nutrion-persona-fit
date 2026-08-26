@@ -2,6 +2,50 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Play Console — resizability feita, edge-to-edge não é acionável (2026-08-26)
+
+Item #7 do backlog, escopo escolhido pelo dev: **edge-to-edge + resizability,
+sem R8**.
+
+**Resizability — feita.** `orientation: 'portrait'` → `'default'`. Confirmei que
+nada no projeto declarava `resizeableActivity=false`: a trava de orientação era
+a única restrição, então essa linha resolve a recomendação.
+
+Junto veio um bug que a rotação exporia: `ExerciseImagesModal` usava
+`Dimensions.get('window').width`, que captura o valor **uma vez**. Cada slide do
+carrossel tem largura fixa em px, então rotacionar desalinharia tudo. Trocado
+por `useWindowDimensions`.
+
+**Edge-to-edge — NÃO é acionável do nosso lado.** Investigado antes de mexer:
+
+- `grep` em `app/`, `src/` e `app.config.ts` por `setStatusBarColor`,
+  `setNavigationBarColor`, `androidStatusBar`, `androidNavigationBar`,
+  `NavigationBar` e `windowOptOutEdgeToEdge`: **zero ocorrências**.
+- `edgeToEdgeEnabled: true` já estava setado.
+- `<StatusBar style="light" />` sem `backgroundColor`.
+- `expo-status-bar@3.0.9` e `react-native-screens@4.16.0` estão nas versões que
+  o SDK 54 espera (`npx expo install --check` não os aponta).
+
+O aviso vem de dentro da camada Expo/RN. Só sai com upgrade de SDK ou
+biblioteca — reavaliar no próximo bump. **Não fiz mudança cosmética pra alegar
+que resolveu.**
+
+**R8 fora por decisão do dev.** Primeira ativação em RN/Expo quebra release por
+proguard rules, e o bug só aparece no build de release. Merece um build só dele,
+onde dá pra atribuir a quebra.
+
+**Risco a checar ANTES do AAB:** o app foi desenhado em portrait. Destravar a
+orientação deixa telefone rodar em landscape, e nenhuma tela foi vista assim.
+Rotacionar no emulador com o dev build **antes** de gerar o binário — OTA não
+conserta config nativa.
+
+**Observação separada, não aplicada:** `npx expo install --check` aponta 5
+pacotes atrás do patch esperado pelo SDK 54 — `expo@54.0.34→54.0.37`,
+`expo-constants`, `expo-file-system`, `expo-router`, `expo-updates@29.0.17→29.0.20`.
+Não bumpei de propósito: não faz parte do item #7, e subir versão de módulo
+nativo cria janela de risco entre o bump e o binário novo chegar (OTA publicado
+nesse meio carrega JS que espera nativo mais novo). Decisão do dev.
+
 ### Sanity check — instrumentação e guard-rails (item #1) — 2026-08-26
 
 O item #1 do backlog eram as ondas **1 e 2**; o que foi entregue mais cedo hoje
