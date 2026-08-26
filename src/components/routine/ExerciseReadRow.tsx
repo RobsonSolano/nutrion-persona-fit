@@ -7,7 +7,7 @@ import {
 import type { MetricType } from '@/types/database';
 import PreviewEyeButton from './PreviewEyeButton';
 import { colors } from '@/lib/theme';
-import { openYouTubeSearchForExercise } from '@/lib/youtube';
+import { openExerciseVideo } from '@/lib/youtube';
 
 // Mapa em vez de ternário aninhado dentro do map — mesmo padrão de
 // MODALITY_LABELS em types/database.ts.
@@ -41,6 +41,8 @@ type Props = {
   exercise: ReadableExercise;
   index: number;
   imageUrls: string[] | null;
+  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
+  videoUrl?: string | null;
   onPreview?: () => void;
 };
 
@@ -48,6 +50,7 @@ export default function ExerciseReadRow({
   exercise,
   index,
   imageUrls,
+  videoUrl,
   onPreview,
 }: Props) {
   const repRange = formatRange(exercise.reps_min, exercise.reps_max);
@@ -74,7 +77,12 @@ export default function ExerciseReadRow({
         <View className="flex-row items-center gap-2">
           {hasImages && onPreview && <PreviewEyeButton onPress={onPreview} />}
           <Pressable
-            onPress={() => openYouTubeSearchForExercise(exercise.exercise_name)}
+            onPress={() =>
+              openExerciseVideo({
+                videoUrl,
+                exerciseName: exercise.exercise_name,
+              })
+            }
             hitSlop={8}
             className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
           >

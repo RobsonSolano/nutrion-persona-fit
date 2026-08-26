@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeYouTubeUrl } from './youtubeUrl';
+import { normalizeYouTubeUrl, resolveExerciseVideoUrl } from './youtubeUrl';
 
 describe('normalizeYouTubeUrl', () => {
   it('normaliza watch?v=', () => {
@@ -77,5 +77,51 @@ describe('normalizeYouTubeUrl', () => {
 
   it('devolve null para javascript: (não é URL http)', () => {
     expect(normalizeYouTubeUrl('javascript:alert(1)')).toBeNull();
+  });
+});
+
+describe('resolveExerciseVideoUrl', () => {
+  it('abre o vídeo salvo quando existe', () => {
+    expect(
+      resolveExerciseVideoUrl({
+        videoUrl: 'https://www.youtube.com/shorts/JByJ3hwyRVE',
+        exerciseName: 'Supino Ravi',
+      }),
+    ).toBe('https://www.youtube.com/watch?v=JByJ3hwyRVE');
+  });
+
+  it('cai na busca quando não há vídeo salvo', () => {
+    expect(
+      resolveExerciseVideoUrl({ videoUrl: null, exerciseName: 'Supino Ravi' }),
+    ).toBe(
+      'https://www.youtube.com/results?search_query=Supino%20Ravi%20como%20fazer',
+    );
+  });
+
+  it('cai na busca quando o link salvo é inválido', () => {
+    // Link antigo/quebrado no banco não deve abrir a home do YouTube.
+    expect(
+      resolveExerciseVideoUrl({
+        videoUrl: 'https://vimeo.com/12345',
+        exerciseName: 'Supino Ravi',
+      }),
+    ).toContain('results?search_query=');
+  });
+
+  it('cai na busca quando o vídeo salvo é string vazia', () => {
+    expect(
+      resolveExerciseVideoUrl({ videoUrl: '   ', exerciseName: 'Agachamento' }),
+    ).toContain('results?search_query=');
+  });
+
+  it('escapa caracteres do nome na busca', () => {
+    expect(
+      resolveExerciseVideoUrl({
+        videoUrl: null,
+        exerciseName: 'Supino reto (barra)',
+      }),
+    ).toBe(
+      'https://www.youtube.com/results?search_query=Supino%20reto%20(barra)%20como%20fazer',
+    );
   });
 });

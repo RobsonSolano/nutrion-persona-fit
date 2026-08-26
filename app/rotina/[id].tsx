@@ -28,7 +28,10 @@ import {
   useUpdateRoutine,
 } from '@/hooks/useRoutines';
 import { useCreateTemplate } from '@/hooks/useTemplates';
-import { useExerciseImagesMap } from '@/hooks/useExercises';
+import {
+  useExerciseImagesMap,
+  useExerciseVideoMap,
+} from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
 import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useAlert } from '@/components/GlobalAlertProvider';
@@ -46,6 +49,7 @@ export default function RotinaDetalheScreen() {
   const update = useUpdateRoutine();
   const remove = useDeleteRoutine();
   const imagesMap = useExerciseImagesMap();
+  const videoMap = useExerciseVideoMap();
 
   const isStudent = profileQ.data?.role === 'aluno';
   const isCoach = profileQ.data?.role === 'professor';
@@ -66,6 +70,7 @@ export default function RotinaDetalheScreen() {
     name: string;
     equipment: string | null;
     images: string[];
+    video: string | null;
   } | null>(null);
 
   if (!id) return null;
@@ -249,12 +254,16 @@ export default function RotinaDetalheScreen() {
                       const imgs = e.exercise_id
                         ? imagesMap.get(e.exercise_id) ?? null
                         : null;
+                      const vid = e.exercise_id
+                        ? videoMap.get(e.exercise_id) ?? null
+                        : null;
                       return (
                         <ExerciseReadRow
                           key={e.id}
                           exercise={e}
                           index={i}
                           imageUrls={imgs}
+                          videoUrl={vid}
                           onPreview={
                             imgs
                               ? () =>
@@ -262,6 +271,7 @@ export default function RotinaDetalheScreen() {
                                     name: e.exercise_name,
                                     equipment: e.equipment,
                                     images: imgs,
+                                    video: vid,
                                   })
                               : undefined
                           }
@@ -325,6 +335,7 @@ export default function RotinaDetalheScreen() {
         exerciseName={preview?.name ?? ''}
         equipment={preview?.equipment}
         imageUrls={preview?.images ?? []}
+        videoUrl={preview?.video ?? null}
       />
     </>
   );

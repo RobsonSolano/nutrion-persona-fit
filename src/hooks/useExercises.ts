@@ -59,6 +59,29 @@ export function useExerciseImagesMap() {
 }
 
 /**
+ * Map<exerciseId, video_url> dos exercícios que têm vídeo.
+ *
+ * Mesma query cacheada do `useExerciseImagesMap` (`allExercises()`), então
+ * não custa requisição nova. Existe porque as rotinas guardam só
+ * `exercise_id` — o `video_url` mora no catálogo.
+ */
+export function useExerciseVideoMap() {
+  const q = useQuery({
+    queryKey: queryKeys.allExercises(),
+    queryFn: listAllExercises,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  return useMemo(() => {
+    const out = new Map<string, string>();
+    for (const e of q.data ?? []) {
+      if (e.video_url) out.set(e.id, e.video_url);
+    }
+    return out;
+  }, [q.data]);
+}
+
+/**
  * Invalida as DUAS keys de catálogo.
  *
  * A `allExercises()` é fácil de esquecer e tem `staleTime` de 60 min

@@ -57,3 +57,26 @@ export function normalizeYouTubeUrl(raw: string): string | null {
 
   return `https://www.youtube.com/watch?v=${id}`;
 }
+
+/** Busca no YouTube pelo nome do exercício. "como fazer" tende a priorizar
+ *  tutorial técnico em PT-BR em vez de vídeo motivacional. */
+export function youtubeSearchUrl(exerciseName: string): string {
+  const query = encodeURIComponent(`${exerciseName} como fazer`);
+  return `https://www.youtube.com/results?search_query=${query}`;
+}
+
+/**
+ * URL que o botão de play deve abrir: o vídeo que o professor salvou no
+ * exercício e, na falta dele, a busca pelo nome.
+ *
+ * Existe porque o `video_url` era campo morto — o formulário coletava o link
+ * e os três botões de play do app chamavam sempre a busca, ignorando o que
+ * o professor tinha colado.
+ */
+export function resolveExerciseVideoUrl(params: {
+  videoUrl?: string | null;
+  exerciseName: string;
+}): string {
+  const salvo = params.videoUrl ? normalizeYouTubeUrl(params.videoUrl) : null;
+  return salvo ?? youtubeSearchUrl(params.exerciseName);
+}

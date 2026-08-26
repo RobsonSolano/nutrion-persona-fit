@@ -1,33 +1,31 @@
 import { Alert, Linking } from 'react-native';
+import { resolveExerciseVideoUrl } from './youtubeUrl';
 
 /**
- * Abre uma busca no YouTube com o nome do exercício pré-preenchido.
- * Tenta o app nativo do YouTube primeiro; se não instalado, cai pro web.
+ * Abre a demonstração do exercício: o vídeo que o professor salvou e, na
+ * falta dele, uma busca no YouTube pelo nome.
  *
- * Padrão da query: "<exercise_name> como fazer" — termo que tende a
- * priorizar tutoriais técnicos em PT-BR (Cariani, Bottura, etc).
+ * Só https. A versão anterior tentava `vnd.youtube://results?search_query=`
+ * antes do web: o `canOpenURL` devolve true porque o app do YouTube registra
+ * o esquema `vnd.youtube`, mas ele não sabe interpretar esse caminho — e o
+ * resultado era cair na HOME do YouTube. Em Android o app link de
+ * `youtube.com` já roteia pro app quando ele está instalado, e em iOS o
+ * universal link sempre fez isso. Não há ganho em adivinhar esquema.
  */
-export async function openYouTubeSearchForExercise(
-  exerciseName: string,
-): Promise<void> {
-  const query = encodeURIComponent(`${exerciseName} como fazer`);
-  const webUrl = `https://www.youtube.com/results?search_query=${query}`;
-
+export async function openExerciseVideo(params: {
+  videoUrl?: string | null;
+  exerciseName: string;
+}): Promise<void> {
+  const url = resolveExerciseVideoUrl(params);
   try {
-    // Tenta deeplink do app YouTube (vnd.youtube://results funciona em
-    // Android com app instalado; iOS já trata https://www.youtube.com/*
-    // como universal link).
-    const appUrl = `vnd.youtube://results?search_query=${query}`;
-    const canOpenApp = await Linking.canOpenURL(appUrl);
-    await Linking.openURL(canOpenApp ? appUrl : webUrl);
-  } catch {
-    try {
-      await Linking.openURL(webUrl);
-    } catch (err) {
-      Alert.alert(
-        'Não consegui abrir',
-        err instanceof Error ? err.message : 'Tente novamente.',
-      );
-    }
+    await Linking.openURL(url);
+  } catch (err) {
+    // Caminho quase inalcançável: falha de openURL com https significa
+    // aparelho sem navegador. Alert nativo aqui porque este módulo não é
+    // componente e não alcança o GlobalAlertProvider.
+    Alert.alert(
+      'Não consegui abrir',
+      err instanceof Error ? err.message : 'Tente novamente.',
+    );
   }
 }
