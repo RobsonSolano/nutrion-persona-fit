@@ -73,6 +73,19 @@ function parseError(err: unknown): { title: string; message: string } {
       message: 'A senha precisa ter pelo menos 6 caracteres.',
     };
   }
+  if (lower.includes('invalid_body')) {
+    return {
+      title: 'Campos obrigatórios',
+      message: 'Preencha e-mail, senha e nome do aluno antes de cadastrar.',
+    };
+  }
+  if (lower.includes('create_user_failed')) {
+    return {
+      title: 'Não consegui criar o acesso do aluno',
+      message:
+        'Verifique se o e-mail é válido (ex: nome@dominio.com) e se a senha tem pelo menos 6 caracteres, e tente de novo.',
+    };
+  }
   if (lower.includes('student_limit_reached')) {
     return {
       title: 'Limite atingido',

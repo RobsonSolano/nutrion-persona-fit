@@ -129,14 +129,20 @@ async function callFn<T>(name: string, body: unknown): Promise<T> {
     // Gating do billing-core: 402 needs_upgrade → erro tipado pro paywall.
     const nu = parseNeedsUpgrade(res.status, text);
     if (nu) throw nu;
+    let code = '';
     let detail = text;
     try {
       const parsed = JSON.parse(text);
+      code = typeof parsed?.error === 'string' ? parsed.error : '';
       detail = parsed?.detail ?? parsed?.error ?? text;
     } catch {
       // raw
     }
-    throw new Error(`${res.status} · ${detail}`);
+    // Preserva o CÓDIGO do erro (ex: email_already_registered) na mensagem pra o
+    // parseError (GlobalAlertProvider) mapear pra texto claro de forma confiável,
+    // sem depender do texto cru do servidor (que varia).
+    const label = code && code !== detail ? `${code} · ${detail}` : detail;
+    throw new Error(`${res.status} · ${label}`);
   }
 
   return (await res.json()) as T;
