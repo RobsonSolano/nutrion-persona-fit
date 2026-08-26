@@ -191,6 +191,13 @@ serve(async (req: Request) => {
             weight_min_kg: ex.weight_min_kg,
             weight_max_kg: ex.weight_max_kg,
             duration_min: ex.duration_min,
+            // Métricas de cárdio (CAR-08): sem estes campos, um template com
+            // esteira era aplicado no aluno como exercício de FORÇA — a
+            // distância e a cadência ficavam null e só o tempo sobrevivia.
+            metric_type: ex.metric_type ?? 'strength',
+            distance_min_m: ex.distance_min_m ?? null,
+            distance_max_m: ex.distance_max_m ?? null,
+            cadence_rpm: ex.cadence_rpm ?? null,
             notes: ex.notes,
           }));
           const { error: exInsErr } = await supabaseService
