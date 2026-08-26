@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatCardioMetrics,
+  formatDuracao,
+  horaMinParaMinutos,
+  minutosParaHoraMin,
   metricTypeFromGroup,
   validateCardioMetrics,
 } from './cardioMetrics';
@@ -139,5 +142,42 @@ describe('validateCardioMetrics', () => {
 
   it('CAR-03: só o máximo preenchido passa (não exige o par)', () => {
     expect(validateCardioMetrics({ distance_max_m: 5000 })).toBeNull();
+  });
+});
+
+describe('duração em horas e minutos', () => {
+  // O schema guarda `duration_min` em MINUTOS (unidade canônica, sem migration).
+  // A UI é que passa a compor e exibir em h/min — digitar "150" pra 2h30 obriga
+  // o professor a fazer conta de cabeça.
+  it('CAR-09: formatDuracao mostra h e min, não minutos crus', () => {
+    expect(formatDuracao(45)).toBe('45 min');
+    expect(formatDuracao(60)).toBe('1h');
+    expect(formatDuracao(90)).toBe('1h30');
+    expect(formatDuracao(150)).toBe('2h30');
+    expect(formatDuracao(120)).toBe('2h');
+    expect(formatDuracao(5)).toBe('5 min');
+    expect(formatDuracao(125)).toBe('2h05');
+  });
+
+  it('CAR-09: minutosParaHoraMin separa pro form preencher os dois campos', () => {
+    expect(minutosParaHoraMin(150)).toEqual({ horas: 2, minutos: 30 });
+    expect(minutosParaHoraMin(45)).toEqual({ horas: 0, minutos: 45 });
+    expect(minutosParaHoraMin(60)).toEqual({ horas: 1, minutos: 0 });
+    expect(minutosParaHoraMin(null)).toEqual({ horas: null, minutos: null });
+  });
+
+  it('CAR-09: horaMinParaMinutos compõe o valor que vai pro banco', () => {
+    expect(horaMinParaMinutos(2, 30)).toBe(150);
+    expect(horaMinParaMinutos(0, 45)).toBe(45);
+    expect(horaMinParaMinutos(2, null)).toBe(120);
+    expect(horaMinParaMinutos(null, 30)).toBe(30);
+    expect(horaMinParaMinutos(null, null)).toBeNull();
+    expect(horaMinParaMinutos(0, 0)).toBeNull();
+  });
+
+  it('CAR-09: chip de cárdio usa o formato h/min', () => {
+    expect(formatCardioMetrics({ duration_min: 150 })).toEqual([
+      { kind: 'duration', label: '2h30' },
+    ]);
   });
 });

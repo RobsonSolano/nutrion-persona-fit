@@ -31,7 +31,9 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
+  horaMinParaMinutos,
   metricTypeFromGroup,
+  minutosParaHoraMin,
   validateCardioMetrics,
 } from '@/lib/cardioMetrics';
 import {
@@ -548,6 +550,11 @@ type FieldsProps = {
  * o schema — sem conversão, sem arredondamento no meio do caminho.
  */
 function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
+  // Horas e minutos separados: o banco guarda minutos, mas obrigar a digitar
+  // "150" pra 2h30 é fazer o professor calcular de cabeça. Digitar mais de 59
+  // minutos normaliza sozinho (90 → 1h30).
+  const { horas, minutos } = minutosParaHoraMin(draft.duration_min);
+
   return (
     <>
       <View className="flex-row gap-2">
@@ -572,9 +579,21 @@ function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
       <View className="flex-row gap-2">
         <View style={{ flex: 1 }}>
           <SmallInput
+            label="Horas"
+            value={horas?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(toInt(v), minutos) })
+            }
+            placeholder="0"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
             label="Minutos"
-            value={draft.duration_min?.toString() ?? ''}
-            onChangeText={(v) => onChange({ duration_min: toInt(v) })}
+            value={minutos?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(horas, toInt(v)) })
+            }
             placeholder="30"
           />
         </View>

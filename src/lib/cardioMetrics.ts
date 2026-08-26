@@ -37,6 +37,35 @@ function numeroPtBr(v: number): string {
   return v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 }
 
+/**
+ * Minutos → "45 min", "1h", "2h30". O schema guarda minutos (unidade canônica),
+ * mas ninguém pensa "150 minutos" — pensa "duas e meia".
+ */
+export function formatDuracao(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`;
+}
+
+/** Separa o total pro form preencher os campos de hora e minuto. */
+export function minutosParaHoraMin(total: number | null | undefined): {
+  horas: number | null;
+  minutos: number | null;
+} {
+  if (!preenchido(total)) return { horas: null, minutos: null };
+  return { horas: Math.floor(total / 60), minutos: total % 60 };
+}
+
+/** Compõe o valor que vai pro banco. Zero em ambos = não informado. */
+export function horaMinParaMinutos(
+  horas: number | null | undefined,
+  minutos: number | null | undefined,
+): number | null {
+  const total = (horas ?? 0) * 60 + (minutos ?? 0);
+  return total > 0 ? total : null;
+}
+
 /** Metros → "800 m", "3 km", "2,5 km". */
 function formatarDistancia(metros: number): string {
   return metros < 1000 ? `${metros} m` : `${numeroPtBr(metros / 1000)} km`;
@@ -80,7 +109,7 @@ export function formatCardioMetrics(m: CardioMetrics): ChipMetrica[] {
   }
 
   if (preenchido(m.duration_min)) {
-    chips.push({ kind: 'duration', label: `${m.duration_min} min` });
+    chips.push({ kind: 'duration', label: formatDuracao(m.duration_min) });
   }
   if (preenchido(m.cadence_rpm)) {
     chips.push({ kind: 'cadence', label: `${m.cadence_rpm} RPM` });
