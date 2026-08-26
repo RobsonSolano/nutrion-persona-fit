@@ -55,9 +55,42 @@ aplicar template é ação deliberada do professor.
 **Buraco conhecido que ficou:** o `chat-ai` não conhece a condição. Se o aluno pedir treino
 de perna no chat, nada bloqueia. É função separada, com persona própria — não entrou nesta leva.
 
-**Ainda sem verificação:** nada rodou contra o banco real. A migration e as functions precisam
-de `db:push` + `fn:deploy`, e o efeito no plano precisa de UAT gerando plano com paraplegia
-declarada.
+**Verificado contra o banco e a IA reais (2026-08-26, após `db:push` + `fn:deploy`):**
+
+| O que | Resultado |
+|---|---|
+| `onboarding-plan` — controle sem restrição | IA prescreveu perna (agachamento, leg press, terra, stiff) — o detector funciona |
+| `onboarding-plan` — **paraplegia só no `bio`** (o caso relatado) | Peito/Tríceps + Ombro/Core + Costas/Bíceps. **Zero perna.** O modelo escreveu "foco em grupos superiores devido à paraplegia" |
+| `onboarding-plan` — mesmo caso, **caminho do fallback** | `Superior A/B/C`, zero perna, aviso de texto livre presente |
+| `onboarding-plan` — campo estruturado | `Superior A/B/C`, zero perna, **sem** aviso (correto) |
+| `onboarding-plan` — respondeu "Não", `bio` cita cadeirante | `Full Body` **com** agachamento/terra — escape hatch confirmado |
+| `coach-create-student` com os 3 campos | 200, persistiu `wheelchair_paraplegia` + nota; e o **espelho de e-mail funcionou num signup novo** |
+| `coach-generate-plan` pro aluno paraplégico | Peito/Tríceps + Costas/Bíceps + Ombros/Core. **Zero perna** |
+| `coach-update-student` | Patch dos 3 campos atravessou a allowlist |
+| Gravação pelo client (shape do `saveOnboardingResult`), RLS ligada | 4 formas válidas gravaram: sim+tipo+nota, múltiplos tipos com "other", "não" limpando, e null |
+| Check constraints | Slug inválido (`paraplegico`) rejeitado; nota de 501 chars rejeitada; 500 passou |
+| Classificação no catálogo real | 270 exercícios, 148 bloqueados, 122 livres. Os 13 movimentos críticos todos bloqueados |
+
+O caminho do fallback foi testado **por acidente**: o teste de controle estourou o rate limit da
+Groq, o circuit breaker abriu, e as três chamadas seguintes caíram no fallback. Foi sorte — é
+exatamente o buraco #3, o que ignorava qualquer prompt por construção.
+
+**Ainda sem verificação: nenhuma tela foi renderizada.** A pergunta "Você é PCD?", os chips, a
+dica de formulário incompleto, o `continueDisabled`, a linha de e-mail no perfil do aluno e o
+`formatDisability` só passaram por typecheck. E o funil real (store → `bio.tsx` → `loading.tsx`)
+não foi exercitado: os payloads dos testes foram montados à mão, contornando o app.
+
+### D3 do billing bloqueia teste de IA de professor (descoberto em 2026-08-26)
+
+`_resolve_entitlement` (20260722000000) só concede `ai_coach` e limite elevado de alunos quando
+`source in ('store_play','store_apple','stripe')`. A linha 79 diz explicitamente
+`-- D3: grandfather/early NÃO concede coach`. Consequência prática: **promover `coach@nutrion.test`
+a `premium/grandfather` NÃO libera `coach-generate-plan` nem passa do limite de 2 alunos** — a RPC
+devolve `tier: free, ai_coach: false, student_limit: 2`.
+
+Pra testar o lado professor é preciso `source = 'store_play'`. Foi o que fiz nesta verificação,
+restaurando `premium/grandfather` no fim. Não é bug — é a decisão documentada. Mas custa tempo
+sempre que alguém tenta testar IA de professor e leva um 402.
 
 ### E-mail do aluno visível pro professor (2026-08-26)
 
