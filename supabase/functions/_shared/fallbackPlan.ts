@@ -159,9 +159,13 @@ async function buildFallbackRoutines(
     ? 'Rotina de membro superior gerada em modo de segurança.'
     : 'Rotina full body gerada em modo de segurança.';
 
+  // `.is('owner_id', null)`: a lista é de nomes canônicos do SEED. Sem isso,
+  // um professor que cadastrasse "Supino reto (halteres)" poderia ser casado
+  // no lugar do exercício original.
   const { data } = await supabase
     .from('exercises')
     .select('id, name, equipment')
+    .is('owner_id', null)
     .in(
       'name',
       sessoes.flat().map((w) => w.name),

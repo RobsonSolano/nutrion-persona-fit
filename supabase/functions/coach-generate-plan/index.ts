@@ -156,6 +156,8 @@ serve(async (req: Request) => {
       has_disability: student.has_disability,
       disability_types: student.disability_types,
       disability_notes: student.disability_notes,
+      // O caller é o professor do aluno — os exclusivos dele entram.
+      visible_owner_id: caller.id,
       anamnese_summary: anamneseSummary,
     };
 

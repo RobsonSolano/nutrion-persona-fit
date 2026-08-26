@@ -91,7 +91,7 @@ serve(async (req: Request) => {
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .select(
-        'onboarding_completed_at, has_disability, disability_types, disability_notes',
+        'onboarding_completed_at, coach_id, has_disability, disability_types, disability_notes',
       )
       .eq('id', user.id)
       .single();
@@ -147,6 +147,9 @@ serve(async (req: Request) => {
         body.disability_types ?? profile?.disability_types ?? null,
       disability_notes:
         body.disability_notes ?? profile?.disability_notes ?? null,
+      // Exercício exclusivo que este plano pode usar: o do professor do
+      // aluno. Aluno sem professor (autônomo) fica só com o público.
+      visible_owner_id: profile?.coach_id ?? null,
       anamnese_summary: formatAnamneseForPrompt(anamnese),
     };
 

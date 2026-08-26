@@ -63,6 +63,16 @@ export type PlanInput = {
   has_disability?: boolean | null;
   disability_types?: string[] | null;
   disability_notes?: string | null;
+  /**
+   * Professor cujos exercícios exclusivos este plano pode usar (o coach do
+   * aluno). Null = só catálogo público.
+   *
+   * Existe porque `generatePlan` não recebe id de usuário e não tem como
+   * descobrir isso sozinho — quem sabe são os callers. Service role ignora
+   * RLS, então sem este filtro a IA de um professor recomendaria o
+   * exercício exclusivo de outro.
+   */
+  visible_owner_id?: string | null;
 };
 
 export type CatalogExercise = {
@@ -300,6 +310,7 @@ export async function fetchCatalog(
   supabase: SupabaseClient<any, 'public', any>,
   modalities: Modality[],
   restrictions?: BodyRestrictions,
+  visibleOwnerId?: string | null,
 ): Promise<CatalogExercise[]> {
   if (modalities.length === 0) return [];
 
@@ -323,6 +334,14 @@ export async function fetchCatalog(
   if (restrictions?.blockLowerLimbs) {
     query = query.eq('requires_lower_limbs', false);
   }
+
+  // Visibilidade: service role IGNORA RLS, então a policy do banco não
+  // protege aqui. Sem este filtro explícito, o exercício exclusivo de um
+  // professor entraria no plano do aluno de outro. Compõe com o filtro
+  // acima — PostgREST faz AND entre os operadores.
+  query = visibleOwnerId
+    ? query.or(`visibility.eq.publico,owner_id.eq.${visibleOwnerId}`)
+    : query.eq('visibility', 'publico');
 
   const { data: exercises, error: exErr } = await query;
   if (exErr) throw exErr;
@@ -627,7 +646,12 @@ export async function generatePlan(
   const [catalog, references] = await Promise.all([
     onlyFood
       ? Promise.resolve([])
-      : fetchCatalog(supabase, modalities, restrictions),
+      : fetchCatalog(
+          supabase,
+          modalities,
+          restrictions,
+          input.visible_owner_id ?? null,
+        ),
     fetchReferences(supabase, ['nutricao', 'treino', 'geral']),
   ]);
 

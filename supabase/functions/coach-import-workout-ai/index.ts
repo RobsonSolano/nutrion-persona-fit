@@ -214,9 +214,13 @@ serve(async (req: Request) => {
     }
 
     // Carrega exercícios pra matching (id, name, group_id, modality).
+    // Filtro explícito de visibilidade: service role IGNORA RLS, então a
+    // policy do banco não vale aqui. Sem isso, o exercício exclusivo de um
+    // professor entraria no prompt de outro.
     const { data: catalog } = await supabaseService
       .from('exercises')
-      .select('id, name, group_id, modality, equipment');
+      .select('id, name, group_id, modality, equipment')
+      .or(`visibility.eq.publico,owner_id.eq.${caller.id}`);
     const exercisesCatalog = (catalog ?? []) as Array<{
       id: string;
       name: string;
