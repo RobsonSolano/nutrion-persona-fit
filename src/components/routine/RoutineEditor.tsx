@@ -1,31 +1,19 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
   View,
-  ActivityIndicator,
   type TextInput,
 } from 'react-native';
-import {
-  Plus,
-  Trash2,
-  Search,
-  X,
-  Save,
-  CheckCircle2,
-  PlusCircle,
-  CirclePlay,
-} from 'lucide-react-native';
+import { Plus, Trash2, Save, CirclePlay } from 'lucide-react-native';
 import { openYouTubeSearchForExercise } from '@/lib/youtube';
 import * as Haptics from 'expo-haptics';
 import {
   useExerciseGroups,
   useExerciseImagesMap,
-  useExercisesByGroup,
 } from '@/hooks/useExercises';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
@@ -44,6 +32,7 @@ import {
   type Modality,
   type RoutineExerciseInsert,
 } from '@/types/database';
+import ExercisePickerModal from './ExercisePickerModal';
 import ExerciseImagesModal from './ExerciseImagesModal';
 import PreviewEyeButton from './PreviewEyeButton';
 
@@ -704,174 +693,3 @@ const SmallInput = forwardRef<TextInput, SmallInputProps>(function SmallInput(
     </View>
   );
 });
-
-function ExercisePickerModal({
-  visible,
-  onClose,
-  modality,
-  preferredGroupId,
-  addedExerciseIds,
-  onSelect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  modality: Modality;
-  preferredGroupId: string | null;
-  addedExerciseIds: Set<string>;
-  onSelect: (ex: Exercise) => void;
-}) {
-  const [groupId, setGroupId] = useState<string | null>(preferredGroupId);
-  const [search, setSearch] = useState('');
-  const groupsQ = useExerciseGroups();
-  const exercisesQ = useExercisesByGroup(groupId, modality);
-
-  // Sempre que o modal abre, sincroniza o grupo com o preferido do form
-  // e limpa a busca anterior — evita confusão de estado antigo.
-  useEffect(() => {
-    if (visible) {
-      setGroupId(preferredGroupId);
-      setSearch('');
-    }
-  }, [visible, preferredGroupId]);
-
-  const filtered = useMemo(() => {
-    const list = exercisesQ.data ?? [];
-    const term = search.trim().toLowerCase();
-    if (!term) return list;
-    return list.filter((e) => e.name.toLowerCase().includes(term));
-  }, [exercisesQ.data, search]);
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent={false}
-    >
-      <View className="flex-1 bg-bg-deep">
-        <View
-          className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle"
-          style={{ paddingTop: Platform.OS === 'ios' ? 50 : 16 }}
-        >
-          <Pressable
-            onPress={onClose}
-            hitSlop={12}
-            className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
-          >
-            <X size={18} color={colors.textDim} />
-          </Pressable>
-          <View className="items-center">
-            <Text className="text-text font-semibold">Escolher exercício</Text>
-            <Text className="text-text-muted text-[10px] mt-0.5">
-              {MODALITY_LABELS[modality]}
-            </Text>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 60 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Card padding="md">
-            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
-              Grupo muscular
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {(groupsQ.data ?? []).map((g) => (
-                <Pressable
-                  key={g.id}
-                  onPress={() => setGroupId(g.id)}
-                  className={`rounded-full border px-3 py-1.5 ${
-                    groupId === g.id
-                      ? 'bg-accent/10 border-accent/40'
-                      : 'bg-surface-muted border-border'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs ${
-                      groupId === g.id ? 'text-accent' : 'text-text-dim'
-                    }`}
-                  >
-                    {g.icon} {g.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Card>
-
-          {groupId && (
-            <Card padding="md">
-              <Input
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Buscar exercício..."
-                leftIcon={<Search size={16} color={colors.textMuted} />}
-                autoCapitalize="none"
-              />
-            </Card>
-          )}
-
-          {!groupId && (
-            <Text className="text-text-muted text-sm text-center py-4">
-              Selecione um grupo pra ver os exercícios.
-            </Text>
-          )}
-
-          {groupId && exercisesQ.isLoading && (
-            <View className="py-8 items-center">
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          )}
-
-          {groupId && !exercisesQ.isLoading && filtered.length === 0 && (
-            <Text className="text-text-muted text-sm text-center py-4">
-              Nenhum exercício de {MODALITY_LABELS[modality]} nesse grupo.
-              {'\n'}Tenta outro grupo ou outra modalidade.
-            </Text>
-          )}
-
-          {filtered.map((ex) => {
-            const added = addedExerciseIds.has(ex.id);
-            return (
-              <Pressable
-                key={ex.id}
-                onPress={() => {
-                  if (!added) onSelect(ex);
-                }}
-                className={added ? 'opacity-60' : 'active:opacity-70'}
-              >
-                <Card padding="md">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1">
-                      <Text
-                        className={`text-sm font-semibold ${
-                          added ? 'text-text-dim' : 'text-text'
-                        }`}
-                      >
-                        {ex.name}
-                      </Text>
-                      {ex.equipment && (
-                        <Text className="text-text-muted text-[11px] mt-0.5">
-                          {ex.equipment}
-                          {ex.is_compound ? ' · composto' : ''}
-                          {added ? ' · já adicionado' : ''}
-                        </Text>
-                      )}
-                    </View>
-                    {added ? (
-                      <CheckCircle2 size={18} color={colors.accent} />
-                    ) : (
-                      <PlusCircle size={18} color={colors.textMuted} />
-                    )}
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
