@@ -264,7 +264,6 @@ export default function ExercisePickerModal({
         exercise={editing}
         initialGroupId={groupId}
         initialModality={modality}
-        catalog={exercisesQ.data ?? []}
         onSaved={(ex) => {
           setFormOpen(false);
           // Só auto-seleciona no cadastro: em edição o exercício já está

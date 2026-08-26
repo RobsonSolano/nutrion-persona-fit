@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/services/supabase';
 import {
@@ -11,6 +11,7 @@ import {
   type DeleteMyAccountError,
 } from '@/services/auth';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { queryClient } from '@/lib/queryClient';
 import { initBilling, logoutBilling } from '@/services/billing';
 
 // Sincroniza o billing (RevenueCat) com a sessão: identifica o SDK com profiles.id (= user.id,
@@ -23,20 +24,45 @@ function syncBilling(userId: string | undefined) {
 export function useAuthBootstrap() {
   const setSession = useSessionStore((s) => s.setSession);
   const setBootstrapping = useSessionStore((s) => s.setBootstrapping);
+  /** Último usuário observado. `undefined` = ainda não observamos nenhum. */
+  const usuarioAnterior = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let alive = true;
+
+    /**
+     * Zera o cache do react-query quando QUEM está logado muda.
+     *
+     * Sem isso, sair de uma conta e entrar em outra na mesma instalação
+     * servia dado cacheado do usuário anterior — exercício exclusivo de um
+     * professor apareceu pra um aluno que não é dele, e o mesmo valeria pra
+     * perfil, plano e lista de alunos. A RLS estava correta; o vazamento era
+     * o cache.
+     *
+     * Só limpa quando o id muda de fato: `onAuthStateChange` também dispara
+     * em TOKEN_REFRESHED com o mesmo usuário, e limpar ali causaria refetch
+     * de tudo a cada renovação de token.
+     */
+    function sincronizar(userId: string | undefined) {
+      const anterior = usuarioAnterior.current;
+      const atual = userId ?? null;
+      if (anterior !== undefined && anterior !== atual) {
+        queryClient.clear();
+      }
+      usuarioAnterior.current = atual;
+      syncBilling(userId);
+    }
 
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
       setSession(data.session);
       setBootstrapping(false);
-      syncBilling(data.session?.user?.id);
+      sincronizar(data.session?.user?.id);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      syncBilling(session?.user?.id);
+      sincronizar(session?.user?.id);
     });
 
     return () => {
