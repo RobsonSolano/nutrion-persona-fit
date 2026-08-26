@@ -2,6 +2,68 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### cardio-metricas (2026-08-25) — implementado (branch `feature/cardio-metricas`)
+
+Spec: `.specs/features/2026-08-25-cardio-metricas/spec.md` (CAR-01..CAR-08). Item #4 da leva.
+**Baseline Test Gate:** 159/159 GREEN em `develop`.
+
+**Problema:** cárdio usava séries/repetições/carga. "3x12 com 20 kg" não significa nada numa esteira.
+
+**A descoberta que definiu o design:** o vetor NÃO pode ser a modalidade. Os 10 exercícios do grupo
+`cardio` (esteira, bike, elíptico, remo, natação, HIIT…) estão todos com `modality='musculacao'` —
+a coluna de modalidade nasceu depois deles (20260428120000) e pegaram o default. Além disso a
+modalidade pertence à ROTINA inteira no `RoutineEditor` (trocá-la apaga os drafts), e uma rotina de
+musculação com 10 min de esteira no fim é caso comum. O vetor certo é o **grupo do exercício**,
+gravado como **snapshot** (`metric_type`) — mesmo princípio de `exercise_name`, que o schema já
+guarda porque `exercise_id` é `on delete set null`.
+
+**Nomenclatura — cuidado registrado:** `duration_min` significa "duração em MINUTOS", enquanto
+`weight_min_kg`/`weight_max_kg` usam `min` como mínimo. Os dois padrões já conviviam. Reusamos
+`duration_min` como o tempo e **não** criamos `duration_max_min`: seria erro de leitura garantido.
+
+**`metric_type` obrigatório no tipo TS de propósito:** o typecheck então apontou os 8 lugares que
+criam exercícios e forçou cada um a decidir, em vez de herdarem default silencioso. Foi assim que
+apareceram o `onboarding.ts` e o import de treino por IA.
+
+**Achados do review que viraram correção:**
+- **DEFEITO REAL em produção** (`coach-apply-template`): o insert lista colunas explicitamente e não
+  incluía os campos novos. Um template de cárdio aplicado no aluno virava exercício de FORÇA —
+  distância e cadência iam a null, só o tempo sobrevivia. Contradizia CAR-08 e **não** estava
+  coberto pelas limitações declaradas. Corrigido; **exige `fn:deploy`**.
+- **Bug de saída no formatador:** faixa que cruza 1 km (`800m–3000m`) produzia `"800 m–3 km"`,
+  misturando unidades, porque cada lado era formatado sozinho e um `.replace(/ km$/,'')` só funcionava
+  quando o primeiro já estava em km. A unidade passou a ser escolhida uma vez para a faixa inteira.
+  Sem teste antes; agora tem.
+- **Zero era ambíguo:** `preenchido()` tratava 0 como "não informado", mas a validação de faixa o
+  tratava como valor — digitar 0 em "Dist. máx" acusava "máxima menor que a mínima". Unificado.
+- **Sem teto de valor:** número gigante passava a validação e estourava o `int4` no INSERT, virando
+  "não consegui salvar" genérico. Tetos plausíveis: 1.000 km, 300 RPM, 1440 min.
+- **`toFixed().replace('.',',')` reinventava** o `toLocaleString('pt-BR')` já usado em 5 lugares do
+  projeto. Trocado.
+- **Altitude:** `src/types/database.ts` era espelho isolado do schema, sem nenhum import, e eu tinha
+  feito ele importar de `lib/`. `MetricType` voltou para lá; a lib importa do types (lib → types).
+- **Duplicação ampliada:** o mapeamento exercício→insert estava copiado em 5 telas (duplicação
+  anterior a esta feature) e eu acrescentei 4 linhas em cada. Extraído `toExerciseInsert`
+  (`src/lib/exerciseInsert.ts`, 3 testes) — os 5 viraram `.map(toExerciseInsert)`.
+- `CardioFields`/`StrengthFields` extraídos: o ternário inline tinha deixado ~100 linhas de JSX e
+  indentação inconsistente no `ExerciseDraftRow`.
+
+**Migration:** auditada antes de aplicar (idempotente pelo padrão de `modality`; backfill com
+`update ... from ... join` correto; `add column` com default constante é metadado, não reescreve a
+tabela; constraints não podem colidir com dado antigo porque as colunas são novas). **Aplicada em
+produção** em 2026-08-25 via `db push` — o dry-run mostrou que só ela estava pendente.
+
+**Limitações declaradas (fora de escopo):** o gerador de plano por IA e a importação de treino por IA
+(`coach-save-imported-workout`) não produzem métricas de cárdio — entram como `strength`, e o
+professor corrige editando.
+
+**Validado:** vitest **181/181**, typecheck sem erro novo, lint sem erro novo, `deno check` na
+function corrigida.
+
+**Pendente:** `fn:deploy` da `coach-apply-template` (senão o defeito segue em produção) e **OTA**
+para a UI chegar ao app — o form de cárdio e a exibição são código do cliente. Nada disso foi visto
+rodando em device.
+
 ### sanity-check-itemizado (2026-08-25) — onda 3 implementada (branch `feature/sanity-itemizado`)
 
 Spec: `.specs/features/2026-08-25-sanity-check-itemizado/spec.md` (SAN-01..SAN-11).

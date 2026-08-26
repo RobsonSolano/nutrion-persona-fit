@@ -222,6 +222,12 @@ export async function saveOnboardingResult(params: {
             weight_min_kg: ex.weight_min_kg ?? null,
             weight_max_kg: ex.weight_max_kg ?? null,
             duration_min: ex.duration_min ?? null,
+            // O gerador de plano por IA ainda não produz métricas de cárdio
+            // (fora de escopo da spec CAR) — entra como força.
+            metric_type: 'strength' as const,
+            distance_min_m: null,
+            distance_max_m: null,
+            cadence_rpm: null,
             notes: ex.notes ?? null,
           }));
         const { error: exErr } = await supabase

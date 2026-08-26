@@ -34,6 +34,7 @@ import {
   MODALITY_LABELS,
   type TemplateExerciseInsert,
 } from '@/types/database';
+import { toExerciseInsert } from '@/lib/exerciseInsert';
 
 export default function TemplateDetailScreen() {
   const router = useRouter();
@@ -141,19 +142,7 @@ export default function TemplateDetailScreen() {
               initialDescription={detailQ.data.description ?? ''}
               initialModality={detailQ.data.modality}
               initialGroupId={detailQ.data.group_id}
-              initialExercises={detailQ.data.exercises.map((e) => ({
-                exercise_id: e.exercise_id,
-                exercise_name: e.exercise_name,
-                equipment: e.equipment,
-                sort_order: e.sort_order,
-                sets: e.sets,
-                reps_min: e.reps_min,
-                reps_max: e.reps_max,
-                weight_min_kg: e.weight_min_kg,
-                weight_max_kg: e.weight_max_kg,
-                duration_min: e.duration_min,
-                notes: e.notes,
-              }))}
+              initialExercises={detailQ.data.exercises.map(toExerciseInsert)}
               submitLabel="Salvar alterações"
               loading={update.isPending}
               onSubmit={async (payload) => {

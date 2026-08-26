@@ -31,6 +31,10 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
+  metricTypeFromGroup,
+  validateCardioMetrics,
+} from '@/lib/cardioMetrics';
+import {
   MODALITY_LABELS,
   type Exercise,
   type ExerciseGroup,
@@ -123,6 +127,11 @@ export default function RoutineEditor(props: Props) {
 
   function handleAddExercise(ex: Exercise) {
     const localId = uid();
+    // O tipo vem do grupo do EXERCÍCIO escolhido, não do grupo da rotina: o
+    // picker permite pegar de outro grupo, e uma rotina de musculação com
+    // esteira no fim é caso comum.
+    const grupoDoExercicio =
+      groupsQ.data?.find((g) => g.id === ex.group_id) ?? null;
     setDrafts((prev) => [
       ...prev,
       {
@@ -137,6 +146,10 @@ export default function RoutineEditor(props: Props) {
         weight_min_kg: null,
         weight_max_kg: null,
         duration_min: null,
+        metric_type: metricTypeFromGroup(grupoDoExercicio?.slug),
+        distance_min_m: null,
+        distance_max_m: null,
+        cadence_rpm: null,
         notes: null,
       },
     ]);
@@ -181,11 +194,26 @@ export default function RoutineEditor(props: Props) {
       );
       return;
     }
+    // CAR-03: a rede de cima. O banco também tem check constraint, mas aqui o
+    // professor vê a mensagem antes de perder o preenchimento.
+    for (const d of drafts) {
+      if (d.metric_type !== 'cardio') continue;
+      const erro = validateCardioMetrics(d);
+      if (erro) {
+        Alert.alert('Métricas de cárdio', `${d.exercise_name}: ${erro}`);
+        return;
+      }
+    }
+
     const exercises: RoutineExerciseInsert[] = drafts.map((d, i) => ({
       exercise_id: d.exercise_id,
       exercise_name: d.exercise_name,
       equipment: d.equipment,
       sort_order: i,
+      metric_type: d.metric_type,
+      distance_min_m: d.distance_min_m,
+      distance_max_m: d.distance_max_m,
+      cadence_rpm: d.cadence_rpm,
       sets: d.sets,
       reps_min: d.reps_min,
       reps_max: d.reps_max,
@@ -498,61 +526,128 @@ function ExerciseDraftRow({
       </View>
 
       <View className="gap-2">
-        <View className="flex-row gap-2">
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              ref={setsRef}
-              label="Séries"
-              value={draft.sets?.toString() ?? ''}
-              onChangeText={(v) => onChange({ sets: toInt(v) })}
-              placeholder="4"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Reps mín"
-              value={draft.reps_min?.toString() ?? ''}
-              onChangeText={(v) => onChange({ reps_min: toInt(v) })}
-              placeholder="8"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Reps máx"
-              value={draft.reps_max?.toString() ?? ''}
-              onChangeText={(v) => onChange({ reps_max: toInt(v) })}
-              placeholder="12"
-            />
-          </View>
-        </View>
-        <View className="flex-row gap-2">
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Peso mín (kg)"
-              value={draft.weight_min_kg?.toString() ?? ''}
-              onChangeText={(v) => onChange({ weight_min_kg: toNum(v) })}
-              placeholder="60"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Peso máx (kg)"
-              value={draft.weight_max_kg?.toString() ?? ''}
-              onChangeText={(v) => onChange({ weight_max_kg: toNum(v) })}
-              placeholder="80"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Minutos"
-              value={draft.duration_min?.toString() ?? ''}
-              onChangeText={(v) => onChange({ duration_min: toInt(v) })}
-              placeholder="—"
-            />
-          </View>
-        </View>
+        {draft.metric_type === 'cardio' ? (
+          <CardioFields draft={draft} onChange={onChange} setsRef={setsRef} />
+        ) : (
+          <StrengthFields draft={draft} onChange={onChange} setsRef={setsRef} />
+        )}
       </View>
     </View>
+  );
+}
+
+type FieldsProps = {
+  draft: Draft;
+  onChange: (patch: Partial<Draft>) => void;
+  /** Opcional como no componente pai — só o exercício recém-adicionado recebe. */
+  setsRef?: (el: TextInput | null) => void;
+};
+
+/**
+ * Cárdio não usa séries/reps/carga (CAR-05). Distância em METROS para casar com
+ * o schema — sem conversão, sem arredondamento no meio do caminho.
+ */
+function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
+  return (
+    <>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            ref={setsRef}
+            label="Dist. mín (m)"
+            value={draft.distance_min_m?.toString() ?? ''}
+            onChangeText={(v) => onChange({ distance_min_m: toInt(v) })}
+            placeholder="3000"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Dist. máx (m)"
+            value={draft.distance_max_m?.toString() ?? ''}
+            onChangeText={(v) => onChange({ distance_max_m: toInt(v) })}
+            placeholder="5000"
+          />
+        </View>
+      </View>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Minutos"
+            value={draft.duration_min?.toString() ?? ''}
+            onChangeText={(v) => onChange({ duration_min: toInt(v) })}
+            placeholder="30"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Cadência (RPM)"
+            value={draft.cadence_rpm?.toString() ?? ''}
+            onChangeText={(v) => onChange({ cadence_rpm: toInt(v) })}
+            placeholder="80"
+          />
+        </View>
+      </View>
+    </>
+  );
+}
+
+function StrengthFields({ draft, onChange, setsRef }: FieldsProps) {
+  return (
+    <>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            ref={setsRef}
+            label="Séries"
+            value={draft.sets?.toString() ?? ''}
+            onChangeText={(v) => onChange({ sets: toInt(v) })}
+            placeholder="4"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Reps mín"
+            value={draft.reps_min?.toString() ?? ''}
+            onChangeText={(v) => onChange({ reps_min: toInt(v) })}
+            placeholder="8"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Reps máx"
+            value={draft.reps_max?.toString() ?? ''}
+            onChangeText={(v) => onChange({ reps_max: toInt(v) })}
+            placeholder="12"
+          />
+        </View>
+      </View>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Peso mín (kg)"
+            value={draft.weight_min_kg?.toString() ?? ''}
+            onChangeText={(v) => onChange({ weight_min_kg: toNum(v) })}
+            placeholder="60"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Peso máx (kg)"
+            value={draft.weight_max_kg?.toString() ?? ''}
+            onChangeText={(v) => onChange({ weight_max_kg: toNum(v) })}
+            placeholder="80"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Minutos"
+            value={draft.duration_min?.toString() ?? ''}
+            onChangeText={(v) => onChange({ duration_min: toInt(v) })}
+            placeholder="—"
+          />
+        </View>
+      </View>
+    </>
   );
 }
 
