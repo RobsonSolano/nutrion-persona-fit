@@ -2,6 +2,38 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### UAT completo no emulador (2026-08-26) — leva de 2026-08-25 VERIFICADA
+
+Ambiente: emulador Pixel 8 / **Android 16 (API 36)**, dev build local (`npx expo run:android`),
+barra de navegação em **3 botões** (o modo gestos não reproduz o bug de safe area). Usuários do
+`seed:test-users`; `coach@` promovido a premium (`source=grandfather`) para liberar a IA.
+
+| O que | Resultado |
+|---|---|
+| Sanity check — **texto** | 545 kcal com gramas / 578 sem (arroz+feijão+bife). Âncora no cru daria 900+ |
+| Sanity check — **foto** | 488 → 417 → **367** no mesmo sanduíche. Os 4 macros fecham com a tabela na casa da unidade |
+| Cárdio — form | Troca séries/reps/carga por distância/duração/RPM ao escolher exercício do grupo cardio |
+| Cárdio — exibição | `2–5 km` · `1h30` · `6 RPM` na visão do aluno |
+| Cárdio — **decisão de design validada** | Rotina de **modalidade Musculação** exibindo métricas de **cárdio** — é o caso que fez rejeitar a modalidade como vetor |
+| **Template → aluno** | Métricas atravessaram o `coach-apply-template`. Confirma o fix do defeito achado em review |
+| Safe area — paywall e demais | Botão de rodapé alcançável |
+| Safe area — **abas** | **Sem espaço duplicado** acima da tab bar: confirma a decisão de NÃO aplicar `bottom` nelas |
+| Validações | Máx < mín bloqueia; 9.999.999 m avisa (teto 1.000 km) sem erro genérico |
+| Duração | `90` no campo de minutos normaliza para `1h30` |
+| Alertas | Card escuro do app, não o Alert branco nativo |
+
+**Bugs achados NO teste e corrigidos na hora:** rodapé do `TemplatePicker` (modal, não passava pelo
+`Screen`) cortado pela barra de navegação, e o mesmo no topo; imagem de esteira em
+"Caminhada (ao ar livre)"; alerta nativo feio; maionese fora da tabela TACO inflando o total.
+
+**Limite do que foi verificado:** não existe baseline do "antes de tudo". Os 488 do primeiro teste de
+foto já eram COM a onda 3+4 no ar, e entre o 1º e o 2º a descrição também mudou — então a comparação
+limpa é **417 → 367 (−12%)**, atribuível ao código. É a consequência concreta de a instrumentação
+(item #1) ter ficado fora da leva.
+
+**Ainda sem verificação:** modal de release notes (`Updates.isEnabled` é `false` em dev build; só
+aparece em build de release, e a partir do 2º OTA publicado).
+
 ### Dívida de typecheck do `/paywall` — RESOLVIDA (2026-08-26)
 
 O erro `src/lib/paywall.ts(6,17)` (`"/paywall"` fora das rotas tipadas), registrado nesta STATE
