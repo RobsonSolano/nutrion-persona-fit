@@ -42,7 +42,11 @@ const config: ExpoConfig = {
   slug: 'nutrion',
   scheme: 'nutrion',
   version: '1.3.0',
-  orientation: 'portrait',
+  // Destravado por recomendação do Play Console (telas grandes): app travado
+  // em portrait é tratado como não-adaptativo em tablet e foldable. Nada no
+  // app declara `resizeableActivity=false` — a trava de orientação era a
+  // única coisa restringindo.
+  orientation: 'default',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
   newArchEnabled: true,

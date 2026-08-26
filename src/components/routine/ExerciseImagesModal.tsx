@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { X, ChevronLeft, ChevronRight, Eye, CirclePlay } from 'lucide-react-native';
@@ -33,7 +33,10 @@ export default function ExerciseImagesModal({
   imageUrls,
   videoUrl,
 }: Props) {
-  const width = Dimensions.get('window').width;
+  // useWindowDimensions e não Dimensions.get: o segundo captura o valor UMA
+  // vez, e com a orientação destravada o carrossel ficaria desalinhado depois
+  // de rotacionar (cada slide tem largura fixa em px).
+  const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState<Set<number>>(new Set());
   const [errored, setErrored] = useState<Set<number>>(new Set());
