@@ -86,6 +86,8 @@ export default function ExerciseFormModal({
   const [duplicata, setDuplicata] = useState<Exercise | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pickingPhoto, setPickingPhoto] = useState(false);
+  /** O professor já decidiu o toggle de perna nesta abertura? */
+  const [tocouPerna, setTocouPerna] = useState(false);
 
   function valoresIniciais(): ExerciseFormValues {
     const groupId = exercise?.group_id ?? initialGroupId ?? '';
@@ -110,23 +112,30 @@ export default function ExerciseFormModal({
     setImageUris(exercise?.image_urls ?? []);
     setErros([]);
     setDuplicata(null);
+    setTocouPerna(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, exercise]);
+
+  // Único lugar que deriva o toggle de perna a partir do grupo. É um efeito
+  // e não parte do `patch` porque `useExerciseGroups` pode responder DEPOIS
+  // do modal abrir — nesse caso o slug seria null e o default cairia em
+  // "Sim" pra um exercício de peito, sem nunca ser recalculado.
+  //
+  // Não roda em edição (o valor salvo é a verdade) nem depois de o
+  // professor mexer no toggle.
+  useEffect(() => {
+    if (!visible || editando || tocouPerna) return;
+    const slug =
+      groupsQ.data?.find((g) => g.id === values.groupId)?.slug ?? null;
+    setValues((prev) => ({
+      ...prev,
+      requiresLowerLimbs: defaultRequiresLowerLimbs(slug),
+    }));
+  }, [visible, editando, tocouPerna, groupsQ.data, values.groupId]);
 
   function patch(p: Partial<ExerciseFormValues>) {
     setValues((prev) => ({ ...prev, ...p }));
     setErros([]);
-  }
-
-  /** Trocar de grupo re-sugere o toggle de perna, mas só se o professor
-   *  ainda não mexeu nele nesta sessão de edição do form. */
-  const [tocouPerna, setTocouPerna] = useState(false);
-  function selecionarGrupo(groupId: string) {
-    const slug = groupsQ.data?.find((g) => g.id === groupId)?.slug ?? null;
-    patch({
-      groupId,
-      ...(tocouPerna ? {} : { requiresLowerLimbs: defaultRequiresLowerLimbs(slug) }),
-    });
   }
 
   const erroDe = (field: ExerciseValidationError['field']) =>
@@ -270,7 +279,7 @@ export default function ExerciseFormModal({
                     key={g.id}
                     label={`${g.icon ?? ''} ${g.name}`}
                     on={values.groupId === g.id}
-                    onPress={() => selecionarGrupo(g.id)}
+                    onPress={() => patch({ groupId: g.id })}
                   />
                 ))}
               </View>
