@@ -93,19 +93,15 @@ const config: ExpoConfig = {
     // aparecem do update seguinte em diante.
     releaseNotes: {
       novidades: [
-        'Cárdio com distância, duração em horas e minutos, e cadência (RPM)',
-        'O professor agora vê o e-mail do aluno no perfil',
-        'O onboarding pergunta se você é PCD e adapta o treino ao que você declarar',
+        'O professor pode cadastrar exercícios próprios — exclusivos dos seus alunos ou públicos no catálogo do app',
+        'O botão de play abre o vídeo que o professor cadastrou no exercício, em vez de uma busca no YouTube',
       ],
       melhorias: [
-        'Contagem de calorias por foto e texto ficou bem mais realista: agora vem item por item, com base na tabela TACO',
-        'A IA não prescreve mais exercício que a sua condição impede de executar',
-        'Avisos do app usam o card escuro em vez do alerta branco do sistema',
+        'Ao cadastrar um exercício, o app avisa se já existe outro com o mesmo nome no grupo',
       ],
       ajustes: [
-        'Botões de rodapé não ficam mais escondidos atrás da barra de navegação do Android',
-        'Imagem de esteira em "Caminhada (ao ar livre)" — agora mostra caminhada na rua',
-        'Preço no aviso de assinatura ficou igual ao da Play Store',
+        'Sair da conta agora limpa os dados já carregados. Antes, ao entrar com outra conta no mesmo aparelho, informações da conta anterior podiam continuar aparecendo',
+        'Rodapé da tela de escolher exercício não fica mais atrás da barra de navegação do Android',
       ],
     },
   },
