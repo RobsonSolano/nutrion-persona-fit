@@ -9,11 +9,12 @@ import {
   type TextInput,
 } from 'react-native';
 import { Plus, Trash2, Save, CirclePlay } from 'lucide-react-native';
-import { openYouTubeSearchForExercise } from '@/lib/youtube';
+import { openExerciseVideo } from '@/lib/youtube';
 import * as Haptics from 'expo-haptics';
 import {
   useExerciseGroups,
   useExerciseImagesMap,
+  useExerciseVideoMap,
 } from '@/hooks/useExercises';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
@@ -83,6 +84,7 @@ export default function RoutineEditor(props: Props) {
   const kbHeight = useKeyboardHeight();
   const groupsQ = useExerciseGroups();
   const imagesMap = useExerciseImagesMap();
+  const videoMap = useExerciseVideoMap();
 
   const [name, setName] = useState(props.initialName ?? '');
   const [description, setDescription] = useState(props.initialDescription ?? '');
@@ -102,6 +104,7 @@ export default function RoutineEditor(props: Props) {
     name: string;
     equipment: string | null;
     images: string[];
+    video: string | null;
   } | null>(null);
   const alert = useAlert();
   const scrollRef = useRef<ScrollView>(null);
@@ -333,6 +336,9 @@ export default function RoutineEditor(props: Props) {
                   draft={d}
                   index={i}
                   imageUrls={imgs}
+                  videoUrl={
+                    d.exercise_id ? videoMap.get(d.exercise_id) ?? null : null
+                  }
                   onChange={(patch) => updateDraft(d.localId, patch)}
                   onRemove={() => handleRemoveExercise(d.localId)}
                   onPreview={() => {
@@ -341,6 +347,9 @@ export default function RoutineEditor(props: Props) {
                       name: d.exercise_name,
                       equipment: d.equipment,
                       images: imgs,
+                      video: d.exercise_id
+                        ? videoMap.get(d.exercise_id) ?? null
+                        : null,
                     });
                   }}
                   setsRef={(el) => {
@@ -376,6 +385,7 @@ export default function RoutineEditor(props: Props) {
         exerciseName={preview?.name ?? ''}
         equipment={preview?.equipment}
         imageUrls={preview?.images ?? []}
+        videoUrl={preview?.video ?? null}
       />
     </ScrollView>
   );
@@ -479,6 +489,7 @@ function ExerciseDraftRow({
   draft,
   index,
   imageUrls,
+  videoUrl,
   onChange,
   onRemove,
   onPreview,
@@ -487,6 +498,8 @@ function ExerciseDraftRow({
   draft: Draft;
   index: number;
   imageUrls: string[] | null;
+  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
+  videoUrl?: string | null;
   onChange: (patch: Partial<Draft>) => void;
   onRemove: () => void;
   onPreview: () => void;
@@ -509,7 +522,9 @@ function ExerciseDraftRow({
         </View>
         {hasImages && <PreviewEyeButton onPress={onPreview} marginRight />}
         <Pressable
-          onPress={() => openYouTubeSearchForExercise(draft.exercise_name)}
+          onPress={() =>
+            openExerciseVideo({ videoUrl, exerciseName: draft.exercise_name })
+          }
           hitSlop={8}
           className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70 mr-2"
         >

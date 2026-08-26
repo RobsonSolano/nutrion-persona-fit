@@ -27,7 +27,10 @@ import {
   useUnarchiveTemplate,
   useUpdateTemplate,
 } from '@/hooks/useTemplates';
-import { useExerciseImagesMap } from '@/hooks/useExercises';
+import {
+  useExerciseImagesMap,
+  useExerciseVideoMap,
+} from '@/hooks/useExercises';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
@@ -45,12 +48,14 @@ export default function TemplateDetailScreen() {
   const unarchive = useUnarchiveTemplate();
   const remove = useDeleteTemplate();
   const imagesMap = useExerciseImagesMap();
+  const videoMap = useExerciseVideoMap();
 
   const [editing, setEditing] = useState(false);
   const [preview, setPreview] = useState<{
     name: string;
     equipment: string | null;
     images: string[];
+    video: string | null;
   } | null>(null);
 
   if (!id) return null;
@@ -217,12 +222,16 @@ export default function TemplateDetailScreen() {
                       const imgs = e.exercise_id
                         ? imagesMap.get(e.exercise_id) ?? null
                         : null;
+                      const vid = e.exercise_id
+                        ? videoMap.get(e.exercise_id) ?? null
+                        : null;
                       return (
                         <ExerciseReadRow
                           key={e.id}
                           exercise={e}
                           index={i}
                           imageUrls={imgs}
+                          videoUrl={vid}
                           onPreview={
                             imgs
                               ? () =>
@@ -230,6 +239,7 @@ export default function TemplateDetailScreen() {
                                     name: e.exercise_name,
                                     equipment: e.equipment,
                                     images: imgs,
+                                    video: vid,
                                   })
                               : undefined
                           }
@@ -276,6 +286,7 @@ export default function TemplateDetailScreen() {
         exerciseName={preview?.name ?? ''}
         equipment={preview?.equipment}
         imageUrls={preview?.images ?? []}
+        videoUrl={preview?.video ?? null}
       />
     </>
   );
