@@ -91,12 +91,12 @@ export default function LoginScreen() {
     try {
       await requestPasswordReset(email);
       setForgotOpen(false);
-      alert.showAlert({
-        title: 'Email enviado',
-        message:
-          'Se o email estiver cadastrado, você vai receber um link pra definir nova senha em alguns minutos.',
-        type: 'success',
-      });
+      // Rota nova: os tipos do expo-router só regeneram no prebuild/start, então
+      // o cast via unknown é necessário até lá (a rota existe e resolve em runtime).
+      router.push({
+        pathname: '/(auth)/recuperar-senha',
+        params: { email: email.trim() },
+      } as unknown as Href);
     } catch (err) {
       alert.showError(err);
     } finally {
@@ -358,12 +358,12 @@ export default function LoginScreen() {
         title="Esqueci a senha"
         message={
           email.trim()
-            ? `Vamos enviar um link pra "${email.trim()}" definir uma nova senha.`
+            ? `Vamos enviar um código pra "${email.trim()}" definir uma nova senha.`
             : 'Digite seu email no campo de login antes de continuar.'
         }
         actions={[
           {
-            label: 'Enviar link',
+            label: 'Enviar código',
             variant: 'primary',
             onPress: handleForgotPassword,
             loading: forgotLoading,
