@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Pause, Play, Square, Save, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -54,77 +54,86 @@ export default function TreinoAtivoScreen() {
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
-      <View className="flex-1 px-6 pt-8 pb-10 items-center justify-between">
-        <View className="items-center gap-2 mt-6">
-          <Text className="text-text-dim text-[12px] uppercase tracking-widest">
-            {stopped ? 'Treino finalizado' : 'Treino em andamento'}
-          </Text>
-          <Text className="text-text text-xl font-bold text-center" numberOfLines={2}>
-            {active.routineName}
-          </Text>
-        </View>
+      {/* ScrollView com flexGrow: em portrait o justify-between distribui como
+          antes; em landscape a altura não cabe (~410dp de conteúdo contra
+          ~380dp disponíveis) e sem scroll o botão de salvar ficava
+          inalcançável. */}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="flex-1 px-6 pt-8 pb-10 items-center justify-between">
+          <View className="items-center gap-2 mt-6">
+            <Text className="text-text-dim text-[12px] uppercase tracking-widest">
+              {stopped ? 'Treino finalizado' : 'Treino em andamento'}
+            </Text>
+            <Text className="text-text text-xl font-bold text-center" numberOfLines={2}>
+              {active.routineName}
+            </Text>
+          </View>
 
-        <View className="items-center gap-3">
-          <Text className="text-text text-6xl font-bold tabular-nums" style={{ letterSpacing: 2 }}>
-            {formatHMS(elapsed)}
-          </Text>
-          {status === 'paused' && !stopped && (
-            <Text className="text-warn text-[13px] font-semibold">⏸ Pausado</Text>
-          )}
-        </View>
+          <View className="items-center gap-3">
+            <Text className="text-text text-6xl font-bold tabular-nums" style={{ letterSpacing: 2 }}>
+              {formatHMS(elapsed)}
+            </Text>
+            {status === 'paused' && !stopped && (
+              <Text className="text-warn text-[13px] font-semibold">⏸ Pausado</Text>
+            )}
+          </View>
 
-        <View className="w-full gap-3">
-          {stopped ? (
-            <Card padding="md">
-              <Text className="text-text-dim text-[12px] text-center mb-3">
-                {active.routineName} — {formatHMS(elapsed)}
-              </Text>
-              <Button
-                label="Salvar treino de hoje"
-                onPress={onSave}
-                loading={saving}
-                icon={<Save size={18} color={colors.textInverse} />}
-              />
-              <View className="h-2" />
-              <Button
-                label="Descartar"
-                onPress={onDiscard}
-                variant="ghost"
-                icon={<Trash2 size={16} color={colors.danger} />}
-              />
-            </Card>
-          ) : (
-            <>
-              {status === 'running' ? (
+          <View className="w-full gap-3">
+            {stopped ? (
+              <Card padding="md">
+                <Text className="text-text-dim text-[12px] text-center mb-3">
+                  {active.routineName} — {formatHMS(elapsed)}
+                </Text>
                 <Button
-                  label="Pausar"
-                  onPress={() => {
-                    void Haptics.selectionAsync();
-                    pause();
-                  }}
-                  variant="secondary"
-                  icon={<Pause size={18} color={colors.text} />}
+                  label="Salvar treino de hoje"
+                  onPress={onSave}
+                  loading={saving}
+                  icon={<Save size={18} color={colors.textInverse} />}
                 />
-              ) : (
+                <View className="h-2" />
                 <Button
-                  label="Retomar"
-                  onPress={() => {
-                    void Haptics.selectionAsync();
-                    resume();
-                  }}
-                  icon={<Play size={18} color={colors.textInverse} />}
+                  label="Descartar"
+                  onPress={onDiscard}
+                  variant="ghost"
+                  icon={<Trash2 size={16} color={colors.danger} />}
                 />
-              )}
-              <Button
-                label="Parar"
-                onPress={onStop}
-                variant="danger"
-                icon={<Square size={16} color={colors.textInverse} />}
-              />
-            </>
-          )}
+              </Card>
+            ) : (
+              <>
+                {status === 'running' ? (
+                  <Button
+                    label="Pausar"
+                    onPress={() => {
+                      void Haptics.selectionAsync();
+                      pause();
+                    }}
+                    variant="secondary"
+                    icon={<Pause size={18} color={colors.text} />}
+                  />
+                ) : (
+                  <Button
+                    label="Retomar"
+                    onPress={() => {
+                      void Haptics.selectionAsync();
+                      resume();
+                    }}
+                    icon={<Play size={18} color={colors.textInverse} />}
+                  />
+                )}
+                <Button
+                  label="Parar"
+                  onPress={onStop}
+                  variant="danger"
+                  icon={<Square size={16} color={colors.textInverse} />}
+                />
+              </>
+            )}
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </Screen>
   );
 }
