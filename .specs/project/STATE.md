@@ -75,10 +75,23 @@ O caminho do fallback foi testado **por acidente**: o teste de controle estourou
 Groq, o circuit breaker abriu, e as três chamadas seguintes caíram no fallback. Foi sorte — é
 exatamente o buraco #3, o que ignorava qualquer prompt por construção.
 
-**Ainda sem verificação: nenhuma tela foi renderizada.** A pergunta "Você é PCD?", os chips, a
-dica de formulário incompleto, o `continueDisabled`, a linha de e-mail no perfil do aluno e o
-`formatDisability` só passaram por typecheck. E o funil real (store → `bio.tsx` → `loading.tsx`)
-não foi exercitado: os payloads dos testes foram montados à mão, contornando o app.
+**Funil da tela verificado (aluno4, 2026-08-26 17:08):** o dev criou uma conta pelo app,
+marcou "Cadeirante / paraplegia" no passo 4 e completou o onboarding. No banco:
+`has_disability=true`, `disability_types=["wheelchair_paraplegia"]`. Plano gerado com 4 rotinas
+e 20 exercícios, **nenhum** com `requires_lower_limbs`. A IA escolheu o handbike sozinha de novo.
+
+Isso fecha a cadeia `DisabilityFields` → store → `loading.tsx` → `generatePlan` →
+`saveOnboardingResult`, que antes só tinha typecheck.
+
+**E isolou o campo estruturado por acidente.** O dev escreveu no "sobre":
+*"Inoperante da cintura pra baixo"* — frase que a rede de palavra-chave **não pega** (não diz
+paraplegia, cadeirante nem amputação). Confirmado por teste: com só esse `bio`,
+`blockLowerLimbs=false`. Ou seja, quem bloqueou foi exclusivamente o campo estruturado — a
+prova de que texto livre sozinho não bastaria, e a justificativa da pergunta nova existir.
+Virou caso permanente em `bodyRestrictions.test.ts`.
+
+**Ainda sem verificação:** a linha de e-mail no perfil do aluno, o `formatDisability` exibido,
+a dica laranja de formulário incompleto e o `continueDisabled` — nenhum foi visto renderizado.
 
 ### D3 do billing bloqueia teste de IA de professor (descoberto em 2026-08-26)
 

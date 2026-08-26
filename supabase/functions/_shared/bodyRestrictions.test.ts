@@ -165,6 +165,31 @@ describe('resolveBodyRestrictions — rede de segurança em texto livre', () => 
   });
 });
 
+describe('resolveBodyRestrictions — limite conhecido da rede', () => {
+  // Frase real escrita por um usuário no onboarding (aluno4, 2026-08-26).
+  // A rede de palavra-chave NÃO pega: não fala paraplegia, cadeirante nem
+  // amputação. Quem bloqueou foi o campo estruturado — é a razão de ele
+  // existir, e a prova de que texto livre sozinho não bastaria.
+  it('PCD06_inoperante_da_cintura_pra_baixo_escapa_da_rede', () => {
+    const r = resolveBodyRestrictions({
+      ...VAZIO,
+      bio: 'Inoperante da cintura pra baixo',
+    });
+    expect(r.blockLowerLimbs).toBe(false);
+  });
+
+  it('PCD05_a_mesma_frase_com_o_campo_estruturado_bloqueia', () => {
+    const r = resolveBodyRestrictions({
+      ...VAZIO,
+      has_disability: true,
+      disability_types: ['wheelchair_paraplegia'],
+      bio: 'Inoperante da cintura pra baixo',
+    });
+    expect(r.blockLowerLimbs).toBe(true);
+    expect(r.source).toBe('structured');
+  });
+});
+
 describe('resolveBodyRestrictions — precedência', () => {
   it('PCD11_estruturado_tem_precedencia_de_origem', () => {
     const r = resolveBodyRestrictions({
