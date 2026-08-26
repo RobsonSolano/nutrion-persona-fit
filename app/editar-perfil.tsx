@@ -127,7 +127,7 @@ export default function EditarPerfilScreen() {
           animation: 'slide_from_bottom',
         }}
       />
-      <Screen variant="violet" edges={['top']}>
+      <Screen variant="violet" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"
           keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}

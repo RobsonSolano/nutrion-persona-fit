@@ -11,6 +11,17 @@ type Props = {
    * ideal para telas de entrada (login, onboarding). Use 'flat' para telas internas.
    */
   variant?: 'hero' | 'flat' | 'violet';
+  /**
+   * Bordas onde o inset do sistema é aplicado. **Default `['top']` de propósito**,
+   * não por descuido: `app.config.ts` tem `edgeToEdgeEnabled: true`, e as telas
+   * dentro de `(tabs)` já têm a base coberta pela tab bar, que soma
+   * `insets.bottom` na própria altura (`app/(tabs)/_layout.tsx`). Passar
+   * `'bottom'` nelas criaria espaço vazio duplicado acima da tab bar.
+   *
+   * **Tela FORA das tabs precisa passar `['top', 'bottom']`** — sem isso, o
+   * conteúdo do rodapé fica embaixo dos botões de navegação do Android e vira
+   * inalcançável. Foi o que aconteceu com 12 telas (incluindo o paywall).
+   */
   edges?: Edge[];
   contentStyle?: ViewStyle;
 };

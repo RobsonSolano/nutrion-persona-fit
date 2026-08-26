@@ -130,7 +130,7 @@ export default function RotinaDetalheScreen() {
           animation: 'slide_from_right',
         }}
       />
-      <Screen variant="hero" edges={['top']}>
+      <Screen variant="hero" edges={['top', 'bottom']}>
         <KeyboardAvoidingView behavior="padding" className="flex-1">
           <View className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle">
             <Pressable

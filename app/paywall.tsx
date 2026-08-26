@@ -163,7 +163,7 @@ export default function PaywallScreen() {
       <Stack.Screen
         options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
-      <Screen variant="violet" edges={['top']}>
+      <Screen variant="violet" edges={['top', 'bottom']}>
         <View className="flex-row items-center justify-between px-5 py-3">
           <Pressable
             onPress={() => router.back()}
