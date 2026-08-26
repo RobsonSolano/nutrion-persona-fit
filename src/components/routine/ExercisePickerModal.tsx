@@ -14,9 +14,22 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CheckCircle2, PlusCircle, Search, X } from 'lucide-react-native';
+import {
+  CheckCircle2,
+  Pencil,
+  Plus,
+  PlusCircle,
+  Search,
+  X,
+} from 'lucide-react-native';
 import { Card, Input } from '@/components/ui';
-import { useExerciseGroups, useExercisesByGroup } from '@/hooks/useExercises';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  useCanCreateExercise,
+  useExerciseGroups,
+  useExercisesByGroup,
+} from '@/hooks/useExercises';
+import ExerciseFormModal from './ExerciseFormModal';
 import { colors } from '@/lib/theme';
 import {
   MODALITY_LABELS,
@@ -40,7 +53,11 @@ export default function ExercisePickerModal({
   onSelect: (ex: Exercise) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const canCreate = useCanCreateExercise();
+  const { user } = useAuth();
   const [groupId, setGroupId] = useState<string | null>(preferredGroupId);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Exercise | null>(null);
   const [search, setSearch] = useState('');
   const groupsQ = useExerciseGroups();
   const exercisesQ = useExercisesByGroup(groupId, modality);
@@ -155,8 +172,28 @@ export default function ExercisePickerModal({
             </Text>
           )}
 
+          {canCreate && groupId && (
+            <Pressable
+              onPress={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+              className="active:opacity-70"
+            >
+              <Card padding="md">
+                <View className="flex-row items-center justify-center gap-2">
+                  <Plus size={18} color={colors.accent} />
+                  <Text className="text-accent text-sm font-semibold">
+                    Novo exercício
+                  </Text>
+                </View>
+              </Card>
+            </Pressable>
+          )}
+
           {filtered.map((ex) => {
             const added = addedExerciseIds.has(ex.id);
+            const meu = !!ex.owner_id && ex.owner_id === user?.id;
             return (
               <Pressable
                 key={ex.id}
@@ -168,13 +205,22 @@ export default function ExercisePickerModal({
                 <Card padding="md">
                   <View className="flex-row items-center justify-between">
                     <View className="flex-1">
-                      <Text
-                        className={`text-sm font-semibold ${
-                          added ? 'text-text-dim' : 'text-text'
-                        }`}
-                      >
-                        {ex.name}
-                      </Text>
+                      <View className="flex-row items-center gap-2">
+                        <Text
+                          className={`text-sm font-semibold ${
+                            added ? 'text-text-dim' : 'text-text'
+                          }`}
+                        >
+                          {ex.name}
+                        </Text>
+                        {meu && (
+                          <View className="rounded-full border border-accent/40 bg-accent/10 px-1.5 py-0.5">
+                            <Text className="text-accent text-[9px] font-semibold uppercase tracking-wider">
+                              meu
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       {ex.equipment && (
                         <Text className="text-text-muted text-[11px] mt-0.5">
                           {ex.equipment}
@@ -183,11 +229,27 @@ export default function ExercisePickerModal({
                         </Text>
                       )}
                     </View>
-                    {added ? (
-                      <CheckCircle2 size={18} color={colors.accent} />
-                    ) : (
-                      <PlusCircle size={18} color={colors.textMuted} />
-                    )}
+                    <View className="flex-row items-center gap-3">
+                      {/* Pressable próprio: consome o toque, então o card
+                          externo não seleciona o exercício ao editar. */}
+                      {meu && (
+                        <Pressable
+                          onPress={() => {
+                            setEditing(ex);
+                            setFormOpen(true);
+                          }}
+                          hitSlop={12}
+                          className="active:opacity-60"
+                        >
+                          <Pencil size={16} color={colors.textDim} />
+                        </Pressable>
+                      )}
+                      {added ? (
+                        <CheckCircle2 size={18} color={colors.accent} />
+                      ) : (
+                        <PlusCircle size={18} color={colors.textMuted} />
+                      )}
+                    </View>
                   </View>
                 </Card>
               </Pressable>
@@ -195,6 +257,22 @@ export default function ExercisePickerModal({
           })}
         </ScrollView>
       </View>
+
+      <ExerciseFormModal
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        exercise={editing}
+        initialGroupId={groupId}
+        initialModality={modality}
+        catalog={exercisesQ.data ?? []}
+        onSaved={(ex) => {
+          setFormOpen(false);
+          // Só auto-seleciona no cadastro: em edição o exercício já está
+          // na rotina, e re-selecionar duplicaria a linha.
+          if (!editing) onSelect(ex);
+        }}
+        onDeleted={() => setFormOpen(false)}
+      />
     </Modal>
   );
 }
