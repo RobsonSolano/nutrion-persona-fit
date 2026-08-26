@@ -286,6 +286,9 @@ export type WorkoutSession = {
   created_at: string;
 };
 
+/** Procedência dos macros: digitado, aceito da IA, ou corrigido depois dela. */
+export type MacrosSource = 'manual' | 'ai' | 'ai_edited';
+
 export type FoodLog = {
   id: string;
   user_id: string;
@@ -297,6 +300,12 @@ export type FoodLog = {
   fats_g: number | null;
   photo_path: string | null;
   ai_feedback: string | null;
+  /** kcal como a IA estimou, antes de qualquer edição do usuário. A diferença
+   *  contra `calories` é o erro da IA medido em produção. Null = sem análise. */
+  ai_kcal_original: number | null;
+  macros_source: MacrosSource | null;
+  /** Peso informado na balança, quando houve. Null = não pesou. */
+  scale_weight_g: number | null;
   created_at: string;
 };
 

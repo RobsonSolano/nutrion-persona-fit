@@ -12,6 +12,7 @@ import {
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
+  aplicarTetoDensidade,
   extrairJsonDoTexto,
   itemsComoTexto,
   parseSanityItems,
@@ -436,7 +437,10 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         model: modelToUse,
         messages,
-        temperature: 0.6,
+        // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
+        // de conversa; no sanity check ela só adiciona variância entre duas
+        // análises da MESMA refeição, que é justo o que atrapalha medir.
+        temperature: isChatMode ? 0.6 : 0.15,
         // Subiu junto com o sanity itemizado (SAN-10): cada item passou a ter
         // 6 campos nomeados em vez de ser só uma string. A conta, pra não virar
         // número mágico: ~35 tokens por item + ~150 de overhead (consistency,
@@ -582,7 +586,7 @@ serve(async (req: Request) => {
       nota: sanityNota,
     } = isChatMode
       ? { text: aiText, sanity: null, nota: null }
-      : resolveSanityOutput(aiText);
+      : resolveSanityOutput(aiText, body.scaleWeightG);
 
     const usedTokens =
       typeof groqJson?.usage?.total_tokens === 'number'
@@ -782,7 +786,10 @@ function buildEnrichedUserMessage(
  * string e macros já reconciliados. Os objetos ricos com gramagem vão no
  * envelope `sanity`, que só o app atualizado lê.
  */
-function resolveSanityOutput(aiText: string): {
+function resolveSanityOutput(
+  aiText: string,
+  scaleWeightG: number | undefined,
+): {
   text: string;
   sanity: { items: SanityItem[]; source: string } | null;
   nota: string | null;
@@ -793,17 +800,27 @@ function resolveSanityOutput(aiText: string): {
   const itens = parseSanityItems(bruto.items);
   const reconciliado = reconcileMacros(itens, bruto.macros);
 
+  // INS-02: último guard-rail, depois da reconciliação. Se o total sobreviveu
+  // até aqui com densidade fisicamente impossível, corrige — e escala os
+  // macros no mesmo fator pra não recriar a divergência que a reconciliação
+  // acabou de resolver.
+  const teto = reconciliado.macros
+    ? aplicarTetoDensidade(reconciliado.macros, scaleWeightG)
+    : { macros: null, fator: null };
+
   return {
     text: JSON.stringify({
       ...bruto,
       items: itemsComoTexto(itens),
-      ...(reconciliado.macros ? { macros: reconciliado.macros } : {}),
+      ...(teto.macros ? { macros: teto.macros } : {}),
     }),
     sanity: { items: itens, source: reconciliado.source },
     nota:
-      reconciliado.source !== 'items'
-        ? `sanity_fallback_${reconciliado.source}`
-        : null,
+      teto.fator !== null
+        ? 'sanity_densidade_corrigida'
+        : reconciliado.source !== 'items'
+          ? `sanity_fallback_${reconciliado.source}`
+          : null,
   };
 }
 

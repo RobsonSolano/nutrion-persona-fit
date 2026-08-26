@@ -197,3 +197,49 @@ export function extrairJsonDoTexto(texto: string): Record<string, unknown> | nul
   const bloco = limpo.match(/\{[\s\S]*\}/);
   return bloco ? tentar(bloco[0]) : null;
 }
+
+/**
+ * Teto físico de densidade calórica: 9 kcal por grama, que é gordura pura.
+ * Nada comestível passa disso, então acima é erro aritmético do modelo e não
+ * estimativa pessimista.
+ *
+ * Deliberadamente NÃO é um teto "de prato" (4-5 kcal/g), que pegaria mais
+ * casos: 15 g de azeite sozinhos dão ~8,8 kcal/g e seriam corrigidos pra baixo
+ * indevidamente. Prefere pegar menos e nunca errar contra o usuário.
+ */
+export const KCAL_POR_GRAMA_MAX = 9;
+
+export type TetoAplicado = {
+  macros: Macros;
+  /** Fator de correção aplicado, ou null quando nada foi mexido. */
+  fator: number | null;
+};
+
+/**
+ * Corrige o total quando a densidade calórica é fisicamente impossível.
+ *
+ * Escala os QUATRO macros pelo mesmo fator: corrigir só o kcal deixaria total
+ * e macros brigando entre si — exatamente o problema que a reconciliação
+ * resolve. Sem peso na balança não há como avaliar densidade, então passa
+ * intacto.
+ */
+export function aplicarTetoDensidade(
+  macros: Macros,
+  scaleWeightG: number | undefined,
+): TetoAplicado {
+  if (!scaleWeightG || scaleWeightG <= 0) return { macros, fator: null };
+
+  const teto = scaleWeightG * KCAL_POR_GRAMA_MAX;
+  if (!(macros.kcal > teto)) return { macros, fator: null };
+
+  const fator = teto / macros.kcal;
+  return {
+    macros: {
+      kcal: Math.round(teto),
+      protein_g: Math.round(macros.protein_g * fator),
+      carbs_g: Math.round(macros.carbs_g * fator),
+      fats_g: Math.round(macros.fats_g * fator),
+    },
+    fator,
+  };
+}

@@ -2,6 +2,62 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Sanity check — instrumentação e guard-rails (item #1) — 2026-08-26
+
+O item #1 do backlog eram as ondas **1 e 2**; o que foi entregue mais cedo hoje
+eram as ondas **3 e 4**. Confusão fácil de fazer, então: verificado no código
+antes de começar que nada da onda 1 existia (`ai_kcal_original`,
+`macros_source`, `scale_weight_g` não apareciam em migration nenhuma).
+
+| Onda | Estado antes | Agora |
+|---|---|---|
+| 2a — reconciliar kcal ↔ macros | ✅ já feito (veio de carona na onda 3) | — |
+| 2b — teto de densidade calórica | ❌ | ✅ `aplicarTetoDensidade` |
+| 2c — baixar temperature no sanity | ❌ estava em **0.6** | ✅ **0.15** |
+| 1 — instrumentar procedência | ❌ nada | ✅ 3 colunas + derivação |
+
+**O teto é 9 kcal/g** — gordura pura, limite físico. Deliberadamente NÃO é um
+teto "de prato" (4-5 kcal/g), que pegaria mais casos: 15 g de azeite sozinhos
+dão ~8,8 kcal/g e seriam corrigidos indevidamente. Pega menos e nunca erra
+contra o usuário. Quando corrige, escala os quatro macros no mesmo fator —
+corrigir só o total recriaria a divergência que a onda 2a resolveu.
+
+**`temperature` de 0.6 → 0.15 só no sanity** (`isChatMode ? 0.6 : 0.15`). O
+chat conversacional segue em 0.6. Contagem de caloria não quer criatividade, e
+0.6 adicionava variância entre duas análises da MESMA refeição — justo o que
+atrapalha medir.
+
+**A instrumentação é o ponto todo.** O `MealForm` preenche o campo com a
+estimativa da IA e o campo segue editável; quando o usuário corrige 500 para
+350 antes de salvar, essa diferença é o erro da IA medido de graça em produção.
+Até hoje o original era descartado. Agora `ai_kcal_original` +
+`macros_source` (`manual` | `ai` | `ai_edited`) transformam cada correção num
+ponto de medição.
+
+Os dois pontos de save foram instrumentados, e o **compilador apontou os dois**
+— `FoodLogInsert` é `Omit<FoodLog, ...>`, então estender o tipo quebrou
+`app/sanity-check.tsx:128` e `MealForm.tsx:171` na hora. `sanity-check.tsx`
+salva a estimativa como veio (`macros_source: 'ai'` sem ambiguidade) e é o
+único que tem peso de balança.
+
+**INS-06 verificado no banco:** tudo nullable e os checks só barram valor
+absurdo. Inserir refeição sem nenhum campo novo continua funcionando —
+instrumentação não pode impedir alguém de registrar comida.
+
+**Teste de ponta a ponta** (aluno3, 150 g arroz + 120 g frango, balança 270 g):
+383 kcal, densidade 1,42 kcal/g. Os itens voltaram como
+`Arroz, tipo 1, cozido 150g/192kcal` e `Frango, peito sem pele, grelhado
+120g/190,8kcal` — batem **exatamente** com a TACO (128 e 159 kcal/100 g).
+
+**Ainda sem verificação:** o `macros_source = 'ai_edited'` pela tela (precisa
+analisar, corrigir o campo e salvar). E o teto de densidade nunca disparou de
+verdade — só foi exercitado por teste unitário, porque exige o modelo errar
+por mais de 9 kcal/g.
+
+**O que isto desbloqueia:** depois de algumas semanas de uso, `select` em
+`food_logs` responde "a IA erra pra cima em quantos %?" com dado. É a baseline
+que o item #6 (IA paga) precisa pra deixar de ser fé.
+
 ### Enriquecimento do catálogo: 271 → 522 — 2026-08-26
 
 Fonte: `yuhonas/free-exercise-db` (CC0), a mesma que já alimentava as imagens —

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  aplicarTetoDensidade,
   extrairJsonDoTexto,
   itemsComoTexto,
   parseSanityItems,
@@ -195,5 +196,66 @@ describe('extrairJsonDoTexto', () => {
 
   it('SAN-03: array no topo não serve como resposta → null', () => {
     expect(extrairJsonDoTexto('["arroz","feijão"]')).toBeNull();
+  });
+});
+
+describe('aplicarTetoDensidade (INS-02)', () => {
+  const m = (kcal: number, p = 10, c = 20, f = 5) => ({
+    kcal,
+    protein_g: p,
+    carbs_g: c,
+    fats_g: f,
+  });
+
+  it('INS02: sem peso na balança não mexe em nada', () => {
+    const r = aplicarTetoDensidade(m(5000), undefined);
+    expect(r.macros).toEqual(m(5000));
+    expect(r.fator).toBeNull();
+  });
+
+  it('INS02: densidade plausível passa intacta', () => {
+    // 400 kcal em 300 g = 1,33 kcal/g — prato normal.
+    const r = aplicarTetoDensidade(m(400), 300);
+    expect(r.macros.kcal).toBe(400);
+    expect(r.fator).toBeNull();
+  });
+
+  it('INS02: azeite puro NÃO é corrigido', () => {
+    // 15 g de azeite = ~132 kcal = 8,8 kcal/g. Está abaixo do teto físico de
+    // propósito: um teto "de prato" (4-5) puniria quem pesou só o azeite.
+    const r = aplicarTetoDensidade(m(132), 15);
+    expect(r.fator).toBeNull();
+  });
+
+  it('INS02: impossível fisicamente é corrigido pro teto', () => {
+    // 3000 kcal em 200 g = 15 kcal/g. Nada comestível chega lá.
+    const r = aplicarTetoDensidade(m(3000), 200);
+    expect(r.macros.kcal).toBe(1800); // 200 g x 9 kcal/g
+    expect(r.fator).toBeCloseTo(0.6, 5);
+  });
+
+  it('INS02: macros escalam no MESMO fator do total', () => {
+    // Corrigir só o kcal deixaria total e macros brigando — o problema que a
+    // reconciliação da onda 2a resolveu.
+    const r = aplicarTetoDensidade(m(3000, 100, 200, 50), 200);
+    expect(r.macros.protein_g).toBe(60);
+    expect(r.macros.carbs_g).toBe(120);
+    expect(r.macros.fats_g).toBe(30);
+  });
+
+  it('INS02: peso zero ou negativo é ignorado (evita divisão por zero)', () => {
+    expect(aplicarTetoDensidade(m(500), 0).fator).toBeNull();
+    expect(aplicarTetoDensidade(m(500), -10).fator).toBeNull();
+  });
+
+  it('INS02: kcal zero não vira NaN', () => {
+    const r = aplicarTetoDensidade(m(0, 0, 0, 0), 100);
+    expect(r.macros.kcal).toBe(0);
+    expect(r.fator).toBeNull();
+  });
+
+  it('INS02: exatamente no teto não é corrigido', () => {
+    const r = aplicarTetoDensidade(m(900), 100); // 9,0 kcal/g
+    expect(r.fator).toBeNull();
   });
 });

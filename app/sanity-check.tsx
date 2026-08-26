@@ -134,6 +134,11 @@ export default function SanityCheckScreen() {
         fats_g: result.macros.fats_g ?? null,
         photo_path: null,
         ai_feedback: result.feedback ?? null,
+        // Esta tela salva a estimativa COMO VEIO — não há campo editável
+        // aqui, então a procedência é 'ai' sem ambiguidade.
+        ai_kcal_original: result.macros.kcal ?? null,
+        macros_source: 'ai',
+        scale_weight_g: scaleWeight ? Number(scaleWeight) : null,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
