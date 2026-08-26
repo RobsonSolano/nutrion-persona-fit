@@ -49,6 +49,9 @@ type Body = {
   water_goal_ml?: number | null;
   allergies?: string | null;
   physical_limitations?: string | null;
+  has_disability?: boolean | null;
+  disability_types?: string[] | null;
+  disability_notes?: string | null;
   bio?: string | null;
 };
 
@@ -170,6 +173,9 @@ serve(async (req: Request) => {
         water_goal_ml: body.water_goal_ml ?? null,
         allergies: body.allergies?.trim() || null,
         physical_limitations: body.physical_limitations?.trim() || null,
+        has_disability: body.has_disability ?? null,
+        disability_types: body.disability_types ?? [],
+        disability_notes: body.disability_notes?.trim() || null,
         bio: body.bio?.trim() || null,
         onboarding_completed_at: now,
         onboarding_skipped_at: null,

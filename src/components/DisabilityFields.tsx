@@ -93,14 +93,19 @@ export default function DisabilityFields({
               selected={types}
               onToggle={toggleTipo}
             />
+            {types.length === 0 && (
+              <Text className="text-warn text-[11px] mt-2">
+                Escolha ao menos uma opção pra continuar.
+              </Text>
+            )}
           </View>
 
           <View>
             <Input
               value={notes}
-              onChangeText={(v) =>
-                v.length <= MAX_DISABILITY_NOTES && onChange({ notes: v })
-              }
+              onChangeText={(v) => {
+                if (v.length <= MAX_DISABILITY_NOTES) onChange({ notes: v });
+              }}
               placeholder={
                 notasObrigatorias
                   ? 'Descreva a sua condição'
