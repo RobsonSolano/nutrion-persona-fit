@@ -2,6 +2,65 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Cadastro de exercício pelo professor (item #5) — 2026-08-26
+
+Implementado a partir da spec e do plano de 2026-07-29 (`docs/superpowers/`),
+41 commits atrás. Os deltas que a base exigiu estão em
+`.specs/features/2026-08-26-exercicios-professor/deltas.md`.
+
+**Onde o professor cadastra:** dentro do `ExercisePickerModal` ("Escolher
+exercício"), botão `+ Novo exercício` abaixo do estado vazio e acima da lista.
+Caminho: aluno → Plano → Treinos → + → escolher exercício. Nenhuma rota nova.
+
+**Cinco furos do plano de julho**, todos corrigidos e documentados:
+
+1. A Task 9 mandava resolver o coach dentro do `plan-generator` usando "o
+   identificador que já existe no escopo" — **não existia**. `generatePlan` não
+   recebe id de usuário. Resolvido com `visible_owner_id` no `PlanInput`.
+2. Eram 4 functions para deploy, não 5: `coach-save-student-plan` importa só
+   `type PlanOut`, apagado no bundle.
+3. `fallbackPlan.ts` foi reescrito no dia 26 — as linhas apontadas não existiam.
+4. `fetchCatalog` ganhou parâmetro de restrição corporal; o filtro de
+   visibilidade teve de compor com ele.
+5. A policy de insert chamava `_resolve_entitlement(uuid)`, que **não tem grant
+   para authenticated** — daria permission denied. Trocado pelo wrapper
+   `resolve_entitlement()`.
+
+**Decisão nova (dev):** `requires_lower_limbs` virou nullable sem default.
+O item #5 é o primeiro portão que cria exercício fora do seed, e `default false`
+significava "liberado" — um "Agachamento Ravi" chegaria a quem declarou
+paraplegia. Com `null` = não classificado e o filtro sendo `eq.false`, o não
+classificado já sai dos planos com restrição. O form ganhou o toggle "Exige uso
+das pernas?", com estado inicial derivado do grupo pela distribuição real do
+catálogo.
+
+**Verificado contra o banco (não é UAT de tela):**
+
+| O que | Resultado |
+|---|---|
+| Policy de leitura | Exclusivo do professor: dono VÊ, aluno dele VÊ, avulso não vê |
+| Policy de insert | Professor premium insere; aluno bloqueado; professor com `owner_id` de outro bloqueado |
+| Seed | 271/271 visíveis pros três papéis — nada ficou invisível |
+| Fail-safe | Insert sem a coluna deixa `requires_lower_limbs = null` |
+| Índices parciais | Professor consegue criar homônimo de exercício do seed |
+| `fetchCatalog` | Aluno do coach 152 exercícios · autônomo 150, e **zero exclusivos de qualquer um** |
+| `fallbackPlan` | `.is('owner_id', null)` casa 1 em vez de 2 no nome duplicado |
+| Bucket | `exercise-photos` público, 2 MB |
+
+**Dois defeitos meus, achados na revisão do próprio diff:** `tocouPerna` não
+resetava ao reabrir o modal (segunda abertura ignorava a sugestão por grupo), e
+`valoresIniciais()` lia `groupsQ.data` que pode não ter respondido ainda —
+o default caía em "Sim" pra exercício de peito e nunca era recalculado.
+
+**Achado de brinde:** o `ExercisePickerModal` tinha o mesmo bug de safe area do
+`TemplatePicker` (`Platform.OS === 'ios' ? 50 : 16` fixo). Corrigido em commit
+separado da extração.
+
+**Sem verificação: nenhuma tela foi renderizada.** Task 10 (UAT) é do dev.
+Falta ver o botão, o form, o upload de imagem, o badge "meu", o lápis de edição,
+o fluxo de duplicata e a exclusão. E o gate depende de `tier === 'premium'`, que
+por D3 do billing só resolve com assinatura de loja.
+
 ### Restrição corporal declarada (PCD) — 2026-08-26
 
 **O bug relatado:** usuário de teste selecionou musculação e escreveu no campo livre
