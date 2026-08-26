@@ -90,7 +90,9 @@ serve(async (req: Request) => {
     // Refazer (após onboarding_completed_at) custa 1 uso por dia.
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('onboarding_completed_at')
+      .select(
+        'onboarding_completed_at, has_disability, disability_types, disability_notes',
+      )
       .eq('id', user.id)
       .single();
     if (profileErr) {
@@ -133,8 +135,18 @@ serve(async (req: Request) => {
       )
       .eq('user_id', user.id)
       .maybeSingle();
+    // Compatibilidade de rollout: app instalado antes desta versão não manda
+    // os campos de PCD no body. Sem esse fallback, quem regenera o plano por
+    // um app antigo perderia o bloqueio de exercício. Body tem precedência
+    // porque durante o onboarding ele é o dado mais fresco — o profile só é
+    // gravado DEPOIS da geração.
     const inputWithAnamnese: PlanInput = {
       ...body,
+      has_disability: body.has_disability ?? profile?.has_disability ?? null,
+      disability_types:
+        body.disability_types ?? profile?.disability_types ?? null,
+      disability_notes:
+        body.disability_notes ?? profile?.disability_notes ?? null,
       anamnese_summary: formatAnamneseForPrompt(anamnese),
     };
 

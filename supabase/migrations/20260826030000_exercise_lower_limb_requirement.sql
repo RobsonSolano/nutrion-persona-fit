@@ -43,7 +43,23 @@ update public.exercises
    and modality = 'corrida';
 
 -- ---------------------------------------------------------------------
--- 3. Lista curada em cardio / full_body / core
+-- 3. Movimentos de perna que NÃO moram no grupo legs — vale pro catálogo
+--    inteiro. `Levantamento terra (barra)` e `Deadlift (CrossFit)` estão em
+--    'back'; `Push press` (que é acionamento de perna por definição) e
+--    `Handstand push-up` estão em 'shoulders'. Sem esta passada eles
+--    escapariam do filtro.
+-- ---------------------------------------------------------------------
+update public.exercises
+   set requires_lower_limbs = true
+ where requires_lower_limbs = false
+   and name ilike any (array[
+     '%levantamento terra%', '%deadlift%', '%push press%',
+     '%remada curvada%', '%cavalinho%',
+     '%handstand%', '%pike push-up%', '%barra australiana%'
+   ]);
+
+-- ---------------------------------------------------------------------
+-- 4. Lista curada em cardio / full_body / core
 --    Padrões acentuados como os nomes do seed (ilike não normaliza acento).
 --    '%assault bike%' e não '%bike%': 'bike' pegaria o handbike adaptado.
 -- ---------------------------------------------------------------------
@@ -78,7 +94,7 @@ update public.exercises e
    ]);
 
 -- ---------------------------------------------------------------------
--- 4. Sem isto não sobra UM cardio pra quem usa cadeira de rodas.
+-- 5. Sem isto não sobra UM cardio pra quem usa cadeira de rodas.
 --    Máquina real de academia, válida pra qualquer pessoa (usada também
 --    em reabilitação de membro inferior), então entra pro catálogo geral.
 -- ---------------------------------------------------------------------
