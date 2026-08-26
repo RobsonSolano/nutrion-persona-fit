@@ -41,7 +41,7 @@ export default function LogScreen() {
           animation: 'slide_from_bottom',
         }}
       />
-      <Screen variant="hero" edges={['top']}>
+      <Screen variant="hero" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"
           keyboardVerticalOffset={0}

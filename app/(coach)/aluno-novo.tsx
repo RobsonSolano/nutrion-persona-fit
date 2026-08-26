@@ -694,7 +694,7 @@ function PreviewScreen({
   saving: boolean;
 }) {
   return (
-    <Screen variant="hero" edges={['top']}>
+    <Screen variant="hero" edges={['top', 'bottom']}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 20,

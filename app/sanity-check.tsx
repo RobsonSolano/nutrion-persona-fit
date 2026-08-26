@@ -159,7 +159,7 @@ export default function SanityCheckScreen() {
           animation: 'slide_from_bottom',
         }}
       />
-      <Screen variant="violet" edges={['top']}>
+      <Screen variant="violet" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"
           keyboardVerticalOffset={0}

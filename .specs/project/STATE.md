@@ -2,6 +2,38 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### safe-area-bottom (2026-08-26) — implementado (branch `bugfix/safe-area-bottom`)
+
+**Sintoma (dev):** em algumas telas — paywall/assinatura o exemplo — o conteúdo do rodapé ficava
+**embaixo dos botões de navegação do Android**, inalcançável.
+
+**Causa raiz:** `app.config.ts:62` tem `edgeToEdgeEnabled: true` (conteúdo desenha atrás das barras,
+por design do Android 15) + `src/components/ui/Screen.tsx` com default `edges = ['top']` (só o topo
+protegido) + **aplicação inconsistente**: 6 telas passavam `['top','bottom']`, 13 passavam só
+`['top']`. Não era bug de uma tela.
+
+**Correção:** `['top', 'bottom']` nas **12 telas fora das tabs** (paywall, editar-perfil, log,
+sanity-check, rotina nova/[id], onboarding/resultado, coach aluno-novo, coach rotina nova/[routineId],
+coach templates novo/[id]).
+
+**O que NÃO foi mexido, e por quê:** `(tabs)/chat` fica em `['top']` e as três telas de tabs que usam
+`<Screen>` sem `edges` (`index`, `treino`, `perfil`) seguem no default. A tab bar já soma
+`insets.bottom` na própria altura (`app/(tabs)/_layout.tsx`), então dar `'bottom'` a elas criaria
+espaço vazio duplicado.
+
+**Recomendação inicial descartada por verificação:** a primeira ideia foi inverter o default do
+`Screen` para `['top','bottom']`. Não serve, exatamente por causa das 3 telas de tabs que dependem do
+default. O default fica `['top']` e a armadilha está **documentada no JSDoc do próprio `Screen.tsx`**
+— é o ponto onde alguém decide, e onde a informação evita a repetição.
+
+**Relação com o item #7 do backlog (Play Console / edge-to-edge):** parentes, não iguais. O #7 é sobre
+APIs deprecadas de insets e **exige build novo**; este é JS puro e **sai por OTA**.
+
+**Validado:** 181/181, typecheck sem erro novo. Lint: os 2 erros em `onboarding/resultado.tsx:114`
+(aspas não escapadas) são pré-existentes — confirmado por stash; só a linha do `<Screen>` foi tocada.
+
+**Pendente:** verificação visual em device — exige OTA. O ajuste é de layout, então só o olho confirma.
+
 ### cardio-metricas (2026-08-25) — implementado (branch `feature/cardio-metricas`)
 
 Spec: `.specs/features/2026-08-25-cardio-metricas/spec.md` (CAR-01..CAR-08). Item #4 da leva.
