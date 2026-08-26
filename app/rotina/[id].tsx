@@ -28,7 +28,10 @@ import {
   useUpdateRoutine,
 } from '@/hooks/useRoutines';
 import { useCreateTemplate } from '@/hooks/useTemplates';
-import { useExerciseImagesMap } from '@/hooks/useExercises';
+import {
+  useExerciseImagesMap,
+  useExerciseVideoMap,
+} from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
 import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useAlert } from '@/components/GlobalAlertProvider';
@@ -36,6 +39,7 @@ import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { MODALITY_LABELS } from '@/types/database';
+import { toExerciseInsert } from '@/lib/exerciseInsert';
 
 export default function RotinaDetalheScreen() {
   const router = useRouter();
@@ -45,6 +49,7 @@ export default function RotinaDetalheScreen() {
   const update = useUpdateRoutine();
   const remove = useDeleteRoutine();
   const imagesMap = useExerciseImagesMap();
+  const videoMap = useExerciseVideoMap();
 
   const isStudent = profileQ.data?.role === 'aluno';
   const isCoach = profileQ.data?.role === 'professor';
@@ -65,6 +70,7 @@ export default function RotinaDetalheScreen() {
     name: string;
     equipment: string | null;
     images: string[];
+    video: string | null;
   } | null>(null);
 
   if (!id) return null;
@@ -77,19 +83,7 @@ export default function RotinaDetalheScreen() {
         modality: detailQ.data.modality,
         groupId: detailQ.data.group_id,
         description: detailQ.data.description,
-        exercises: detailQ.data.exercises.map((e) => ({
-          exercise_id: e.exercise_id,
-          exercise_name: e.exercise_name,
-          equipment: e.equipment,
-          sort_order: e.sort_order,
-          sets: e.sets,
-          reps_min: e.reps_min,
-          reps_max: e.reps_max,
-          weight_min_kg: e.weight_min_kg,
-          weight_max_kg: e.weight_max_kg,
-          duration_min: e.duration_min,
-          notes: e.notes,
-        })),
+        exercises: detailQ.data.exercises.map(toExerciseInsert),
       });
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
@@ -141,7 +135,7 @@ export default function RotinaDetalheScreen() {
           animation: 'slide_from_right',
         }}
       />
-      <Screen variant="hero" edges={['top']}>
+      <Screen variant="hero" edges={['top', 'bottom']}>
         <KeyboardAvoidingView behavior="padding" className="flex-1">
           <View className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle">
             <Pressable
@@ -171,19 +165,7 @@ export default function RotinaDetalheScreen() {
               initialDescription={detailQ.data.description ?? ''}
               initialModality={detailQ.data.modality}
               initialGroupId={detailQ.data.group_id}
-              initialExercises={detailQ.data.exercises.map((e) => ({
-                exercise_id: e.exercise_id,
-                exercise_name: e.exercise_name,
-                equipment: e.equipment,
-                sort_order: e.sort_order,
-                sets: e.sets,
-                reps_min: e.reps_min,
-                reps_max: e.reps_max,
-                weight_min_kg: e.weight_min_kg,
-                weight_max_kg: e.weight_max_kg,
-                duration_min: e.duration_min,
-                notes: e.notes,
-              }))}
+              initialExercises={detailQ.data.exercises.map(toExerciseInsert)}
               submitLabel="Salvar alterações"
               loading={update.isPending}
               onSubmit={async (payload) => {
@@ -272,12 +254,16 @@ export default function RotinaDetalheScreen() {
                       const imgs = e.exercise_id
                         ? imagesMap.get(e.exercise_id) ?? null
                         : null;
+                      const vid = e.exercise_id
+                        ? videoMap.get(e.exercise_id) ?? null
+                        : null;
                       return (
                         <ExerciseReadRow
                           key={e.id}
                           exercise={e}
                           index={i}
                           imageUrls={imgs}
+                          videoUrl={vid}
                           onPreview={
                             imgs
                               ? () =>
@@ -285,6 +271,7 @@ export default function RotinaDetalheScreen() {
                                     name: e.exercise_name,
                                     equipment: e.equipment,
                                     images: imgs,
+                                    video: vid,
                                   })
                               : undefined
                           }
@@ -348,6 +335,7 @@ export default function RotinaDetalheScreen() {
         exerciseName={preview?.name ?? ''}
         equipment={preview?.equipment}
         imageUrls={preview?.images ?? []}
+        videoUrl={preview?.video ?? null}
       />
     </>
   );

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  DisabilityType,
   GoalType,
   Sex,
   WeeklyFrequency,
@@ -23,6 +24,10 @@ export type OnboardingState = {
   water_goal_ml: number | null;
   allergies: string;
   physical_limitations: string;
+  // null = ainda não respondeu (o campo é opcional)
+  has_disability: boolean | null;
+  disability_types: DisabilityType[];
+  disability_notes: string;
   // Tela 6 — bio
   bio: string;
   // Controle
@@ -50,6 +55,9 @@ const initial: OnboardingState = {
   water_goal_ml: 2000,
   allergies: '',
   physical_limitations: '',
+  has_disability: null,
+  disability_types: [],
+  disability_notes: '',
   bio: '',
   startedAt: null,
 };

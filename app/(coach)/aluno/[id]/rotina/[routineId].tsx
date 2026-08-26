@@ -20,6 +20,7 @@ import {
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { ConfirmModal, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { toExerciseInsert } from '@/lib/exerciseInsert';
 
 export default function CoachEditarRotinaAluno() {
   const router = useRouter();
@@ -59,19 +60,7 @@ export default function CoachEditarRotinaAluno() {
         modality: detailQ.data.modality,
         groupId: detailQ.data.group_id,
         description: detailQ.data.description,
-        exercises: detailQ.data.exercises.map((e) => ({
-          exercise_id: e.exercise_id,
-          exercise_name: e.exercise_name,
-          equipment: e.equipment,
-          sort_order: e.sort_order,
-          sets: e.sets,
-          reps_min: e.reps_min,
-          reps_max: e.reps_max,
-          weight_min_kg: e.weight_min_kg,
-          weight_max_kg: e.weight_max_kg,
-          duration_min: e.duration_min,
-          notes: e.notes,
-        })),
+        exercises: detailQ.data.exercises.map(toExerciseInsert),
       });
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
@@ -95,7 +84,7 @@ export default function CoachEditarRotinaAluno() {
           animation: 'slide_from_right',
         }}
       />
-      <Screen variant="hero" edges={['top']}>
+      <Screen variant="hero" edges={['top', 'bottom']}>
         <KeyboardAvoidingView behavior="padding" className="flex-1">
           <View className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle">
             <Pressable
@@ -144,19 +133,7 @@ export default function CoachEditarRotinaAluno() {
               initialDescription={detailQ.data.description ?? ''}
               initialModality={detailQ.data.modality}
               initialGroupId={detailQ.data.group_id}
-              initialExercises={detailQ.data.exercises.map((e) => ({
-                exercise_id: e.exercise_id,
-                exercise_name: e.exercise_name,
-                equipment: e.equipment,
-                sort_order: e.sort_order,
-                sets: e.sets,
-                reps_min: e.reps_min,
-                reps_max: e.reps_max,
-                weight_min_kg: e.weight_min_kg,
-                weight_max_kg: e.weight_max_kg,
-                duration_min: e.duration_min,
-                notes: e.notes,
-              }))}
+              initialExercises={detailQ.data.exercises.map(toExerciseInsert)}
               submitLabel="Salvar alterações"
               loading={update.isPending}
               onSubmit={async (payload) => {

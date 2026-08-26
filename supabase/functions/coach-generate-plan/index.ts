@@ -89,7 +89,7 @@ serve(async (req: Request) => {
     const { data: student, error: studentErr } = await supabaseService
       .from('profiles')
       .select(
-        'id, role, coach_id, full_name, sex, birth_year, weight_kg, height_cm, goal_type, goal_weight_kg, goal_target_date, practices_sport, sports, weekly_frequency, water_goal_ml, allergies, physical_limitations, bio',
+        'id, role, coach_id, full_name, sex, birth_year, weight_kg, height_cm, goal_type, goal_weight_kg, goal_target_date, practices_sport, sports, weekly_frequency, water_goal_ml, allergies, physical_limitations, bio, has_disability, disability_types, disability_notes',
       )
       .eq('id', body.student_id)
       .single();
@@ -153,6 +153,11 @@ serve(async (req: Request) => {
       allergies: student.allergies,
       physical_limitations: student.physical_limitations,
       bio: student.bio,
+      has_disability: student.has_disability,
+      disability_types: student.disability_types,
+      disability_notes: student.disability_notes,
+      // O caller é o professor do aluno — os exclusivos dele entram.
+      visible_owner_id: caller.id,
       anamnese_summary: anamneseSummary,
     };
 

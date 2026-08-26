@@ -1,8 +1,24 @@
 import { Pressable, Text, View } from 'react-native';
-import { Check, Clock, CirclePlay } from 'lucide-react-native';
+import { Check, Clock, CirclePlay, Gauge, Route } from 'lucide-react-native';
+import {
+  formatCardioMetrics,
+  type ChipMetrica,
+} from '@/lib/cardioMetrics';
+import type { MetricType } from '@/types/database';
 import PreviewEyeButton from './PreviewEyeButton';
 import { colors } from '@/lib/theme';
-import { openYouTubeSearchForExercise } from '@/lib/youtube';
+import { openExerciseVideo } from '@/lib/youtube';
+
+// Mapa em vez de ternário aninhado dentro do map — mesmo padrão de
+// MODALITY_LABELS em types/database.ts.
+const CHIP_ICON: Record<
+  ChipMetrica['kind'],
+  { Icon: typeof Route; color: string }
+> = {
+  distance: { Icon: Route, color: colors.accent },
+  duration: { Icon: Clock, color: colors.info },
+  cadence: { Icon: Gauge, color: colors.info },
+};
 
 export type ReadableExercise = {
   exercise_id: string | null;
@@ -14,6 +30,10 @@ export type ReadableExercise = {
   weight_min_kg: number | null;
   weight_max_kg: number | null;
   duration_min: number | null;
+  metric_type?: MetricType;
+  distance_min_m?: number | null;
+  distance_max_m?: number | null;
+  cadence_rpm?: number | null;
   notes: string | null;
 };
 
@@ -21,6 +41,8 @@ type Props = {
   exercise: ReadableExercise;
   index: number;
   imageUrls: string[] | null;
+  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
+  videoUrl?: string | null;
   onPreview?: () => void;
 };
 
@@ -28,6 +50,7 @@ export default function ExerciseReadRow({
   exercise,
   index,
   imageUrls,
+  videoUrl,
   onPreview,
 }: Props) {
   const repRange = formatRange(exercise.reps_min, exercise.reps_max);
@@ -54,7 +77,12 @@ export default function ExerciseReadRow({
         <View className="flex-row items-center gap-2">
           {hasImages && onPreview && <PreviewEyeButton onPress={onPreview} />}
           <Pressable
-            onPress={() => openYouTubeSearchForExercise(exercise.exercise_name)}
+            onPress={() =>
+              openExerciseVideo({
+                videoUrl,
+                exerciseName: exercise.exercise_name,
+              })
+            }
             hitSlop={8}
             className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
           >
@@ -63,19 +91,35 @@ export default function ExerciseReadRow({
         </View>
       </View>
       <View className="flex-row flex-wrap gap-2 mt-2">
-        {exercise.sets != null && (
-          <Pill
-            icon={<Check size={10} color={colors.accent} />}
-            label={`${exercise.sets} séries`}
-          />
-        )}
-        {repRange && <Pill label={`${repRange} reps`} />}
-        {weightRange && <Pill label={`${weightRange} kg`} />}
-        {exercise.duration_min != null && (
-          <Pill
-            icon={<Clock size={10} color={colors.info} />}
-            label={`${exercise.duration_min} min`}
-          />
+        {exercise.metric_type === 'cardio' ? (
+          // Cárdio não usa séries/carga — mostra distância, tempo e cadência.
+          formatCardioMetrics(exercise).map((chip) => {
+            const { Icon, color } = CHIP_ICON[chip.kind];
+            return (
+              <Pill
+                key={chip.kind}
+                icon={<Icon size={10} color={color} />}
+                label={chip.label}
+              />
+            );
+          })
+        ) : (
+          <>
+            {exercise.sets != null && (
+              <Pill
+                icon={<Check size={10} color={colors.accent} />}
+                label={`${exercise.sets} séries`}
+              />
+            )}
+            {repRange && <Pill label={`${repRange} reps`} />}
+            {weightRange && <Pill label={`${weightRange} kg`} />}
+            {exercise.duration_min != null && (
+              <Pill
+                icon={<Clock size={10} color={colors.info} />}
+                label={`${exercise.duration_min} min`}
+              />
+            )}
+          </>
         )}
       </View>
       {exercise.notes && (

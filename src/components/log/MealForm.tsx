@@ -31,6 +31,7 @@ import { useImagePicker } from '@/hooks/useImagePicker';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { runSanityCheck } from '@/services/sanityCheck';
+import { derivarMacrosSource } from '@/lib/macrosSource';
 import { captureError } from '@/lib/sentry';
 import { Button, Card, Input } from '@/components/ui';
 import { CharCounter } from '@/components/onboarding';
@@ -69,6 +70,10 @@ export default function MealForm() {
   const [description, setDescription] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+
+  /** kcal da última análise da IA. É contra ele que a edição do usuário faz
+   *  sentido — a diferença é o erro da IA medido em produção (INS-05). */
+  const [aiKcalOriginal, setAiKcalOriginal] = useState<number | null>(null);
 
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
@@ -118,7 +123,10 @@ export default function MealForm() {
       });
       const m = res.macros;
       if (m) {
-        if (m.kcal != null) setCalories(String(Math.round(m.kcal)));
+        if (m.kcal != null) {
+          setCalories(String(Math.round(m.kcal)));
+          setAiKcalOriginal(Math.round(m.kcal));
+        }
         if (m.protein_g != null) setProtein(String(Math.round(m.protein_g)));
         if (m.carbs_g != null) setCarbs(String(Math.round(m.carbs_g)));
         if (m.fats_g != null) setFats(String(Math.round(m.fats_g)));
@@ -177,6 +185,14 @@ export default function MealForm() {
         fats_g: toInt(fats),
         photo_path: null,
         ai_feedback: aiFeedback,
+        ai_kcal_original: aiKcalOriginal,
+        macros_source: derivarMacrosSource({
+          aiKcalOriginal,
+          kcalSalvo: cal,
+        }),
+        // Este formulário não tem campo de balança (a tela de sanity check
+        // tem). Null é a verdade, não um placeholder.
+        scale_weight_g: null,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();

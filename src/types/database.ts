@@ -10,10 +10,22 @@ export type WeeklyFrequency = '1-2' | '2-3' | '3-4' | '4-5' | '5-6' | '6-7';
 
 export type ProfileRole = 'comum' | 'aluno' | 'professor';
 
+/** Tipos de deficiência declarados. Os dois primeiros viram bloqueio
+ *  determinístico de exercício no gerador de plano (bodyRestrictions.ts). */
+export type DisabilityType =
+  | 'wheelchair_paraplegia'
+  | 'amputation_lower'
+  | 'amputation_upper'
+  | 'visual'
+  | 'hearing'
+  | 'other';
+
 export type Profile = {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  /** Espelho de auth.users.email (trigger). Somente leitura. */
+  email: string | null;
   weight_kg: number | null;
   height_cm: number | null;
   goal_weight_kg: number | null;
@@ -30,6 +42,10 @@ export type Profile = {
   practices_sport: boolean | null;
   sports: string[] | null;
   weekly_frequency: WeeklyFrequency | null;
+  /** null = nunca respondeu (perfis antigos). */
+  has_disability: boolean | null;
+  disability_types: DisabilityType[];
+  disability_notes: string | null;
   onboarding_completed_at: string | null;
   onboarding_skipped_at: string | null;
   suspended_at: string | null;
@@ -111,6 +127,10 @@ export type ExerciseGroup = {
   sort_order: number;
 };
 
+/** Formato de métricas do exercício: força usa séries/reps/carga, cardio usa
+ *  distância/RPM/tempo. */
+export type MetricType = 'strength' | 'cardio';
+
 export type Modality =
   | 'musculacao'
   | 'calistenia'
@@ -126,6 +146,9 @@ export const MODALITY_LABELS: Record<Modality, string> = {
   generico: 'Genérico',
 };
 
+/** exclusivo = só o dono e os alunos dele; publico = catálogo global. */
+export type ExerciseVisibility = 'exclusivo' | 'publico';
+
 export type Exercise = {
   id: string;
   group_id: string;
@@ -135,6 +158,13 @@ export type Exercise = {
   image_urls: string[] | null;
   video_url: string | null;
   modality: Modality;
+  /** Professor que criou. Null = catálogo seed original. */
+  owner_id: string | null;
+  visibility: ExerciseVisibility;
+  /** Exige função de membro inferior. `null` = não classificado — e por
+   *  segurança também sai dos planos de quem declara restrição, porque o
+   *  filtro do gerador é `eq.false` e `null = false` não é verdadeiro. */
+  requires_lower_limbs: boolean | null;
 };
 
 export type WaterLog = {
@@ -185,6 +215,14 @@ export type TemplateExercise = {
   weight_min_kg: number | null;
   weight_max_kg: number | null;
   duration_min: number | null;
+  /** strength (séries/reps/carga) ou cardio (distância/RPM/tempo). Snapshot do
+   *  grupo do exercício — não depende de exercise_id continuar existindo. */
+  metric_type: MetricType;
+  /** Só em cardio. Metros (inteiro cobre natação 100m e corrida 10000m). */
+  distance_min_m: number | null;
+  distance_max_m: number | null;
+  /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
+  cadence_rpm: number | null;
   notes: string | null;
 };
 
@@ -217,6 +255,14 @@ export type RoutineExercise = {
   weight_min_kg: number | null;
   weight_max_kg: number | null;
   duration_min: number | null;
+  /** strength (séries/reps/carga) ou cardio (distância/RPM/tempo). Snapshot do
+   *  grupo do exercício — não depende de exercise_id continuar existindo. */
+  metric_type: MetricType;
+  /** Só em cardio. Metros (inteiro cobre natação 100m e corrida 10000m). */
+  distance_min_m: number | null;
+  distance_max_m: number | null;
+  /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
+  cadence_rpm: number | null;
   notes: string | null;
 };
 
@@ -240,6 +286,9 @@ export type WorkoutSession = {
   created_at: string;
 };
 
+/** Procedência dos macros: digitado, aceito da IA, ou corrigido depois dela. */
+export type MacrosSource = 'manual' | 'ai' | 'ai_edited';
+
 export type FoodLog = {
   id: string;
   user_id: string;
@@ -251,6 +300,12 @@ export type FoodLog = {
   fats_g: number | null;
   photo_path: string | null;
   ai_feedback: string | null;
+  /** kcal como a IA estimou, antes de qualquer edição do usuário. A diferença
+   *  contra `calories` é o erro da IA medido em produção. Null = sem análise. */
+  ai_kcal_original: number | null;
+  macros_source: MacrosSource | null;
+  /** Peso informado na balança, quando houve. Null = não pesou. */
+  scale_weight_g: number | null;
   created_at: string;
 };
 

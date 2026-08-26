@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -15,6 +14,7 @@ import {
   Square,
   X,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useTemplates } from '@/hooks/useTemplates';
@@ -42,6 +42,7 @@ export default function TemplatePicker({
   confirmLabel = 'Aplicar',
   loading = false,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const templatesQ = useTemplates({ archived: false });
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -84,7 +85,7 @@ export default function TemplatePicker({
       <View className="flex-1 bg-bg-deep">
         <View
           className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle"
-          style={{ paddingTop: Platform.OS === 'ios' ? 50 : 16 }}
+          style={{ paddingTop: Math.max(insets.top, 16) + 4 }}
         >
           <Pressable
             onPress={onClose}
@@ -132,9 +133,12 @@ export default function TemplatePicker({
           )}
         </ScrollView>
 
+        {/* `insets.bottom` em vez de 16px fixos: com edgeToEdgeEnabled, a barra
+            de 3 botões do Android tem ~48px e engolia o botão de confirmar. Este
+            é um Modal, então não passa pelo `Screen`, que trata os edges. */}
         <View
           className="px-5 py-3 border-t border-border-subtle bg-bg-deep"
-          style={{ paddingBottom: Platform.OS === 'ios' ? 30 : 16 }}
+          style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}
         >
           <Button
             label={count > 0 ? `${confirmLabel} (${count})` : confirmLabel}

@@ -1,35 +1,31 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
   View,
-  ActivityIndicator,
   type TextInput,
 } from 'react-native';
-import {
-  Plus,
-  Trash2,
-  Search,
-  X,
-  Save,
-  CheckCircle2,
-  PlusCircle,
-  CirclePlay,
-} from 'lucide-react-native';
-import { openYouTubeSearchForExercise } from '@/lib/youtube';
+import { Plus, Trash2, Save, CirclePlay } from 'lucide-react-native';
+import { openExerciseVideo } from '@/lib/youtube';
 import * as Haptics from 'expo-haptics';
 import {
   useExerciseGroups,
   useExerciseImagesMap,
-  useExercisesByGroup,
+  useExerciseVideoMap,
 } from '@/hooks/useExercises';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
+import {
+  horaMinParaMinutos,
+  metricTypeFromGroup,
+  minutosParaHoraMin,
+  validateCardioMetrics,
+} from '@/lib/cardioMetrics';
 import {
   MODALITY_LABELS,
   type Exercise,
@@ -37,6 +33,7 @@ import {
   type Modality,
   type RoutineExerciseInsert,
 } from '@/types/database';
+import ExercisePickerModal from './ExercisePickerModal';
 import ExerciseImagesModal from './ExerciseImagesModal';
 import PreviewEyeButton from './PreviewEyeButton';
 
@@ -87,6 +84,7 @@ export default function RoutineEditor(props: Props) {
   const kbHeight = useKeyboardHeight();
   const groupsQ = useExerciseGroups();
   const imagesMap = useExerciseImagesMap();
+  const videoMap = useExerciseVideoMap();
 
   const [name, setName] = useState(props.initialName ?? '');
   const [description, setDescription] = useState(props.initialDescription ?? '');
@@ -106,7 +104,9 @@ export default function RoutineEditor(props: Props) {
     name: string;
     equipment: string | null;
     images: string[];
+    video: string | null;
   } | null>(null);
+  const alert = useAlert();
   const scrollRef = useRef<ScrollView>(null);
   const seriesRefs = useRef<Map<string, TextInput>>(new Map());
 
@@ -123,6 +123,11 @@ export default function RoutineEditor(props: Props) {
 
   function handleAddExercise(ex: Exercise) {
     const localId = uid();
+    // O tipo vem do grupo do EXERCÍCIO escolhido, não do grupo da rotina: o
+    // picker permite pegar de outro grupo, e uma rotina de musculação com
+    // esteira no fim é caso comum.
+    const grupoDoExercicio =
+      groupsQ.data?.find((g) => g.id === ex.group_id) ?? null;
     setDrafts((prev) => [
       ...prev,
       {
@@ -137,6 +142,10 @@ export default function RoutineEditor(props: Props) {
         weight_min_kg: null,
         weight_max_kg: null,
         duration_min: null,
+        metric_type: metricTypeFromGroup(grupoDoExercicio?.slug),
+        distance_min_m: null,
+        distance_max_m: null,
+        cadence_rpm: null,
         notes: null,
       },
     ]);
@@ -171,21 +180,45 @@ export default function RoutineEditor(props: Props) {
   async function handleSubmit() {
     const cleanName = name.trim();
     if (cleanName.length < 2) {
-      Alert.alert('Nome do treino', 'Informe um nome (ex: Peito A).');
+      alert.showAlert({
+        title: 'Nome do treino',
+        message: 'Informe um nome (ex: Peito A).',
+        type: 'warning',
+      });
       return;
     }
     if (drafts.length === 0) {
-      Alert.alert(
-        'Sem exercícios',
-        'Adicione pelo menos um exercício ao treino.',
-      );
+      alert.showAlert({
+        title: 'Sem exercícios',
+        message: 'Adicione pelo menos um exercício ao treino.',
+        type: 'warning',
+      });
       return;
     }
+    // CAR-03: a rede de cima. O banco também tem check constraint, mas aqui o
+    // professor vê a mensagem antes de perder o preenchimento.
+    for (const d of drafts) {
+      if (d.metric_type !== 'cardio') continue;
+      const erro = validateCardioMetrics(d);
+      if (erro) {
+        alert.showAlert({
+          title: 'Métricas de cárdio',
+          message: `${d.exercise_name}: ${erro}`,
+          type: 'warning',
+        });
+        return;
+      }
+    }
+
     const exercises: RoutineExerciseInsert[] = drafts.map((d, i) => ({
       exercise_id: d.exercise_id,
       exercise_name: d.exercise_name,
       equipment: d.equipment,
       sort_order: i,
+      metric_type: d.metric_type,
+      distance_min_m: d.distance_min_m,
+      distance_max_m: d.distance_max_m,
+      cadence_rpm: d.cadence_rpm,
       sets: d.sets,
       reps_min: d.reps_min,
       reps_max: d.reps_max,
@@ -203,10 +236,7 @@ export default function RoutineEditor(props: Props) {
         exercises,
       });
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -306,6 +336,9 @@ export default function RoutineEditor(props: Props) {
                   draft={d}
                   index={i}
                   imageUrls={imgs}
+                  videoUrl={
+                    d.exercise_id ? videoMap.get(d.exercise_id) ?? null : null
+                  }
                   onChange={(patch) => updateDraft(d.localId, patch)}
                   onRemove={() => handleRemoveExercise(d.localId)}
                   onPreview={() => {
@@ -314,6 +347,9 @@ export default function RoutineEditor(props: Props) {
                       name: d.exercise_name,
                       equipment: d.equipment,
                       images: imgs,
+                      video: d.exercise_id
+                        ? videoMap.get(d.exercise_id) ?? null
+                        : null,
                     });
                   }}
                   setsRef={(el) => {
@@ -349,6 +385,7 @@ export default function RoutineEditor(props: Props) {
         exerciseName={preview?.name ?? ''}
         equipment={preview?.equipment}
         imageUrls={preview?.images ?? []}
+        videoUrl={preview?.video ?? null}
       />
     </ScrollView>
   );
@@ -452,6 +489,7 @@ function ExerciseDraftRow({
   draft,
   index,
   imageUrls,
+  videoUrl,
   onChange,
   onRemove,
   onPreview,
@@ -460,6 +498,8 @@ function ExerciseDraftRow({
   draft: Draft;
   index: number;
   imageUrls: string[] | null;
+  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
+  videoUrl?: string | null;
   onChange: (patch: Partial<Draft>) => void;
   onRemove: () => void;
   onPreview: () => void;
@@ -482,7 +522,9 @@ function ExerciseDraftRow({
         </View>
         {hasImages && <PreviewEyeButton onPress={onPreview} marginRight />}
         <Pressable
-          onPress={() => openYouTubeSearchForExercise(draft.exercise_name)}
+          onPress={() =>
+            openExerciseVideo({ videoUrl, exerciseName: draft.exercise_name })
+          }
           hitSlop={8}
           className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70 mr-2"
         >
@@ -498,61 +540,145 @@ function ExerciseDraftRow({
       </View>
 
       <View className="gap-2">
-        <View className="flex-row gap-2">
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              ref={setsRef}
-              label="Séries"
-              value={draft.sets?.toString() ?? ''}
-              onChangeText={(v) => onChange({ sets: toInt(v) })}
-              placeholder="4"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Reps mín"
-              value={draft.reps_min?.toString() ?? ''}
-              onChangeText={(v) => onChange({ reps_min: toInt(v) })}
-              placeholder="8"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Reps máx"
-              value={draft.reps_max?.toString() ?? ''}
-              onChangeText={(v) => onChange({ reps_max: toInt(v) })}
-              placeholder="12"
-            />
-          </View>
-        </View>
-        <View className="flex-row gap-2">
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Peso mín (kg)"
-              value={draft.weight_min_kg?.toString() ?? ''}
-              onChangeText={(v) => onChange({ weight_min_kg: toNum(v) })}
-              placeholder="60"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Peso máx (kg)"
-              value={draft.weight_max_kg?.toString() ?? ''}
-              onChangeText={(v) => onChange({ weight_max_kg: toNum(v) })}
-              placeholder="80"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <SmallInput
-              label="Minutos"
-              value={draft.duration_min?.toString() ?? ''}
-              onChangeText={(v) => onChange({ duration_min: toInt(v) })}
-              placeholder="—"
-            />
-          </View>
-        </View>
+        {draft.metric_type === 'cardio' ? (
+          <CardioFields draft={draft} onChange={onChange} setsRef={setsRef} />
+        ) : (
+          <StrengthFields draft={draft} onChange={onChange} setsRef={setsRef} />
+        )}
       </View>
     </View>
+  );
+}
+
+type FieldsProps = {
+  draft: Draft;
+  onChange: (patch: Partial<Draft>) => void;
+  /** Opcional como no componente pai — só o exercício recém-adicionado recebe. */
+  setsRef?: (el: TextInput | null) => void;
+};
+
+/**
+ * Cárdio não usa séries/reps/carga (CAR-05). Distância em METROS para casar com
+ * o schema — sem conversão, sem arredondamento no meio do caminho.
+ */
+function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
+  // Horas e minutos separados: o banco guarda minutos, mas obrigar a digitar
+  // "150" pra 2h30 é fazer o professor calcular de cabeça. Digitar mais de 59
+  // minutos normaliza sozinho (90 → 1h30).
+  const { horas, minutos } = minutosParaHoraMin(draft.duration_min);
+
+  return (
+    <>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            ref={setsRef}
+            label="Dist. mín (m)"
+            value={draft.distance_min_m?.toString() ?? ''}
+            onChangeText={(v) => onChange({ distance_min_m: toInt(v) })}
+            placeholder="3000"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Dist. máx (m)"
+            value={draft.distance_max_m?.toString() ?? ''}
+            onChangeText={(v) => onChange({ distance_max_m: toInt(v) })}
+            placeholder="5000"
+          />
+        </View>
+      </View>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Horas"
+            value={horas?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(toInt(v), minutos) })
+            }
+            placeholder="0"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Minutos"
+            value={minutos?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(horas, toInt(v)) })
+            }
+            placeholder="30"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Cadência (RPM)"
+            value={draft.cadence_rpm?.toString() ?? ''}
+            onChangeText={(v) => onChange({ cadence_rpm: toInt(v) })}
+            placeholder="80"
+          />
+        </View>
+      </View>
+    </>
+  );
+}
+
+function StrengthFields({ draft, onChange, setsRef }: FieldsProps) {
+  return (
+    <>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            ref={setsRef}
+            label="Séries"
+            value={draft.sets?.toString() ?? ''}
+            onChangeText={(v) => onChange({ sets: toInt(v) })}
+            placeholder="4"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Reps mín"
+            value={draft.reps_min?.toString() ?? ''}
+            onChangeText={(v) => onChange({ reps_min: toInt(v) })}
+            placeholder="8"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Reps máx"
+            value={draft.reps_max?.toString() ?? ''}
+            onChangeText={(v) => onChange({ reps_max: toInt(v) })}
+            placeholder="12"
+          />
+        </View>
+      </View>
+      <View className="flex-row gap-2">
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Peso mín (kg)"
+            value={draft.weight_min_kg?.toString() ?? ''}
+            onChangeText={(v) => onChange({ weight_min_kg: toNum(v) })}
+            placeholder="60"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Peso máx (kg)"
+            value={draft.weight_max_kg?.toString() ?? ''}
+            onChangeText={(v) => onChange({ weight_max_kg: toNum(v) })}
+            placeholder="80"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
+            label="Minutos"
+            value={draft.duration_min?.toString() ?? ''}
+            onChangeText={(v) => onChange({ duration_min: toInt(v) })}
+            placeholder="—"
+          />
+        </View>
+      </View>
+    </>
   );
 }
 
@@ -582,174 +708,3 @@ const SmallInput = forwardRef<TextInput, SmallInputProps>(function SmallInput(
     </View>
   );
 });
-
-function ExercisePickerModal({
-  visible,
-  onClose,
-  modality,
-  preferredGroupId,
-  addedExerciseIds,
-  onSelect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  modality: Modality;
-  preferredGroupId: string | null;
-  addedExerciseIds: Set<string>;
-  onSelect: (ex: Exercise) => void;
-}) {
-  const [groupId, setGroupId] = useState<string | null>(preferredGroupId);
-  const [search, setSearch] = useState('');
-  const groupsQ = useExerciseGroups();
-  const exercisesQ = useExercisesByGroup(groupId, modality);
-
-  // Sempre que o modal abre, sincroniza o grupo com o preferido do form
-  // e limpa a busca anterior — evita confusão de estado antigo.
-  useEffect(() => {
-    if (visible) {
-      setGroupId(preferredGroupId);
-      setSearch('');
-    }
-  }, [visible, preferredGroupId]);
-
-  const filtered = useMemo(() => {
-    const list = exercisesQ.data ?? [];
-    const term = search.trim().toLowerCase();
-    if (!term) return list;
-    return list.filter((e) => e.name.toLowerCase().includes(term));
-  }, [exercisesQ.data, search]);
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent={false}
-    >
-      <View className="flex-1 bg-bg-deep">
-        <View
-          className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle"
-          style={{ paddingTop: Platform.OS === 'ios' ? 50 : 16 }}
-        >
-          <Pressable
-            onPress={onClose}
-            hitSlop={12}
-            className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
-          >
-            <X size={18} color={colors.textDim} />
-          </Pressable>
-          <View className="items-center">
-            <Text className="text-text font-semibold">Escolher exercício</Text>
-            <Text className="text-text-muted text-[10px] mt-0.5">
-              {MODALITY_LABELS[modality]}
-            </Text>
-          </View>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 60 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Card padding="md">
-            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
-              Grupo muscular
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {(groupsQ.data ?? []).map((g) => (
-                <Pressable
-                  key={g.id}
-                  onPress={() => setGroupId(g.id)}
-                  className={`rounded-full border px-3 py-1.5 ${
-                    groupId === g.id
-                      ? 'bg-accent/10 border-accent/40'
-                      : 'bg-surface-muted border-border'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs ${
-                      groupId === g.id ? 'text-accent' : 'text-text-dim'
-                    }`}
-                  >
-                    {g.icon} {g.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Card>
-
-          {groupId && (
-            <Card padding="md">
-              <Input
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Buscar exercício..."
-                leftIcon={<Search size={16} color={colors.textMuted} />}
-                autoCapitalize="none"
-              />
-            </Card>
-          )}
-
-          {!groupId && (
-            <Text className="text-text-muted text-sm text-center py-4">
-              Selecione um grupo pra ver os exercícios.
-            </Text>
-          )}
-
-          {groupId && exercisesQ.isLoading && (
-            <View className="py-8 items-center">
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          )}
-
-          {groupId && !exercisesQ.isLoading && filtered.length === 0 && (
-            <Text className="text-text-muted text-sm text-center py-4">
-              Nenhum exercício de {MODALITY_LABELS[modality]} nesse grupo.
-              {'\n'}Tenta outro grupo ou outra modalidade.
-            </Text>
-          )}
-
-          {filtered.map((ex) => {
-            const added = addedExerciseIds.has(ex.id);
-            return (
-              <Pressable
-                key={ex.id}
-                onPress={() => {
-                  if (!added) onSelect(ex);
-                }}
-                className={added ? 'opacity-60' : 'active:opacity-70'}
-              >
-                <Card padding="md">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1">
-                      <Text
-                        className={`text-sm font-semibold ${
-                          added ? 'text-text-dim' : 'text-text'
-                        }`}
-                      >
-                        {ex.name}
-                      </Text>
-                      {ex.equipment && (
-                        <Text className="text-text-muted text-[11px] mt-0.5">
-                          {ex.equipment}
-                          {ex.is_compound ? ' · composto' : ''}
-                          {added ? ' · já adicionado' : ''}
-                        </Text>
-                      )}
-                    </View>
-                    {added ? (
-                      <CheckCircle2 size={18} color={colors.accent} />
-                    ) : (
-                      <PlusCircle size={18} color={colors.textMuted} />
-                    )}
-                  </View>
-                </Card>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-

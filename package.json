@@ -19,7 +19,8 @@
     "audit:ai-usage": "node --env-file=.env.local scripts/audit-ai-usage.mjs",
     "update:preview": "eas update --branch preview --message",
     "update:production": "eas update --branch production --message",
-    "test:e2e": "node --env-file=.env.local scripts/e2e/runner.mjs"
+    "test:e2e": "node --env-file=.env.local scripts/e2e/runner.mjs",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -27,7 +28,7 @@
     "@sentry/react-native": "~7.2.0",
     "@supabase/supabase-js": "^2.103.3",
     "@tanstack/react-query": "^5.99.2",
-    "expo": "~54.0.34",
+    "expo": "~54.0.37",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.21",
@@ -39,10 +40,10 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
-    "expo-router": "~6.0.23",
+    "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
-    "expo-updates": "~29.0.17",
+    "expo-updates": "~29.0.20",
     "lucide-react-native": "^1.8.0",
     "nativewind": "^4.2.3",
     "react": "19.1.0",

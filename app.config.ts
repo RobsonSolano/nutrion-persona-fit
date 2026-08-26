@@ -41,8 +41,12 @@ const config: ExpoConfig = {
   name: 'Persona Fit',
   slug: 'nutrion',
   scheme: 'nutrion',
-  version: '1.3.0',
-  orientation: 'portrait',
+  version: '1.4.0',
+  // Destravado por recomendação do Play Console (telas grandes): app travado
+  // em portrait é tratado como não-adaptativo em tablet e foldable. Nada no
+  // app declara `resizeableActivity=false` — a trava de orientação era a
+  // única coisa restringindo.
+  orientation: 'default',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
   newArchEnabled: true,
@@ -84,6 +88,18 @@ const config: ExpoConfig = {
     // URL pública da Política de Privacidade (exigida pela Google Play / App Store).
     // Deve casar com legal_documents.privacidade (seed em 20260622020000_legal_docs.sql).
     privacyPolicyUrl: 'https://apppersonafit.vercel.app/legal/privacidade',
+    // "O que há de novo" exibido no modal de OTA. ATUALIZAR ANTES DE CADA
+    // `eas update` — o texto viaja no manifest daquela publicação. Se ficar
+    // desatualizado ou vazio, o modal cai no aviso genérico (sem erro).
+    // Viajam no manifest deste update e são exibidas pelo bundle que JÁ está
+    // no aparelho. Ou seja: quem estiver num bundle sem a feature de notas
+    // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
+    // aparecem do update seguinte em diante.
+    releaseNotes: {
+      novidades: [],
+      melhorias: [],
+      ajustes: [],
+    },
   },
 };
 

@@ -4,8 +4,10 @@ import { useRouter, type Href } from 'expo-router';
 import { Droplets, AlertTriangle, Activity } from 'lucide-react-native';
 import { OnboardingLayout } from '@/components/onboarding';
 import { Input } from '@/components/ui';
+import DisabilityFields from '@/components/DisabilityFields';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { colors } from '@/lib/theme';
+import { isDisabilityValid } from '@/lib/disability';
 
 export default function OnboardingHabitos() {
   const router = useRouter();
@@ -13,6 +15,9 @@ export default function OnboardingHabitos() {
     water_goal_ml,
     allergies,
     physical_limitations,
+    has_disability,
+    disability_types,
+    disability_notes,
     patch,
   } = useOnboardingStore();
 
@@ -39,6 +44,13 @@ export default function OnboardingHabitos() {
       onBack={() => router.back()}
       onSkip={() => router.replace('/(tabs)' as Href)}
       onContinue={() => router.push('/onboarding/bio' as Href)}
+      continueDisabled={
+        !isDisabilityValid({
+          hasDisability: has_disability,
+          types: disability_types,
+          notes: disability_notes,
+        })
+      }
     >
       <View className="gap-4">
         <View>
@@ -98,6 +110,21 @@ export default function OnboardingHabitos() {
             A IA evita exercícios que agravem o que você relatar.
           </Text>
         </View>
+
+        <DisabilityFields
+          hasDisability={has_disability}
+          types={disability_types}
+          notes={disability_notes}
+          onChange={(p) =>
+            patch({
+              ...(p.hasDisability !== undefined && {
+                has_disability: p.hasDisability,
+              }),
+              ...(p.types !== undefined && { disability_types: p.types }),
+              ...(p.notes !== undefined && { disability_notes: p.notes }),
+            })
+          }
+        />
       </View>
     </OnboardingLayout>
   );

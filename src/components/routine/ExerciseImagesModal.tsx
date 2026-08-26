@@ -1,19 +1,19 @@
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { X, ChevronLeft, ChevronRight, Eye, CirclePlay } from 'lucide-react-native';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import { openYouTubeSearchForExercise } from '@/lib/youtube';
+import { openExerciseVideo } from '@/lib/youtube';
 
 type Props = {
   visible: boolean;
@@ -21,6 +21,8 @@ type Props = {
   exerciseName: string;
   equipment?: string | null;
   imageUrls: string[];
+  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
+  videoUrl?: string | null;
 };
 
 export default function ExerciseImagesModal({
@@ -29,8 +31,12 @@ export default function ExerciseImagesModal({
   exerciseName,
   equipment,
   imageUrls,
+  videoUrl,
 }: Props) {
-  const width = Dimensions.get('window').width;
+  // useWindowDimensions e não Dimensions.get: o segundo captura o valor UMA
+  // vez, e com a orientação destravada o carrossel ficaria desalinhado depois
+  // de rotacionar (cada slide tem largura fixa em px).
+  const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState<Set<number>>(new Set());
   const [errored, setErrored] = useState<Set<number>>(new Set());
@@ -229,7 +235,7 @@ export default function ExerciseImagesModal({
           <View className="px-5 mt-3 gap-2">
             <Button
               label="Buscar vídeo no YouTube"
-              onPress={() => openYouTubeSearchForExercise(exerciseName)}
+              onPress={() => openExerciseVideo({ videoUrl, exerciseName })}
               variant="secondary"
               icon={<CirclePlay size={16} color={colors.text} />}
             />

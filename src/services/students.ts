@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type {
+  DisabilityType,
   GoalType,
   Profile,
   Sex,
@@ -100,6 +101,9 @@ export type CreateStudentInput = {
   water_goal_ml?: number | null;
   allergies?: string | null;
   physical_limitations?: string | null;
+  has_disability?: boolean | null;
+  disability_types?: DisabilityType[];
+  disability_notes?: string | null;
   bio?: string | null;
 };
 
@@ -208,6 +212,9 @@ export type UpdateStudentPatch = Partial<{
   protein_goal_g: number | null;
   allergies: string | null;
   physical_limitations: string | null;
+  has_disability: boolean | null;
+  disability_types: DisabilityType[];
+  disability_notes: string | null;
   bio: string | null;
 }>;
 

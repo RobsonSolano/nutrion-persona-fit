@@ -19,6 +19,9 @@ import {
   Screen,
   SegmentedControl,
 } from '@/components/ui';
+import DisabilityFields, {
+  type DisabilityValue,
+} from '@/components/DisabilityFields';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useStudentDetail, useUpdateStudent } from '@/hooks/useStudents';
@@ -160,6 +163,11 @@ function EditForm({
     profile.physical_limitations ?? '',
   );
   const [bio, setBio] = useState(profile.bio ?? '');
+  const [disability, setDisability] = useState<DisabilityValue>({
+    hasDisability: profile.has_disability,
+    types: profile.disability_types ?? [],
+    notes: profile.disability_notes ?? '',
+  });
 
   const [calorieGoal, setCalorieGoal] = useState(
     profile.daily_calorie_goal != null ? String(profile.daily_calorie_goal) : '',
@@ -191,6 +199,9 @@ function EditForm({
       weekly_frequency: frequency,
       allergies: allergies.trim() || null,
       physical_limitations: limitations.trim() || null,
+      has_disability: disability.hasDisability,
+      disability_types: disability.types,
+      disability_notes: disability.notes.trim() || null,
       bio: bio.trim() || null,
       daily_calorie_goal: calorieGoal ? Number(calorieGoal) : null,
       protein_goal_g: proteinGoal ? Number(proteinGoal) : null,
@@ -376,6 +387,12 @@ function EditForm({
               multiline
               numberOfLines={3}
               style={{ minHeight: 80, textAlignVertical: 'top' }}
+            />
+            <DisabilityFields
+              {...disability}
+              onChange={(patch) =>
+                setDisability((prev) => ({ ...prev, ...patch }))
+              }
             />
           </Section>
 

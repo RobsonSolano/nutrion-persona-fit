@@ -27,6 +27,7 @@ import {
   BookOpen,
   FileText,
   TrendingUp,
+  Mail,
 } from 'lucide-react-native';
 import {
   Avatar,
@@ -52,6 +53,7 @@ import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
 import TemplatePicker from '@/components/coach/TemplatePicker';
 import { RoutinesReorderList } from '@/components/coach/RoutinesReorderList';
 import { bmi, bmiCategory } from '@/lib/biometrics';
+import { formatDisability } from '@/lib/disability';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { DayActivity, StudentTracking } from '@/services/studentTracking';
 import { captureError } from '@/lib/sentry';
@@ -406,6 +408,19 @@ function VisaoTab({
                 </Text>
               )}
             </View>
+            {profile.email && (
+              <View className="flex-row items-center gap-1 mt-1.5">
+                <Mail size={11} color={colors.textDim} />
+                {/* selectable: long-press no Android abre "Copiar" sem
+                    precisar de expo-clipboard (dep nativa = APK novo). */}
+                <Text
+                  selectable
+                  className="text-text-dim text-[11px] flex-1"
+                >
+                  {profile.email}
+                </Text>
+              </View>
+            )}
             {goalLabel && (
               <View className="flex-row items-center gap-1 mt-1.5">
                 <Target size={11} color={colors.violetSoft} />
@@ -465,6 +480,7 @@ function PlanoTab({
   onOpenTemplates: () => void;
 }) {
   const router = useRouter();
+  const deficiencia = formatDisability(profile);
 
   return (
     <ScrollView
@@ -499,12 +515,19 @@ function PlanoTab({
         </View>
       </Card>
 
-      {(profile.allergies || profile.physical_limitations || profile.bio) && (
+      {(deficiencia ||
+        profile.allergies ||
+        profile.physical_limitations ||
+        profile.bio) && (
         <Card padding="md">
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
             Saúde / contexto
           </Text>
           <View className="gap-2">
+            {/* Primeiro da lista: é o que mais muda a prescrição. */}
+            {deficiencia && (
+              <InfoLine label="Deficiência" value={deficiencia} />
+            )}
             {profile.allergies && (
               <InfoLine label="Alergias" value={profile.allergies} />
             )}

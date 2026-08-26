@@ -16,7 +16,7 @@ export type PaywallContent = {
 };
 
 // Placeholder único pra não espalhar string de preço (substituído pela offering real na #5).
-const PRICE_HINT = 'a partir de R$ 15,90/mês';
+const PRICE_HINT = 'a partir de R$ 15,99/mês';
 
 const PERSONAL: PaywallContent = {
   title: 'Desbloqueie a IA pessoal',

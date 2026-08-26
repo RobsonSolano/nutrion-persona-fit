@@ -134,6 +134,11 @@ export default function SanityCheckScreen() {
         fats_g: result.macros.fats_g ?? null,
         photo_path: null,
         ai_feedback: result.feedback ?? null,
+        // Esta tela salva a estimativa COMO VEIO — não há campo editável
+        // aqui, então a procedência é 'ai' sem ambiguidade.
+        ai_kcal_original: result.macros.kcal ?? null,
+        macros_source: 'ai',
+        scale_weight_g: scaleWeight ? Number(scaleWeight) : null,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -159,7 +164,7 @@ export default function SanityCheckScreen() {
           animation: 'slide_from_bottom',
         }}
       />
-      <Screen variant="violet" edges={['top']}>
+      <Screen variant="violet" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"
           keyboardVerticalOffset={0}
@@ -462,10 +467,14 @@ function ResultStage({
           <View className="flex-row flex-wrap gap-2">
             {result.items.map((item, i) => (
               <View
-                key={`${item}-${i}`}
+                key={`${item.name}-${i}`}
                 className="rounded-full border border-border bg-surface-muted px-3 py-1"
               >
-                <Text className="text-text-dim text-xs">{item}</Text>
+                <Text className="text-text-dim text-xs">
+                  {item.qty_g && item.qty_g > 0
+                    ? `${item.name} · ${Math.round(item.qty_g)} g`
+                    : item.name}
+                </Text>
               </View>
             ))}
           </View>

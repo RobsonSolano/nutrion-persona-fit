@@ -17,6 +17,11 @@ type Props = {
   onClose: () => void;
   title: string;
   message?: string;
+  /** Conteúdo rico abaixo do `message` (listas, seções). Opcional — os
+   *  callers que só precisam de texto seguem usando `message`.
+   *  O container do header é `items-center`: quem passa `content` cuida do
+   *  próprio layout (ex. `w-full` no root) se não quiser ficar centralizado. */
+  content?: ReactNode;
   icon?: ReactNode;
   /** Ações em ordem visual (top-down). Convenção: cancelar por último. */
   actions: ConfirmAction[];
@@ -29,6 +34,7 @@ export default function ConfirmModal({
   onClose,
   title,
   message,
+  content,
   icon,
   actions,
   dismissable = true,
@@ -70,6 +76,7 @@ export default function ConfirmModal({
                 {message}
               </Text>
             )}
+            {content}
           </View>
           <View className="px-5 pt-4 pb-5 gap-2">
             {actions.map((a, i) => (

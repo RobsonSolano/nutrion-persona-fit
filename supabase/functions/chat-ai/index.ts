@@ -10,6 +10,15 @@ import {
   formatReferencesForPrompt,
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
+import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
+import {
+  aplicarTetoDensidade,
+  extrairJsonDoTexto,
+  itemsComoTexto,
+  parseSanityItems,
+  reconcileMacros,
+  type SanityItem,
+} from './sanityMath.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -113,10 +122,13 @@ Sua única tarefa é estimar macros de uma refeição e devolver um objeto JSON 
 
 Diretrizes:
 - Sempre responda em português brasileiro DENTRO do campo "feedback" do JSON.
-- Use bom senso e tabelas nutricionais brasileiras (TACO/USDA) pra estimar.
-- SEMPRE preencha "macros" com os 4 campos numéricos (kcal, protein_g, carbs_g, fats_g). NUNCA null, NUNCA string, NUNCA omita. Se a info for limitada, faça a melhor estimativa razoável.
+- Use a REFERÊNCIA NUTRICIONAL fornecida abaixo como base dos números. Ela traz kcal e macros por 100 g na forma em que o alimento é servido. Para o que não estiver lá, estime por analogia com o item mais parecido dela.
+- Preencha "items" com CADA alimento do prato: name, qty_g, kcal, protein_g, carbs_g, fats_g — nunca null, nunca string, nunca vazio, mesmo que a estimativa seja aproximada. É o "items" que o app usa para calcular o total.
+- Preencha "macros" também, com sua melhor estimativa do total, mas ele é só um cross-check secundário: o app soma os itens e ignora "macros" sempre que "items" trouxer números. Não gaste esforço fazendo "macros" bater com a soma — priorize a precisão de cada item.
 - "feedback" deve ser empático e curto (1-2 frases) — celebre acertos, sugira ajustes sem culpar.
-- Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.`;
+- Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.
+
+${formatTacoForPrompt()}`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -399,6 +411,9 @@ serve(async (req: Request) => {
     // serve pro chat. No sanity_check usamos um persona enxuto que NÃO
     // instrui markdown — caso contrário o modelo prioriza o "texto fluido"
     // do system e ignora o pedido de JSON estrito do user message.
+    // A referência TACO viaja dentro do SANITY_PERSONA_PROMPT (estática, montada
+    // uma vez no módulo) — não entra no chat, onde gastaria ~800 tokens sem
+    // servir à conversa.
     const personaPrompt = isChatMode ? PERSONA_PROMPT : SANITY_PERSONA_PROMPT;
     const messages: { role: string; content: unknown }[] = [
       {
@@ -422,8 +437,17 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         model: modelToUse,
         messages,
-        temperature: 0.6,
-        max_tokens: isMultimodal ? 1500 : 700,
+        // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
+        // de conversa; no sanity check ela só adiciona variância entre duas
+        // análises da MESMA refeição, que é justo o que atrapalha medir.
+        temperature: isChatMode ? 0.6 : 0.15,
+        // Subiu junto com o sanity itemizado (SAN-10): cada item passou a ter
+        // 6 campos nomeados em vez de ser só uma string. A conta, pra não virar
+        // número mágico: ~35 tokens por item + ~150 de overhead (consistency,
+        // macros, feedback). Um prato carregado de 10-12 itens fica em ~500-600
+        // tokens, então 1400 dá folga de ~2x. Sem folga o JSON trunca
+        // (json_validate_failed, já aconteceu no caminho de visão).
+        max_tokens: isMultimodal ? 2400 : 1400,
         top_p: 0.9,
         stream: useStream,
         // Visão usa o qwen (único modelo de visão da Groq), que é "reasoning":
@@ -556,14 +580,25 @@ serve(async (req: Request) => {
       }
     }
 
+    const {
+      text: textoFinal,
+      sanity: sanityPayload,
+      nota: sanityNota,
+    } = isChatMode
+      ? { text: aiText, sanity: null, nota: null }
+      : resolveSanityOutput(aiText, body.scaleWeightG);
+
     const usedTokens =
       typeof groqJson?.usage?.total_tokens === 'number'
         ? groqJson.usage.total_tokens
         : null;
-    await logEvent({ status: 'success', tokens: usedTokens });
+    // A chamada foi bem-sucedida; `error_code` aqui é observação de qualidade
+    // (não usamos a soma dos itens), pra dar visibilidade sem coluna nova.
+    await logEvent({ status: 'success', tokens: usedTokens, errorCode: sanityNota });
 
     return json({
-      text: aiText,
+      text: textoFinal,
+      sanity: sanityPayload,
       usage: groqJson?.usage ?? null,
       model: modelToUse,
     });
@@ -743,6 +778,57 @@ function buildEnrichedUserMessage(
   ].join('\n');
 }
 
+/**
+ * Sanity check: o total de macros vem da SOMA DOS ITENS feita aqui, não do
+ * número que o modelo escreveu — era ele que inflava as calorias (SAN-02).
+ *
+ * O `text` sai COMPATÍVEL com apps antigos (SAN-11): `items` como array de
+ * string e macros já reconciliados. Os objetos ricos com gramagem vão no
+ * envelope `sanity`, que só o app atualizado lê.
+ */
+function resolveSanityOutput(
+  aiText: string,
+  scaleWeightG: number | undefined,
+): {
+  text: string;
+  sanity: { items: SanityItem[]; source: string } | null;
+  nota: string | null;
+} {
+  const bruto = extrairJsonDoTexto(aiText);
+  if (!bruto) return { text: aiText, sanity: null, nota: 'sanity_parse_failed' };
+
+  const itens = parseSanityItems(bruto.items);
+  const reconciliado = reconcileMacros(itens, bruto.macros);
+
+  // INS-02: último guard-rail, depois da reconciliação. Se o total sobreviveu
+  // até aqui com densidade fisicamente impossível, corrige — e escala os
+  // macros no mesmo fator pra não recriar a divergência que a reconciliação
+  // acabou de resolver.
+  const teto = reconciliado.macros
+    ? aplicarTetoDensidade(reconciliado.macros, scaleWeightG)
+    : { macros: null, fator: null };
+
+  return {
+    text: JSON.stringify({
+      ...bruto,
+      items: itemsComoTexto(itens),
+      ...(teto.macros ? { macros: teto.macros } : {}),
+    }),
+    sanity: { items: itens, source: reconciliado.source },
+    nota:
+      teto.fator !== null
+        ? 'sanity_densidade_corrigida'
+        : reconciliado.source !== 'items'
+          ? `sanity_fallback_${reconciliado.source}`
+          : null,
+  };
+}
+
+// Mesma frase nos dois ramos de buildSanityPrompt (com e sem foto). Const única
+// pra que as duas não divirjam numa edição futura.
+const REGRA_FORMA_PREPARADA =
+  'aplicando os valores por 100 g da REFERÊNCIA NUTRICIONAL do system. Use sempre a linha da forma PREPARADA (cozido/grelhado/assado), nunca do alimento cru.';
+
 function buildSanityPrompt(body: ChatRequest) {
   const hasPhoto = !!body.imageBase64;
   const weightLine = body.scaleWeightG
@@ -757,11 +843,11 @@ function buildSanityPrompt(body: ChatRequest) {
       'Tarefas:',
       '1. Identifique os itens visíveis na foto.',
       '2. Verifique consistência entre descrição, peso e volume visual.',
-      '3. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando bom senso e tabelas nutricionais brasileiras (TACO/USDA).',
+      `3. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA}`,
       '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
-      'IMPORTANTE: SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Se não tiver certeza absoluta, faça a melhor estimativa razoável.',
+      'IMPORTANTE: cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
       'Responda APENAS em JSON puro, sem markdown, sem ```:',
-      '{ "items":["..."], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+      '{ "items":[{"name":"...","qty_g":N,"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
     ].join('\n');
   }
 
@@ -771,12 +857,12 @@ function buildSanityPrompt(body: ChatRequest) {
     weightLine,
     'Tarefas:',
     '1. Liste os itens da refeição a partir da descrição (em "items").',
-    '2. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando tabelas nutricionais brasileiras (TACO/USDA) e bom senso. Se faltar quantidade explícita, assuma porções típicas brasileiras.',
+    `2. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA} Se faltar quantidade explícita, assuma a porção típica brasileira daquele alimento.`,
     '3. Dê feedback empático curto (1-2 frases) sobre a refeição.',
-    'IMPORTANTE: NUNCA recuse a estimativa. SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Faça sempre uma estimativa razoável mesmo com pouca informação.',
+    'IMPORTANTE: NUNCA recuse a estimativa. Cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
     'Use "consistency":"ok" (não há foto pra divergir).',
     'Responda APENAS em JSON puro, sem markdown, sem ```:',
-    '{ "items":["..."], "consistency":"ok", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+    '{ "items":[{"name":"...","qty_g":N,"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}], "consistency":"ok", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
   ].join('\n');
 }
 

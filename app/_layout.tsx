@@ -14,8 +14,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 LogBox.ignoreLogs([
   'VirtualizedLists should never be nested inside plain ScrollViews',
 ]);
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { useEffect } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
 import { useNotificationRouter } from '@/hooks/useNotificationRouter';
 import { useOtaUpdate } from '@/hooks/useOtaUpdate';
@@ -27,6 +28,8 @@ import {
 } from '@/services/pushNotifications';
 import { GlobalAlertProvider } from '@/components/GlobalAlertProvider';
 import { ConfirmModal } from '@/components/ui';
+import OtaReleaseNotes from '@/components/OtaReleaseNotes';
+import { getOtaModalMessage } from '@/lib/otaReleaseNotes';
 import { Sparkles } from 'lucide-react-native';
 import { colors } from '@/lib/theme';
 
@@ -55,7 +58,10 @@ function Providers({ children }: { children: React.ReactNode }) {
         visible={ota.isReady}
         onClose={ota.dismiss}
         title="Atualização disponível"
-        message="Uma nova versão do app foi baixada. Aplicar agora reinicia o Persona Fit em alguns segundos."
+        message={getOtaModalMessage(ota.releaseNotes)}
+        content={
+          ota.releaseNotes && <OtaReleaseNotes notes={ota.releaseNotes} />
+        }
         icon={<Sparkles size={26} color={colors.accent} />}
         dismissable={!ota.isApplying}
         actions={[
@@ -78,19 +84,6 @@ function Providers({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayout() {
-  const queryClient = useMemo(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: 1,
-            staleTime: 30_000,
-          },
-        },
-      }),
-    [],
-  );
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
