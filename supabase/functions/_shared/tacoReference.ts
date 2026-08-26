@@ -87,6 +87,12 @@ export const TACO_ALIMENTOS: readonly AlimentoTaco[] = [
   { nome: 'Macarrão ao molho bolonhesa', kcal: 120, prot: 4.9, carb: 22.5, gord: 0.9 },
   { nome: 'Porco, lombo, assado', kcal: 210, prot: 35.7, carb: 0, gord: 6.4 },
   { nome: 'Abacate, cru', kcal: 96, prot: 1.2, carb: 6, gord: 8.4 },
+  { nome: 'Maionese tradicional', kcal: 302, prot: 0.6, carb: 7.9, gord: 30.5 },
+  { nome: 'Creme de leite', kcal: 221, prot: 1.5, carb: 4.5, gord: 22.5 },
+  { nome: 'Queijo, prato', kcal: 360, prot: 22.7, carb: 1.9, gord: 29.1 },
+  { nome: 'Queijo, parmesão', kcal: 453, prot: 35.6, carb: 1.7, gord: 33.5 },
+  { nome: 'Molho de tomate industrializado', kcal: 38, prot: 1.4, carb: 7.7, gord: 0.9 },
+  { nome: 'Shoyu', kcal: 61, prot: 3.3, carb: 11.6, gord: 0.3 },
 ];
 
 /**
@@ -108,6 +114,13 @@ export function formatTacoForPrompt(): string {
     'nunca do grão seco ou do alimento cru. Arroz e feijão cozidos têm de 3 a 5 vezes menos kcal por',
     '100 g que crus — confundir os dois é o erro mais comum nesse tipo de estimativa.',
     'Alimento fora da lista: estime por analogia com o mais parecido dela.',
+    'CONDIMENTOS E MOLHOS (maionese, creme de leite, requeijão, azeite, manteiga) são densos e',
+    'costumam dominar o total de um prato pronto — use a porção REAL vista, não a porção cheia.',
+    'VERSÃO LIGHT: a lista traz a versão tradicional. Light tem, por definição, ao menos 25% menos',
+    'caloria ou gordura que a tradicional — então use o valor da lista como TETO e reduza; nunca',
+    'estime acima dele. Ex.: maionese light não pode passar de 302 kcal/100 g.',
+    'VERSÃO DIET é diferente de light: tira o açúcar mas pode ter MAIS gordura, então pode chegar a',
+    'caloria igual ou maior que a tradicional. Não reduza por ser diet.',
     'Se só souber o valor do alimento SECO/CRU, lembre que grão e massa absorvem água e rendem de',
     '2,5 a 3 vezes o peso seco ao cozinhar — divida o valor por 100 g do seco por esse fator antes',
     'de aplicar à porção cozida. Ex.: 100 g de macarrão seco (371 kcal) viram ~250-300 g cozidos.',

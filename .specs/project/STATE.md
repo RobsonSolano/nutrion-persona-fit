@@ -2,6 +2,67 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### UAT completo no emulador (2026-08-26) — leva de 2026-08-25 VERIFICADA
+
+Ambiente: emulador Pixel 8 / **Android 16 (API 36)**, dev build local (`npx expo run:android`),
+barra de navegação em **3 botões** (o modo gestos não reproduz o bug de safe area). Usuários do
+`seed:test-users`; `coach@` promovido a premium (`source=grandfather`) para liberar a IA.
+
+| O que | Resultado |
+|---|---|
+| Sanity check — **texto** | 545 kcal com gramas / 578 sem (arroz+feijão+bife). Âncora no cru daria 900+ |
+| Sanity check — **foto** | 488 → 417 → **367** no mesmo sanduíche. Os 4 macros fecham com a tabela na casa da unidade |
+| Cárdio — form | Troca séries/reps/carga por distância/duração/RPM ao escolher exercício do grupo cardio |
+| Cárdio — exibição | `2–5 km` · `1h30` · `6 RPM` na visão do aluno |
+| Cárdio — **decisão de design validada** | Rotina de **modalidade Musculação** exibindo métricas de **cárdio** — é o caso que fez rejeitar a modalidade como vetor |
+| **Template → aluno** | Métricas atravessaram o `coach-apply-template`. Confirma o fix do defeito achado em review |
+| Safe area — paywall e demais | Botão de rodapé alcançável |
+| Safe area — **abas** | **Sem espaço duplicado** acima da tab bar: confirma a decisão de NÃO aplicar `bottom` nelas |
+| Validações | Máx < mín bloqueia; 9.999.999 m avisa (teto 1.000 km) sem erro genérico |
+| Duração | `90` no campo de minutos normaliza para `1h30` |
+| Alertas | Card escuro do app, não o Alert branco nativo |
+
+**Bugs achados NO teste e corrigidos na hora:** rodapé do `TemplatePicker` (modal, não passava pelo
+`Screen`) cortado pela barra de navegação, e o mesmo no topo; imagem de esteira em
+"Caminhada (ao ar livre)"; alerta nativo feio; maionese fora da tabela TACO inflando o total.
+
+**Limite do que foi verificado:** não existe baseline do "antes de tudo". Os 488 do primeiro teste de
+foto já eram COM a onda 3+4 no ar, e entre o 1º e o 2º a descrição também mudou — então a comparação
+limpa é **417 → 367 (−12%)**, atribuível ao código. É a consequência concreta de a instrumentação
+(item #1) ter ficado fora da leva.
+
+**Ainda sem verificação:** modal de release notes (`Updates.isEnabled` é `false` em dev build; só
+aparece em build de release, e a partir do 2º OTA publicado).
+
+### Dívida de typecheck do `/paywall` — RESOLVIDA (2026-08-26)
+
+O erro `src/lib/paywall.ts(6,17)` (`"/paywall"` fora das rotas tipadas), registrado nesta STATE
+desde 2026-07-21 como "pré-existente e alheio" e presente em toda esta sessão, **desapareceu**:
+`npx expo run:android` regenerou `.expo/types/router.d.ts` (que estava de 29/jun, antes de
+`app/paywall.tsx` existir). `npm run typecheck` agora passa **sem nenhum erro**.
+
+Confirma o diagnóstico original: era cache stale de typed routes, não código quebrado. Nenhuma
+alteração em `paywall.ts` foi necessária. **Consequência prática:** o typecheck volta a ser um gate
+útil — antes havia sempre 1 erro esperado, o que obrigava a contar erros em vez de exigir zero.
+
+### cardio-duracao-hm (2026-08-26) — implementado (branch `feature/cardio-duracao-hm`)
+
+**Feedback do dev, no teste do emulador:** registrar duração em minutos inteiros é ruim — para 2h30
+o professor tem de calcular 150 de cabeça.
+
+**Correção sem tocar o banco:** `duration_min` continua em MINUTOS (unidade canônica, nenhuma
+migration). Só a UI muda: o form ganha **Horas + Minutos** que compõem o valor, e a exibição passa a
+mostrar **`2h30`** em vez de `150 min`.
+
+Funções puras novas em `cardioMetrics.ts` (4 testes): `formatDuracao` (45 → "45 min", 60 → "1h",
+150 → "2h30", 125 → "2h05"), `minutosParaHoraMin` e `horaMinParaMinutos`.
+
+**Trade-off aceito:** digitar mais de 59 no campo de minutos normaliza sozinho (90 vira 1h30, com o
+campo mudando na frente do usuário). É correto e até útil, mas causa um pequeno susto ao digitar. A
+alternativa seria estado local desacoplado do draft, o que traria dessincronização.
+
+**Validado:** 185/185, typecheck **zero erros**, lint sem erro novo.
+
 ### safe-area-bottom (2026-08-26) — implementado (branch `bugfix/safe-area-bottom`)
 
 **Sintoma (dev):** em algumas telas — paywall/assinatura o exemplo — o conteúdo do rodapé ficava

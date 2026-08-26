@@ -29,9 +29,12 @@ import {
 } from '@/hooks/useExercises';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
+  horaMinParaMinutos,
   metricTypeFromGroup,
+  minutosParaHoraMin,
   validateCardioMetrics,
 } from '@/lib/cardioMetrics';
 import {
@@ -111,6 +114,7 @@ export default function RoutineEditor(props: Props) {
     equipment: string | null;
     images: string[];
   } | null>(null);
+  const alert = useAlert();
   const scrollRef = useRef<ScrollView>(null);
   const seriesRefs = useRef<Map<string, TextInput>>(new Map());
 
@@ -184,14 +188,19 @@ export default function RoutineEditor(props: Props) {
   async function handleSubmit() {
     const cleanName = name.trim();
     if (cleanName.length < 2) {
-      Alert.alert('Nome do treino', 'Informe um nome (ex: Peito A).');
+      alert.showAlert({
+        title: 'Nome do treino',
+        message: 'Informe um nome (ex: Peito A).',
+        type: 'warning',
+      });
       return;
     }
     if (drafts.length === 0) {
-      Alert.alert(
-        'Sem exercícios',
-        'Adicione pelo menos um exercício ao treino.',
-      );
+      alert.showAlert({
+        title: 'Sem exercícios',
+        message: 'Adicione pelo menos um exercício ao treino.',
+        type: 'warning',
+      });
       return;
     }
     // CAR-03: a rede de cima. O banco também tem check constraint, mas aqui o
@@ -200,7 +209,11 @@ export default function RoutineEditor(props: Props) {
       if (d.metric_type !== 'cardio') continue;
       const erro = validateCardioMetrics(d);
       if (erro) {
-        Alert.alert('Métricas de cárdio', `${d.exercise_name}: ${erro}`);
+        alert.showAlert({
+          title: 'Métricas de cárdio',
+          message: `${d.exercise_name}: ${erro}`,
+          type: 'warning',
+        });
         return;
       }
     }
@@ -231,10 +244,7 @@ export default function RoutineEditor(props: Props) {
         exercises,
       });
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -548,6 +558,11 @@ type FieldsProps = {
  * o schema — sem conversão, sem arredondamento no meio do caminho.
  */
 function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
+  // Horas e minutos separados: o banco guarda minutos, mas obrigar a digitar
+  // "150" pra 2h30 é fazer o professor calcular de cabeça. Digitar mais de 59
+  // minutos normaliza sozinho (90 → 1h30).
+  const { horas, minutos } = minutosParaHoraMin(draft.duration_min);
+
   return (
     <>
       <View className="flex-row gap-2">
@@ -572,9 +587,21 @@ function CardioFields({ draft, onChange, setsRef }: FieldsProps) {
       <View className="flex-row gap-2">
         <View style={{ flex: 1 }}>
           <SmallInput
+            label="Horas"
+            value={horas?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(toInt(v), minutos) })
+            }
+            placeholder="0"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SmallInput
             label="Minutos"
-            value={draft.duration_min?.toString() ?? ''}
-            onChangeText={(v) => onChange({ duration_min: toInt(v) })}
+            value={minutos?.toString() ?? ''}
+            onChangeText={(v) =>
+              onChange({ duration_min: horaMinParaMinutos(horas, toInt(v)) })
+            }
             placeholder="30"
           />
         </View>
