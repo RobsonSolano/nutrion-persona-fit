@@ -2,6 +2,69 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Enriquecimento do catálogo: 271 → 522 — 2026-08-26
+
+Fonte: `yuhonas/free-exercise-db` (CC0), a mesma que já alimentava as imagens —
+então os 251 novos nascem **com as duas imagens** de demonstração (verificado
+por HEAD no CDN).
+
+| | antes | depois |
+|---|---|---|
+| Total | 271 | **522** |
+| Sem imagem | 13 | **9** |
+| Disponível com restrição de membro inferior | 120 | 247 |
+
+Por grupo depois: chest 45, back 60, legs 87, shoulders 51, biceps 31,
+triceps 28, core 64, full_body 118, cardio 38.
+
+**Decisões do dev aplicadas:** sem nível `expert` (45 descartados); kettlebell
+completo (41); nomes em PT-BR com o inglês entre parênteses quando o termo não
+se traduz (`Bom dia pernas estendidas (good morning)`).
+
+**63 candidatos podados na mão** por serem variação de pegada/lateralidade do
+mesmo movimento — seis roscas de punho, quatro flexões inclinadas, três
+extensões de tríceps curvado, nove desenvolvimentos de kettlebell. Isso é o que
+separa 522 de "586 com enchimento": o prompt da IA recebe só **8 exercícios por
+grupo**, então variação redundante empurra movimento útil pra fora. O dev pediu
+quantidade *com categorização correta*, e near-duplicata não é nem uma nem outra.
+
+**Zero colisão de nome** com o catálogo existente — validado antes de gerar a
+migration, não depois. Cinco candidatos foram descartados justamente por
+colidirem (`Flexão inclinada`, `Flexão pegada larga`, `Supino reto (máquina)`,
+`Agachamento livre (barra)`, `Sled push`).
+
+**Grupo por categoria, não por músculo primário.** O dataset marca quadríceps
+como primário em clean, snatch e box jump, o que jogaria 60 exercícios em
+`legs`. Mas os equivalentes que já existem (`Power clean`, `Snatch`, `Box jump`,
+`Sled push`, `Wall ball`) moram em `full_body` — então halterofilismo olímpico,
+pliometria e strongman vão pra `full_body`, exceto agachamentos olímpicos.
+
+**`requires_lower_limbs`:** classificado por músculo primário + categoria, com
+19 correções manuais para movimentos que usam a perna como apoio ou alavanca
+sem citá-la no nome (sit-up, superman, prancha caminhando, figura 8). Resultado:
+275 true, 247 false, **0 null** — nada entrou não classificado.
+
+**Não precisa de OTA:** catálogo é dado de servidor. Os 251 aparecem no app
+assim que o cache de query expira (5 min no picker, 60 min no mapa de imagens).
+
+### Poluição do catálogo global por import de IA — 13 linhas em CAIXA ALTA
+
+Achado ao listar o catálogo: `ABDUÇÃO`, `ADUÇÃO`, `AGACHAMENTO PÊNDULO`,
+`EXTENSÃO`, `FLEXÃO CADEIRA`, `FLEXÃO MESA`, `GÊMEOS PÊNDULO`, `GLÚTEO MÁQUINA`,
+`ELEVAÇÃO PÉLVICA SOLO UNI`, `ROSCA DIRETA POLIA`, `REMADA BAIXA ABERTA`,
+`REMADA CURVADA PRON.`, `PULLEY FRENTE`.
+
+São do `coach-save-imported-workout` **antes** do item #5, quando o import por
+IA criava exercício no catálogo global com `owner_id = null` e sem convenção de
+nome. Vários duplicam entradas próprias (`EXTENSÃO` vs `Cadeira extensora`,
+`FLEXÃO MESA` vs `Mesa flexora`).
+
+O item #5 fechou a torneira (import agora nasce `exclusivo` do professor), mas
+a spec de julho deixou a limpeza retroativa explicitamente fora de escopo.
+**Pendente de decisão do dev**: renomear para a convenção, ou apagar. Apagar é
+seguro — `exercise_id` é `on delete set null` nas três tabelas que referenciam,
+e `exercise_name` é snapshot.
+
 ### Cadastro de exercício pelo professor (item #5) — 2026-08-26
 
 Implementado a partir da spec e do plano de 2026-07-29 (`docs/superpowers/`),
