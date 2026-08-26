@@ -59,6 +59,22 @@ export function useExerciseImagesMap() {
 }
 
 /**
+ * Catálogo inteiro visível ao usuário (RLS aplicada).
+ *
+ * Mesma query cacheada dos mapas de mídia — não custa requisição nova.
+ * O form de cadastro usa pra detectar nome duplicado: a checagem precisa
+ * bater com o índice de unicidade do banco, que é `(group_id, name)`, e não
+ * com a lista filtrada por modalidade que o picker mostra.
+ */
+export function useAllVisibleExercises() {
+  return useQuery({
+    queryKey: queryKeys.allExercises(),
+    queryFn: listAllExercises,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+/**
  * Map<exerciseId, video_url> dos exercícios que têm vídeo.
  *
  * Mesma query cacheada do `useExerciseImagesMap` (`allExercises()`), então

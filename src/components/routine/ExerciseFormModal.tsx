@@ -20,6 +20,7 @@ import { Camera, Image as ImageIcon, Trash2, X } from 'lucide-react-native';
 import { Button, Card, ConfirmModal, Input } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import {
+  useAllVisibleExercises,
   useDeleteExercise,
   useExerciseGroups,
   useSaveExercise,
@@ -54,8 +55,6 @@ type Props = {
   exercise?: Exercise | null;
   initialGroupId: string | null;
   initialModality: Modality;
-  /** Catálogo visível do grupo, pra checagem de duplicata. */
-  catalog: Exercise[];
   onSaved: (exercise: Exercise) => void;
   onDeleted: () => void;
 };
@@ -66,13 +65,16 @@ export default function ExerciseFormModal({
   exercise,
   initialGroupId,
   initialModality,
-  catalog,
   onSaved,
   onDeleted,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { showAlert, showError } = useAlert();
   const groupsQ = useExerciseGroups();
+  // Catálogo completo, não o do picker: o professor pode TROCAR de grupo
+  // dentro do form, e a lista do picker (filtrada por grupo e modalidade)
+  // deixaria a checagem de duplicata cega no grupo novo.
+  const catalogQ = useAllVisibleExercises();
   const saveM = useSaveExercise();
   const deleteM = useDeleteExercise();
 
@@ -204,7 +206,7 @@ export default function ExerciseFormModal({
     const dup = findDuplicateExercise(
       values.name,
       values.groupId,
-      catalog,
+      catalogQ.data ?? [],
       exercise?.id,
     );
     if (dup) {
