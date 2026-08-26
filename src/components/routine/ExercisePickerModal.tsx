@@ -8,12 +8,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle2, PlusCircle, Search, X } from 'lucide-react-native';
 import { Card, Input } from '@/components/ui';
 import { useExerciseGroups, useExercisesByGroup } from '@/hooks/useExercises';
@@ -39,6 +39,7 @@ export default function ExercisePickerModal({
   addedExerciseIds: Set<string>;
   onSelect: (ex: Exercise) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [groupId, setGroupId] = useState<string | null>(preferredGroupId);
   const [search, setSearch] = useState('');
   const groupsQ = useExerciseGroups();
@@ -70,7 +71,7 @@ export default function ExercisePickerModal({
       <View className="flex-1 bg-bg-deep">
         <View
           className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle"
-          style={{ paddingTop: Platform.OS === 'ios' ? 50 : 16 }}
+          style={{ paddingTop: Math.max(insets.top, 16) + 4 }}
         >
           <Pressable
             onPress={onClose}
@@ -89,7 +90,11 @@ export default function ExercisePickerModal({
         </View>
 
         <ScrollView
-          contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 60 }}
+          contentContainerStyle={{
+            padding: 20,
+            gap: 12,
+            paddingBottom: Math.max(insets.bottom, 16) + 44,
+          }}
           keyboardShouldPersistTaps="handled"
         >
           <Card padding="md">
