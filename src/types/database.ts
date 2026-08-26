@@ -146,6 +146,9 @@ export const MODALITY_LABELS: Record<Modality, string> = {
   generico: 'Genérico',
 };
 
+/** exclusivo = só o dono e os alunos dele; publico = catálogo global. */
+export type ExerciseVisibility = 'exclusivo' | 'publico';
+
 export type Exercise = {
   id: string;
   group_id: string;
@@ -155,6 +158,13 @@ export type Exercise = {
   image_urls: string[] | null;
   video_url: string | null;
   modality: Modality;
+  /** Professor que criou. Null = catálogo seed original. */
+  owner_id: string | null;
+  visibility: ExerciseVisibility;
+  /** Exige função de membro inferior. `null` = não classificado — e por
+   *  segurança também sai dos planos de quem declara restrição, porque o
+   *  filtro do gerador é `eq.false` e `null = false` não é verdadeiro. */
+  requires_lower_limbs: boolean | null;
 };
 
 export type WaterLog = {

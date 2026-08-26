@@ -158,6 +158,14 @@ serve(async (req: Request) => {
             name: ref.name.trim(),
             equipment: ref.equipment ?? null,
             modality: ref.modality,
+            // Quem importou um PDF de treino não pediu pra publicar no
+            // catálogo do app inteiro — nasce exclusivo do professor.
+            // Antes caía no catálogo global anonimamente.
+            owner_id: caller.id,
+            visibility: 'exclusivo',
+            // requires_lower_limbs fica NULL de propósito: ninguém
+            // classificou. Null sai dos planos de quem declara restrição
+            // (o filtro é eq.false), então falha pro lado seguro.
           })
           .select('id')
           .maybeSingle();
@@ -167,12 +175,16 @@ serve(async (req: Request) => {
           exerciseIdByNewKey.set(key, insertRes.data.id as string);
           continue;
         }
-        // Conflito (UNIQUE group_id+name) — busca o existente.
+        // Conflito nos índices parciais de unicidade — busca o existente
+        // DENTRO DO ESCOPO VISÍVEL do professor. Sem o filtro, um nome que
+        // colide com o exclusivo de outro professor devolveria o id errado.
         const existing = await supabaseService
           .from('exercises')
           .select('id')
           .eq('group_id', groupId)
           .eq('name', ref.name.trim())
+          .or(`visibility.eq.publico,owner_id.eq.${caller.id}`)
+          .limit(1)
           .maybeSingle();
         if (existing.data?.id) {
           exerciseIdByNewKey.set(key, existing.data.id as string);
