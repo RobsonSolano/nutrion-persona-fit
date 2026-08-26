@@ -2,6 +2,51 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### AAB de polimento 1.4.0 — preparado, build e submit pendentes (2026-08-26)
+
+**`version` 1.3.0 → 1.4.0, e isso é a decisão mais consequente daqui.**
+`runtimeVersion` é `appVersion`, então subir a version **isola o binário antigo
+do canal OTA**. O comentário no `app.config.ts` já prescrevia exatamente isso
+para mudança nativa — e este build muda nativo duas vezes (orientação
+destravada + 5 módulos nativos em patch novo).
+
+Sem o bump, um OTA publicado em 1.3.0 depois deste build entregaria JS
+compilado contra `expo-updates@29.0.20` para binários rodando `29.0.17`. Com o
+bump: quem está no versionCode 4 **mantém o último OTA de hoje** e para de
+receber novos até instalar o AAB. Ninguém perde nada; só congela.
+
+**Patches do SDK aplicados** (decisão do dev de mandar junto, que é o único
+momento sem janela de risco): `expo` 54.0.34→54.0.37, `expo-updates`
+29.0.17→29.0.20, `expo-router` 6.0.23→6.0.24, `expo-constants` e
+`expo-file-system` pelo lockfile. `expo install --check` agora diz
+"Dependencies are up to date". 280 testes e typecheck passam depois do bump.
+
+**`submit.production.android.track = "alpha"`** — closed testing. O default do
+`eas submit` é `internal`, que **não** alcança quem está no closed testing.
+Decisão do dev, gravada no `eas.json` pra não depender de escolher na hora.
+
+**Release notes voltaram a arrays vazios.** Descreviam o OTA anterior e ficaram
+obsoletas no instante em que ele foi publicado. Anunciar conteúdo errado é pior
+que cair no modal genérico. Preencher antes de cada `eas update` — segue sem
+guarda automático (a ideia de um script no `update:*` continua não aplicada).
+
+**Pendente, e é do dev:**
+
+1. **Rotacionar o emulador antes do build.** É o único risco que OTA não
+   conserta: o app foi desenhado em portrait e nenhuma tela foi vista em
+   landscape. Checar aba de treino, modal de imagens do exercício, paywall e
+   onboarding.
+2. `eas build --platform android --profile production` → sai `versionCode 5`
+   sozinho (`appVersionSource: remote` + `autoIncrement`).
+3. **Service account do Google Play** — não existe ainda. `google-services.json`
+   no repo é config do Firebase (login + push), coisa diferente. Exige criar a
+   service account no Google Cloud, habilitar a Play Android Developer API,
+   baixar o JSON e convidar o e-mail no Play Console com permissão de release.
+   **Nada disso é alcançável daqui** — são duas interfaces web. Alternativa:
+   rodar `eas submit` interativo uma vez, que o EAS guarda a chave.
+4. `eas submit --platform android --profile production`. Com managed publishing
+   ligado, a release fica em "pronta para publicar" esperando o clique.
+
 ### Play Console — resizability feita, edge-to-edge não é acionável (2026-08-26)
 
 Item #7 do backlog, escopo escolhido pelo dev: **edge-to-edge + resizability,
