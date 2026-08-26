@@ -36,6 +36,7 @@ import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { MODALITY_LABELS } from '@/types/database';
+import { toExerciseInsert } from '@/lib/exerciseInsert';
 
 export default function RotinaDetalheScreen() {
   const router = useRouter();
@@ -77,19 +78,7 @@ export default function RotinaDetalheScreen() {
         modality: detailQ.data.modality,
         groupId: detailQ.data.group_id,
         description: detailQ.data.description,
-        exercises: detailQ.data.exercises.map((e) => ({
-          exercise_id: e.exercise_id,
-          exercise_name: e.exercise_name,
-          equipment: e.equipment,
-          sort_order: e.sort_order,
-          sets: e.sets,
-          reps_min: e.reps_min,
-          reps_max: e.reps_max,
-          weight_min_kg: e.weight_min_kg,
-          weight_max_kg: e.weight_max_kg,
-          duration_min: e.duration_min,
-          notes: e.notes,
-        })),
+        exercises: detailQ.data.exercises.map(toExerciseInsert),
       });
       void Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success,
@@ -171,19 +160,7 @@ export default function RotinaDetalheScreen() {
               initialDescription={detailQ.data.description ?? ''}
               initialModality={detailQ.data.modality}
               initialGroupId={detailQ.data.group_id}
-              initialExercises={detailQ.data.exercises.map((e) => ({
-                exercise_id: e.exercise_id,
-                exercise_name: e.exercise_name,
-                equipment: e.equipment,
-                sort_order: e.sort_order,
-                sets: e.sets,
-                reps_min: e.reps_min,
-                reps_max: e.reps_max,
-                weight_min_kg: e.weight_min_kg,
-                weight_max_kg: e.weight_max_kg,
-                duration_min: e.duration_min,
-                notes: e.notes,
-              }))}
+              initialExercises={detailQ.data.exercises.map(toExerciseInsert)}
               submitLabel="Salvar alterações"
               loading={update.isPending}
               onSubmit={async (payload) => {

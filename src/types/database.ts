@@ -111,6 +111,10 @@ export type ExerciseGroup = {
   sort_order: number;
 };
 
+/** Formato de métricas do exercício: força usa séries/reps/carga, cardio usa
+ *  distância/RPM/tempo. */
+export type MetricType = 'strength' | 'cardio';
+
 export type Modality =
   | 'musculacao'
   | 'calistenia'
@@ -185,6 +189,14 @@ export type TemplateExercise = {
   weight_min_kg: number | null;
   weight_max_kg: number | null;
   duration_min: number | null;
+  /** strength (séries/reps/carga) ou cardio (distância/RPM/tempo). Snapshot do
+   *  grupo do exercício — não depende de exercise_id continuar existindo. */
+  metric_type: MetricType;
+  /** Só em cardio. Metros (inteiro cobre natação 100m e corrida 10000m). */
+  distance_min_m: number | null;
+  distance_max_m: number | null;
+  /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
+  cadence_rpm: number | null;
   notes: string | null;
 };
 
@@ -217,6 +229,14 @@ export type RoutineExercise = {
   weight_min_kg: number | null;
   weight_max_kg: number | null;
   duration_min: number | null;
+  /** strength (séries/reps/carga) ou cardio (distância/RPM/tempo). Snapshot do
+   *  grupo do exercício — não depende de exercise_id continuar existindo. */
+  metric_type: MetricType;
+  /** Só em cardio. Metros (inteiro cobre natação 100m e corrida 10000m). */
+  distance_min_m: number | null;
+  distance_max_m: number | null;
+  /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
+  cadence_rpm: number | null;
   notes: string | null;
 };
 
