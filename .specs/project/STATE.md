@@ -46,8 +46,15 @@ guarda automático (a ideia de um script no `update:*` continua não aplicada).
    como trabalho demais para o retorno agora: **sobe o `.aab` à mão** no Play
    Console → Closed testing → nova versão.
 
-   O `submit.production.android.track = "alpha"` fica no `eas.json` **dormente**,
-   pronto se um dia a service account existir. Não atrapalha nada.
+   O `submit.production.android.track = "production"` fica no `eas.json`
+   **dormente**, pronto se um dia a service account existir.
+
+   **Correção (2026-08-26):** eu havia escrito `alpha`, assumindo que o app
+   estava cumprindo closed testing e sem acesso a produção. **O app já está
+   publicado em produção** — o dev corrigiu. Consequência maior que uma linha de
+   config: os **dois OTAs de hoje foram para usuários reais em produção**, não
+   para uma plateia de testadores. Não há público de teste absorvendo o primeiro
+   impacto de um update.
 
    Vale reabrir quando o submit virar rotina (várias releases por mês).
 
