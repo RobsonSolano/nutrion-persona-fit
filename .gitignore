@@ -56,3 +56,7 @@ firebase-service-account.json
 
 # backlog local de melhorias (rascunho pessoal, fora do git)
 BACKLOG.md
+
+# documentos-fonte de referência (TACO etc) — usados pra gerar migration,
+# não fazem parte do build
+taco_*.pdf
