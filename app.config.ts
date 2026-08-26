@@ -41,7 +41,7 @@ const config: ExpoConfig = {
   name: 'Persona Fit',
   slug: 'nutrion',
   scheme: 'nutrion',
-  version: '1.3.0',
+  version: '1.4.0',
   // Destravado por recomendação do Play Console (telas grandes): app travado
   // em portrait é tratado como não-adaptativo em tablet e foldable. Nada no
   // app declara `resizeableActivity=false` — a trava de orientação era a
@@ -96,17 +96,9 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [
-        'O professor pode cadastrar exercícios próprios — exclusivos dos seus alunos ou públicos no catálogo do app',
-        'O botão de play abre o vídeo que o professor cadastrou no exercício, em vez de uma busca no YouTube',
-      ],
-      melhorias: [
-        'Ao cadastrar um exercício, o app avisa se já existe outro com o mesmo nome no grupo',
-      ],
-      ajustes: [
-        'Sair da conta agora limpa os dados já carregados. Antes, ao entrar com outra conta no mesmo aparelho, informações da conta anterior podiam continuar aparecendo',
-        'Rodapé da tela de escolher exercício não fica mais atrás da barra de navegação do Android',
-      ],
+      novidades: [],
+      melhorias: [],
+      ajustes: [],
     },
   },
 };
