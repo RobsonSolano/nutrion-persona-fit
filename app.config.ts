@@ -87,10 +87,26 @@ const config: ExpoConfig = {
     // "O que há de novo" exibido no modal de OTA. ATUALIZAR ANTES DE CADA
     // `eas update` — o texto viaja no manifest daquela publicação. Se ficar
     // desatualizado ou vazio, o modal cai no aviso genérico (sem erro).
+    // Viajam no manifest deste update e são exibidas pelo bundle que JÁ está
+    // no aparelho. Ou seja: quem estiver num bundle sem a feature de notas
+    // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
+    // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [],
-      melhorias: [],
-      ajustes: [],
+      novidades: [
+        'Cárdio com distância, duração em horas e minutos, e cadência (RPM)',
+        'O professor agora vê o e-mail do aluno no perfil',
+        'O onboarding pergunta se você é PCD e adapta o treino ao que você declarar',
+      ],
+      melhorias: [
+        'Contagem de calorias por foto e texto ficou bem mais realista: agora vem item por item, com base na tabela TACO',
+        'A IA não prescreve mais exercício que a sua condição impede de executar',
+        'Avisos do app usam o card escuro em vez do alerta branco do sistema',
+      ],
+      ajustes: [
+        'Botões de rodapé não ficam mais escondidos atrás da barra de navegação do Android',
+        'Imagem de esteira em "Caminhada (ao ar livre)" — agora mostra caminhada na rua',
+        'Preço no aviso de assinatura ficou igual ao da Play Store',
+      ],
     },
   },
 };
