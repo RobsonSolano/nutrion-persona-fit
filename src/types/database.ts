@@ -10,6 +10,16 @@ export type WeeklyFrequency = '1-2' | '2-3' | '3-4' | '4-5' | '5-6' | '6-7';
 
 export type ProfileRole = 'comum' | 'aluno' | 'professor';
 
+/** Tipos de deficiência declarados. Os dois primeiros viram bloqueio
+ *  determinístico de exercício no gerador de plano (bodyRestrictions.ts). */
+export type DisabilityType =
+  | 'wheelchair_paraplegia'
+  | 'amputation_lower'
+  | 'amputation_upper'
+  | 'visual'
+  | 'hearing'
+  | 'other';
+
 export type Profile = {
   id: string;
   full_name: string | null;
@@ -32,6 +42,10 @@ export type Profile = {
   practices_sport: boolean | null;
   sports: string[] | null;
   weekly_frequency: WeeklyFrequency | null;
+  /** null = nunca respondeu (perfis antigos). */
+  has_disability: boolean | null;
+  disability_types: DisabilityType[];
+  disability_notes: string | null;
   onboarding_completed_at: string | null;
   onboarding_skipped_at: string | null;
   suspended_at: string | null;

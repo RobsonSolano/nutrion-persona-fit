@@ -45,6 +45,9 @@ type Body = {
     protein_goal_g?: number | null;
     allergies?: string | null;
     physical_limitations?: string | null;
+    has_disability?: boolean | null;
+    disability_types?: string[] | null;
+    disability_notes?: string | null;
     bio?: string | null;
   };
 };
@@ -66,6 +69,9 @@ const ALLOWED_KEYS = new Set<keyof Body['patch']>([
   'protein_goal_g',
   'allergies',
   'physical_limitations',
+  'has_disability',
+  'disability_types',
+  'disability_notes',
   'bio',
 ]);
 

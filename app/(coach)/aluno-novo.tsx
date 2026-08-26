@@ -31,6 +31,10 @@ import {
   SegmentedControl,
 } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
+import DisabilityFields, {
+  type DisabilityValue,
+} from '@/components/DisabilityFields';
+import { isDisabilityValid } from '@/lib/disability';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
@@ -140,6 +144,11 @@ export default function AlunoNovo() {
   const [allergies, setAllergies] = useState('');
   const [limitations, setLimitations] = useState('');
   const [bio, setBio] = useState('');
+  const [disability, setDisability] = useState<DisabilityValue>({
+    hasDisability: null,
+    types: [],
+    notes: '',
+  });
 
   // Resultado
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -165,6 +174,7 @@ export default function AlunoNovo() {
     goalType !== null &&
     sports.length > 0 &&
     frequency !== null &&
+    isDisabilityValid(disability) &&
     (!isTemplatesMode || selectedTemplateIds.length > 0);
 
   async function handleCreateAndGenerate() {
@@ -198,6 +208,9 @@ export default function AlunoNovo() {
         water_goal_ml: 2500,
         allergies: allergies.trim() || null,
         physical_limitations: limitations.trim() || null,
+        has_disability: disability.hasDisability,
+        disability_types: disability.types,
+        disability_notes: disability.notes.trim() || null,
         bio: bio.trim() || null,
       });
       setStudentId(student.id);
@@ -520,6 +533,12 @@ export default function AlunoNovo() {
               multiline
               numberOfLines={3}
               style={{ minHeight: 80, textAlignVertical: 'top' }}
+            />
+            <DisabilityFields
+              {...disability}
+              onChange={(patch) =>
+                setDisability((prev) => ({ ...prev, ...patch }))
+              }
             />
           </Section>
 

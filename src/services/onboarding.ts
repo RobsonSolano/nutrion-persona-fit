@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type {
+  DisabilityType,
   GoalType,
   Modality,
   Profile,
@@ -28,6 +29,9 @@ export type OnboardingInput = {
   water_goal_ml: number | null;
   allergies: string | null;
   physical_limitations: string | null;
+  has_disability: boolean | null;
+  disability_types: DisabilityType[];
+  disability_notes: string | null;
   bio: string | null;
 };
 
@@ -147,6 +151,9 @@ export async function saveOnboardingResult(params: {
     weekly_frequency: input.weekly_frequency,
     allergies: input.allergies,
     physical_limitations: input.physical_limitations,
+    has_disability: input.has_disability,
+    disability_types: input.disability_types,
+    disability_notes: input.disability_notes,
     bio: input.bio,
     daily_calorie_goal: plan.calorie_goal,
     protein_goal_g: plan.protein_goal_g,

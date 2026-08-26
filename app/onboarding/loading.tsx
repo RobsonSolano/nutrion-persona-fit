@@ -66,6 +66,9 @@ export default function OnboardingLoading() {
         water_goal_ml: state.water_goal_ml,
         allergies: state.allergies.trim() || null,
         physical_limitations: state.physical_limitations.trim() || null,
+        has_disability: state.has_disability,
+        disability_types: state.disability_types,
+        disability_notes: state.disability_notes.trim() || null,
         bio: state.bio.trim() || null,
       };
     }

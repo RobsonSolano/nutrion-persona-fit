@@ -11,6 +11,11 @@ import {
   fetchReferences,
   formatReferencesForPrompt,
 } from './references.ts';
+import {
+  avisoRestricaoDetectada,
+  resolveBodyRestrictions,
+  type BodyRestrictions,
+} from './bodyRestrictions.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -53,6 +58,11 @@ export type PlanInput = {
   bio?: string | null;
   /** Bloco formatado pela anamnese clínica (formatAnamneseForPrompt). */
   anamnese_summary?: string | null;
+  /** Condição declarada. Vira bloqueio determinístico de catálogo em
+   *  resolveBodyRestrictions() — não é só texto pro prompt. */
+  has_disability?: boolean | null;
+  disability_types?: string[] | null;
+  disability_notes?: string | null;
 };
 
 export type CatalogExercise = {
@@ -108,6 +118,13 @@ Regras gerais (siga com rigor):
   com a base — nome diferente = exercício descartado).
 - Respeite limitações físicas declaradas: não prescreva movimentos que piorem
   a condição (ex: joelho instável → evitar agachamento profundo/pliometria).
+- TODO texto livre do usuário ("Limitações físicas" e "Contexto declarado")
+  pode conter restrição de saúde, não só preferência de rotina. Leia como
+  restrição.
+- Restrição de saúde SEMPRE vence preferência, objetivo e modalidade
+  selecionada. Se o usuário pedir treino de perna E declarar paraplegia, a
+  paraplegia vence — sem exceção e sem "versão adaptada" do movimento
+  impossível.
 - Respeite o objetivo: perda de gordura → compostos + finalização aeróbica;
   ganho de massa → volume moderado com cargas pesadas.
 - "weight_min_kg" / "weight_max_kg" podem ser null se não for sensato sugerir
@@ -195,17 +212,31 @@ Regras de segurança a partir da anamnese clínica (quando presente no perfil do
 - Restrição alimentar (vegano, sem lactose, etc): refletir nas metas e sugestões (ex: sem lactose -> não sugerir whey de leite; vegano -> proteínas vegetais).
 - Cirurgia recente (< 12 meses) na região X: tratar como lesão ativa da região.`;
 
+/** Bloco de restrições declaradas. Vem no system prompt (e não só no user
+ *  block) porque é a instrução que não pode ser diluída pelo resto. */
+function restrictionsBlock(restrictions: BodyRestrictions): string {
+  if (restrictions.promptRules.length === 0) return '';
+  const rules = restrictions.promptRules.map((r) => `- ${r}`).join('\n');
+  return `
+
+RESTRIÇÕES DE SAÚDE DESTE USUÁRIO — PRIORIDADE MÁXIMA:
+${rules}`;
+}
+
 export function buildSystemPrompt(
   modalities: Modality[],
   onlyFood: boolean,
+  restrictions: BodyRestrictions,
 ): string {
+  const restricoes = restrictionsBlock(restrictions);
+
   if (onlyFood) {
     return `${BASE_SYSTEM_PROMPT}
 
 MODO ESPECIAL — usuário escolheu NÃO TREINAR:
 - Retorne "routines": [] (array vazio).
 - Foque o "rationale" 100% em alimentação, hidratação e hábitos.
-- NÃO invente rotinas mesmo se houver exercícios no catálogo.${ANAMNESE_SAFETY_RULES}`;
+- NÃO invente rotinas mesmo se houver exercícios no catálogo.${ANAMNESE_SAFETY_RULES}${restricoes}`;
   }
 
   const labels = modalities.map((m) => MODALITY_LABEL[m]).join(', ');
@@ -222,7 +253,7 @@ ${guidelines}
 Quantidade de rotinas:
 - Entre 3 e 5 rotinas semanais no total, distribuídas entre as modalidades selecionadas
   proporcionalmente. Ex: se ele pratica musculação + corrida com freq 4x, gera ~3 musc + 1 corrida.
-- Compatíveis com a frequência semanal informada.${ANAMNESE_SAFETY_RULES}`;
+- Compatíveis com a frequência semanal informada.${ANAMNESE_SAFETY_RULES}${restricoes}`;
 }
 
 function mapSportsToModalities(sports: string[]): Modality[] {
@@ -256,10 +287,19 @@ export function pickRelevantModalities(input: PlanInput): {
   return { modalities, onlyFood: false };
 }
 
+/**
+ * Carrega o catálogo já FILTRADO pelas restrições do usuário.
+ *
+ * O filtro mora aqui de propósito: `sanitizePlan` descarta qualquer
+ * exercício ausente do catálogo que recebe, então tirar os bloqueados neste
+ * ponto fecha as duas pontas — o modelo não vê o exercício pra escolher, e
+ * se ele inventar o nome mesmo assim a saída é descartada.
+ */
 export async function fetchCatalog(
   // deno-lint-ignore no-explicit-any
   supabase: SupabaseClient<any, 'public', any>,
   modalities: Modality[],
+  restrictions?: BodyRestrictions,
 ): Promise<CatalogExercise[]> {
   if (modalities.length === 0) return [];
 
@@ -275,10 +315,16 @@ export async function fetchCatalog(
     ]),
   );
 
-  const { data: exercises, error: exErr } = await supabase
+  let query = supabase
     .from('exercises')
     .select('id, group_id, name, equipment, is_compound, modality')
     .in('modality', modalities);
+
+  if (restrictions?.blockLowerLimbs) {
+    query = query.eq('requires_lower_limbs', false);
+  }
+
+  const { data: exercises, error: exErr } = await query;
   if (exErr) throw exErr;
 
   return (exercises ?? [])
@@ -312,6 +358,7 @@ export function buildUserBlock(
   catalog: CatalogExercise[],
   modalities: Modality[],
   onlyFood: boolean,
+  restrictions: BodyRestrictions,
 ): string {
   const age =
     input.birth_year != null
@@ -327,7 +374,17 @@ export function buildUserBlock(
 
   const goalLabel = goalToLabel(input.goal_type);
 
-  const lines = [
+  const lines: string[] = [];
+
+  // No topo, não no fim: a restrição precisa ser a primeira coisa que o
+  // modelo lê. Antes o dado de saúde chegava como última linha do perfil.
+  if (restrictions.promptRules.length > 0) {
+    lines.push('RESTRIÇÕES DE SAÚDE — LEIA ANTES DE QUALQUER COISA:');
+    for (const rule of restrictions.promptRules) lines.push(`- ${rule}`);
+    lines.push('');
+  }
+
+  lines.push(
     'Perfil do usuário:',
     `- Nome: ${input.full_name ?? 'não informado'}`,
     `- Sexo: ${sexLabel}${age != null ? `, ${age} anos` : ''}`,
@@ -337,9 +394,11 @@ export function buildUserBlock(
     `- Frequência semanal: ${input.weekly_frequency ?? 'não informado'}`,
     `- Água atual/desejada: ${input.water_goal_ml ?? '?'} ml/dia`,
     `- Alergias: ${input.allergies ?? 'nenhuma relatada'}`,
-    `- Limitações físicas: ${input.physical_limitations ?? 'nenhuma relatada'}`,
-    `- Bio: ${input.bio ?? 'não informado'}`,
-  ];
+    `- Limitações físicas declaradas: ${input.physical_limitations ?? 'nenhuma relatada'}`,
+    // Rótulo era "Bio", e o modelo lia como contexto de rotina/sono — foi
+    // assim que uma declaração de paraplegia virou treino de perna.
+    `- Contexto declarado pelo usuário (texto livre — PODE CONTER RESTRIÇÃO DE SAÚDE, leia como restrição e não como preferência): ${input.bio ?? 'não informado'}`,
+  );
 
   if (input.anamnese_summary) {
     lines.push('', 'Anamnese clínica:', input.anamnese_summary);
@@ -564,8 +623,11 @@ export async function generatePlan(
   input: PlanInput,
 ): Promise<GeneratePlanResponse> {
   const { modalities, onlyFood } = pickRelevantModalities(input);
+  const restrictions = resolveBodyRestrictions(input);
   const [catalog, references] = await Promise.all([
-    onlyFood ? Promise.resolve([]) : fetchCatalog(supabase, modalities),
+    onlyFood
+      ? Promise.resolve([])
+      : fetchCatalog(supabase, modalities, restrictions),
     fetchReferences(supabase, ['nutricao', 'treino', 'geral']),
   ]);
 
@@ -573,8 +635,14 @@ export async function generatePlan(
     return { error: { kind: 'empty_catalog' } };
   }
 
-  const systemPrompt = buildSystemPrompt(modalities, onlyFood);
-  const userBlock = buildUserBlock(input, catalog, modalities, onlyFood);
+  const systemPrompt = buildSystemPrompt(modalities, onlyFood, restrictions);
+  const userBlock = buildUserBlock(
+    input,
+    catalog,
+    modalities,
+    onlyFood,
+    restrictions,
+  );
   const referencesBlock = formatReferencesForPrompt(references, {
     mode: 'json_field',
     jsonField: 'rationale',
@@ -631,6 +699,14 @@ export async function generatePlan(
   }
 
   const sanitized = sanitizePlan(parsed, catalog, modalities, onlyFood);
+
+  // Bloqueio vindo de palavra-chave em texto livre pode ser falso positivo.
+  // Avisa depois do slice de 1000 chars pra o aviso nunca ser truncado.
+  const aviso = avisoRestricaoDetectada(restrictions);
+  if (aviso) {
+    sanitized.rationale = `${sanitized.rationale}\n\n${aviso}`;
+  }
+
   const totalTokens =
     typeof groqJson?.usage?.total_tokens === 'number'
       ? groqJson.usage.total_tokens

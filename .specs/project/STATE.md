@@ -2,6 +2,73 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Restrição corporal declarada (PCD) — 2026-08-26
+
+**O bug relatado:** usuário de teste selecionou musculação e escreveu no campo livre
+"Conta um pouco sobre você": *"Sou paraplégico, então não preciso ter treino de pernas"*.
+A IA gerou treino de pernas.
+
+**Eram três causas, não uma:**
+
+| # | Onde | Causa |
+|---|---|---|
+| 1 | `plan-generator.ts:341` | O `bio` chegava como **última** das 11 linhas do perfil, rotulado "Bio". A única regra de obediência apontava pra `physical_limitations` — campo que o usuário deixou vazio. O placeholder da tela pede "trabalho sentado 8h, durmo ~6h", então o modelo leu como preferência de rotina |
+| 2 | `sanitizePlan()` | Valida modalidade, nome no catálogo e clamps numéricos. **Nada anatômico** |
+| 3 | `buildFallbackPlan()` | Agachamento/terra/afundo/stiff/panturrilha **hardcoded** — com circuit breaker aberto, prescrevia perna independentemente de qualquer prompt |
+
+E como `coach-generate-plan` usa o mesmo gerador, o professor tinha o bug idêntico.
+
+**Princípio da correção:** pedir educadamente pro LLM não é correção. O filtro mora em
+`fetchCatalog`, antes do prompt. Aproveita uma propriedade que já existia — `sanitizePlan`
+descarta o que não está no catálogo recebido — então **um** filtro fecha as duas pontas.
+
+**Decisões:**
+
+- Pergunta "Você é PCD?" entra no passo 4 (Hábitos e restrições), não em tela nova: funil segue em 6 passos.
+- Bloqueio determinístico **só pra membro inferior**. Amputação de membro superior não vira
+  bloqueio — amputar *um* braço não impede treino de membro superior e o campo não diz
+  lateralidade; bloquear o grupo deixaria o plano vazio. Vira regra de prompt. Auditiva
+  **não tem implicação de prescrição** e não inventamos uma.
+- Responder "Não" **desarma** a rede de palavra-chave. É o escape hatch de quem escreve
+  "meu pai é cadeirante". Contradição inversa (respondeu não mas marcou tipo) → segurança vence.
+- Bloqueio vindo de texto livre é **anunciado no rationale** com como desfazer. Bloquear
+  errado e avisar é melhor que liberar errado e calar.
+- LGPD: coberto pelo `consentimento_saude` existente. Sem fluxo novo.
+
+**Achado durante a implementação:** `Levantamento terra (barra)` e `Deadlift (CrossFit)` moram
+no grupo `back`; `Push press` e `Handstand push-up` em `shoulders`. A lista curada restrita a
+cardio/full_body/core deixava os quatro passarem — precisou de passada catalog-wide.
+
+**Efeito medido do filtro:** 140 exercícios bloqueados, **117 livres** (peito 25, costas 22,
+ombros 19, bíceps 13, tríceps 13, core 8, full_body 14 de mobilidade, cardio 3 + handbike).
+Dá 3-5 rotinas cheias. Sem o handbike não sobrava **um** cardio.
+
+**Limitação assumida:** classificar 300 exercícios pra treino adaptado não é algo que se faça
+sem autoridade clínica. A linha traçada foi "assume função de perna pra ser executado".
+Mobilidade de solo e foam roll de perna ficam liberados — pra quem usa cadeira de rodas são,
+no pior caso, inúteis, não perigosos. Mora em coluna de banco pra ser corrigível sem deploy.
+
+**Fora de escopo, e o dev sabe:** cadastro manual de treino de perna pelo próprio usuário
+(decisão dele: é mau uso, não falha do app). `coach-apply-template` também não filtra —
+aplicar template é ação deliberada do professor.
+
+**Buraco conhecido que ficou:** o `chat-ai` não conhece a condição. Se o aluno pedir treino
+de perna no chat, nada bloqueia. É função separada, com persona própria — não entrou nesta leva.
+
+**Ainda sem verificação:** nada rodou contra o banco real. A migration e as functions precisam
+de `db:push` + `fn:deploy`, e o efeito no plano precisa de UAT gerando plano com paraplegia
+declarada.
+
+### E-mail do aluno visível pro professor (2026-08-26)
+
+`public.profiles` não tinha `email` — vive em `auth.users`, ilegível pelo client. O professor
+cadastrava, avisava "vai chegar um e-mail" e não tinha onde consultar qual. Agora é espelho de
+`auth.users.email` com backfill e dois gatilhos (signup e troca). A policy `profiles_select_own`
+já libera `coach_id = auth.uid()` — RLS intocada.
+
+Texto `selectable` em vez de botão copiar: `expo-clipboard` é dependência nativa e exigiria APK
+novo, o que a regra de pré-lançamento evita.
+
 ### UAT completo no emulador (2026-08-26) — leva de 2026-08-25 VERIFICADA
 
 Ambiente: emulador Pixel 8 / **Android 16 (API 36)**, dev build local (`npx expo run:android`),
