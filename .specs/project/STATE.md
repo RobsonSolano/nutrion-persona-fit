@@ -2,6 +2,23 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Cadastro de aluno: sucesso parcial tratado (2026-08-27, noite)
+
+Desdobramento do incidente do 502: o cadastro é multi-passo (criar aluno → gerar
+plano/aplicar treinos → enviar e-mail). Se um passo POSTERIOR à criação falhava,
+o coach via "Instabilidade" genérico e recadastrava → batia em "e-mail já
+cadastrado" (o aluno já existia). Agora `aluno-novo.tsx` trata os 3 pontos com
+mensagem de sucesso parcial (`type: warning`):
+- Gerar plano/aplicar treinos falha → "Aluno cadastrado — plano pendente. Abra o
+  aluno e gere o plano" + volta pra lista (via `createdStudentId` local, porque o
+  state `studentId` ainda não atualizou no closure do catch).
+- Salvar plano falha → "Aluno cadastrado — plano não salvo".
+- Enviar e-mail falha → "Aluno cadastrado — e-mail não enviado" + mostra e-mail e
+  senha pro coach enviar manualmente.
+Sabrina (aluna do reginaldo) teve as metas populadas manualmente via SQL com a
+fórmula `computeBaselineGoals` (1560 kcal / 137g), já que a IA 502-ou; treinos o
+reginaldo vincula depois.
+
 ### CAUSA RAIZ REAL do 500 do reginaldo: ano de nascimento inválido (2026-08-27, noite)
 
 **Correção da entrada anterior:** a hipótese "leftover `.coms` no auth.users" estava
