@@ -30,3 +30,34 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 export function isRetryableGroqStatus(status: number): boolean {
   return RETRYABLE.has(status);
 }
+
+/**
+ * fetch ao Groq com retry em erro transiente (5xx / 429), no mesmo endpoint.
+ * Compartilhado pelo chat-ai (sanity + foto) e disponível pra quem mais
+ * precisar. Não faz failover de modelo — quem quiser isso compõe por cima
+ * (o plan-generator faz). Não usar em requisição com stream: o corpo é
+ * consumido pelo caller.
+ */
+export async function groqFetchWithRetry(
+  url: string,
+  apiKey: string,
+  body: string,
+  maxAttempts = 2,
+): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body,
+    });
+    if (res.ok || attempt >= maxAttempts || !isRetryableGroqStatus(res.status)) {
+      return res;
+    }
+    console.warn(`[groq] ${res.status} na tentativa ${attempt}, repetindo...`);
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+}

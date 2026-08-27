@@ -11,7 +11,10 @@ import {
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
-import { DEFAULT_TEXT_MODEL } from '../_shared/groqRetry.ts';
+import {
+  DEFAULT_TEXT_MODEL,
+  groqFetchWithRetry,
+} from '../_shared/groqRetry.ts';
 import {
   aplicarTetoDensidade,
   extrairJsonDoTexto,
@@ -430,13 +433,7 @@ serve(async (req: Request) => {
     // continuam síncronos (devolvem JSON estrito de uma vez).
     const useStream = !!body.stream && isChatMode && !isMultimodal;
 
-    const groqRes = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
+    const requestBody = JSON.stringify({
         model: modelToUse,
         messages,
         // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
@@ -462,8 +459,22 @@ serve(async (req: Request) => {
         // Resolve definitivamente o problema do modelo retornar texto livre
         // que o parser nao consegue extrair.
         ...(isChatMode ? {} : { response_format: { type: 'json_object' } }),
-      }),
-    });
+      });
+
+    // Stream (chat texto) segue direto — não dá pra repetir um corpo já
+    // consumido. Sanity check (texto e FOTO) é síncrono e ganha retry: era o
+    // único caminho de IA sem nenhuma resiliência, e o de foto roda num
+    // modelo de visão instável com JSON.
+    const groqRes = useStream
+      ? await fetch(GROQ_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: requestBody,
+        })
+      : await groqFetchWithRetry(GROQ_URL, GROQ_API_KEY, requestBody);
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
