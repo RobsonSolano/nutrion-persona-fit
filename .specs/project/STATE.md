@@ -2,6 +2,43 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### CAUSA RAIZ REAL do 500 do reginaldo: ano de nascimento inválido (2026-08-27, noite)
+
+**Correção da entrada anterior:** a hipótese "leftover `.coms` no auth.users" estava
+**ERRADA** — query provou que não havia leftover (0 rows). A causa real, achada
+puxando os logs pela Management API + inspecionando os CHECK constraints:
+
+**O reginaldo digitava a IDADE (`46`) no campo "Ano nasc.".** A tabela tem
+`profiles_birth_year_check: CHECK (birth_year >= 1900 AND birth_year <= ano_atual)`.
+`46 < 1900` → o UPDATE do profile no `coach-create-student` estourava →
+`profile_update_failed` → 500 "Instabilidade" → rollback (deleta o auth criado) →
+0 alunos. Por isso e-mail/senha/entitlement despistaram: o problema era a
+**biometria**, não a identidade. O dev passava porque usava ano válido.
+
+**Como foi cravado (ferramentas novas desta sessão):**
+- Management API de logs: `GET /v1/projects/{ref}/analytics/endpoints/logs.all?sql=...`
+  com PAT (token `cli_`/`sbp_`). Mostra `POST | status | url` por invocação
+  (function_edge_logs) — foi assim que vimos 500→200 do dev vs 500 do reginaldo.
+  ⚠️ O output de `console.log/error` do Deno **NÃO** é consultável por essa API
+  (só a linha de status HTTP); só aparece no dashboard ao vivo.
+- Management API de SQL: `POST /v1/projects/{ref}/database/query` `{"query":"..."}`
+  — rodei SELECT/DELETE e li os `pg_constraint` direto.
+
+**Fix (branch `bugfix/cadastro-aluno-ano-nascimento`, testado 308/308):**
+- `src/lib/birthYear.ts` (novo, com testes) — `isValidBirthYear(year, currentYear)`
+  (1900..ano atual), espelha o CHECK.
+- `aluno-novo.tsx` — campo do ano em linha própria, **label "Ano de nascimento"**,
+  placeholder "Ex: 1999 (o ano, não a idade)", validação + borda vermelha,
+  bloqueia submit; peso/altura ganharam label + exemplo; `bio` ganhou
+  `maxLength={500}` (outro CHECK latente de 500 chars). `disability_notes` já
+  tinha limite.
+- `coach-create-student` — valida `birth_year` antes do UPDATE → 400
+  `invalid_birth_year` claro em vez de 500.
+- `parseError` — branch `invalid_birth_year`.
+
+**Destrave imediato do reginaldo (sem deploy):** ano `1980` ou deixar em branco
+(campo é opcional).
+
 ### Cadastro de aluno: 500 "Instabilidade" com e-mail malformado (2026-08-27, fim de tarde)
 
 **Sintoma:** professor Reginaldo não conseguia cadastrar aluno — sempre "Tivemos

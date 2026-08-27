@@ -74,6 +74,13 @@ function parseError(err: unknown): { title: string; message: string } {
         'Confira o endereço de e-mail (ex: nome@dominio.com) e tente de novo.',
     };
   }
+  if (lower.includes('invalid_birth_year')) {
+    return {
+      title: 'Ano de nascimento inválido',
+      message:
+        'Use o ano completo de nascimento (ex: 1999), não a idade. Entre 1900 e o ano atual.',
+    };
+  }
   if (lower.includes('weak_password')) {
     return {
       title: 'Senha fraca',

@@ -37,6 +37,7 @@ import DisabilityFields, {
 import { isDisabilityValid } from '@/lib/disability';
 import { colors } from '@/lib/theme';
 import { isValidEmail } from '@/lib/email';
+import { isValidBirthYear } from '@/lib/birthYear';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
   useCreateStudent,
@@ -175,8 +176,17 @@ export default function AlunoNovo() {
   // vermelho antes da hora. Formato inválido bloqueia o submit e pinta a borda.
   const emailInvalid = email.trim().length > 0 && !isValidEmail(email);
 
+  // Ano de nascimento é opcional; quando preenchido precisa ser um ANO válido
+  // (1900–ano atual). Espelha o CHECK do banco — sem isso a idade digitada no
+  // lugar do ano (ex: "46") ia pro servidor e estourava 500 na constraint.
+  const currentYear = new Date().getFullYear();
+  const birthYearInvalid =
+    birthYear.trim().length > 0 &&
+    !isValidBirthYear(Number(birthYear), currentYear);
+
   const canSubmitForm =
     isValidEmail(email) &&
+    !birthYearInvalid &&
     password.length >= 8 &&
     fullName.trim().length >= 2 &&
     sex !== null &&
@@ -466,29 +476,35 @@ export default function AlunoNovo() {
               value={sex ?? ''}
               onChange={(v) => setSex(v as Sex)}
             />
+            <Input
+              label="Ano de nascimento"
+              value={birthYear}
+              onChangeText={setBirthYear}
+              placeholder="Ex: 1999 (o ano, não a idade)"
+              keyboardType="number-pad"
+              maxLength={4}
+              error={
+                birthYearInvalid
+                  ? `Ano inválido. Use o ano completo entre 1900 e ${currentYear} (ex: 1999).`
+                  : undefined
+              }
+            />
             <View className="flex-row gap-2">
               <View className="flex-1">
                 <Input
-                  value={birthYear}
-                  onChangeText={setBirthYear}
-                  placeholder="Ano nasc. (ex: 1990)"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-              </View>
-              <View className="flex-1">
-                <Input
+                  label="Peso (kg)"
                   value={weight}
                   onChangeText={setWeight}
-                  placeholder="Peso (kg)"
+                  placeholder="Ex: 70"
                   keyboardType="decimal-pad"
                 />
               </View>
               <View className="flex-1">
                 <Input
+                  label="Altura (cm)"
                   value={height}
                   onChangeText={setHeight}
-                  placeholder="Altura (cm)"
+                  placeholder="Ex: 170"
                   keyboardType="number-pad"
                 />
               </View>
@@ -567,6 +583,7 @@ export default function AlunoNovo() {
               placeholder="Bio / contexto (rotina, sono, trabalho)"
               multiline
               numberOfLines={3}
+              maxLength={500}
               style={{ minHeight: 80, textAlignVertical: 'top' }}
             />
             <DisabilityFields

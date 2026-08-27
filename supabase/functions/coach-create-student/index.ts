@@ -129,6 +129,22 @@ serve(async (req: Request) => {
         400,
       );
     }
+    // Espelha o CHECK profiles.birth_year (>= 1900 e <= ano atual). Sem isso, a
+    // idade digitada no lugar do ano vinha pra cá e estourava 500 na constraint.
+    if (
+      body.birth_year != null &&
+      (!Number.isInteger(body.birth_year) ||
+        body.birth_year < 1900 ||
+        body.birth_year > new Date().getUTCFullYear())
+    ) {
+      return json(
+        {
+          error: 'invalid_birth_year',
+          detail: 'Ano de nascimento inválido (use o ano completo, de 1900 até o ano atual).',
+        },
+        400,
+      );
+    }
 
     // 3. Limite de alunos (entitlement vs count atual).
     const ent = await getEntitlement(supabaseAuth);
