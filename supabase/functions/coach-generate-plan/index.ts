@@ -9,6 +9,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_TEXT_MODEL } from '../_shared/groqRetry.ts';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
 import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
 import { getAiCircuitState } from '../_shared/aiCircuit.ts';
@@ -18,7 +19,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
-const MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+const MODEL = Deno.env.get('GROQ_MODEL') ?? DEFAULT_TEXT_MODEL;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

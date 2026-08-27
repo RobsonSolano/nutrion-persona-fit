@@ -9,6 +9,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_TEXT_MODEL } from '../_shared/groqRetry.ts';
 import { getAiCircuitState } from '../_shared/aiCircuit.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
@@ -19,7 +20,7 @@ const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
 const VISION_MODEL =
   Deno.env.get('GROQ_VISION_MODEL') ??
   'meta-llama/llama-4-scout-17b-16e-instruct';
-const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? DEFAULT_TEXT_MODEL;
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const MAX_IMAGES = 3;

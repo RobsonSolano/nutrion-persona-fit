@@ -16,6 +16,7 @@ import {
   resolveBodyRestrictions,
   type BodyRestrictions,
 } from './bodyRestrictions.ts';
+import { isRetryableGroqStatus } from './groqRetry.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -634,6 +635,52 @@ export type GeneratePlanResponse =
  * loga, não persiste. Caller decide cota, log e save. As referências
  * bibliográficas são injetadas no system prompt automaticamente.
  */
+/**
+ * Chama o Groq com retry em erro transiente (5xx / 429).
+ *
+ * Uma chamada só transformava um soluço de servidor do Groq em falha dura —
+ * e o coach-generate-plan, sem fallback, repassava isso como "instabilidade"
+ * no cadastro do aluno. 1 retry com backoff curto absorve a esmagadora
+ * maioria dos casos (o modelo funciona; é o servidor que oscila), sem estourar
+ * o tempo que o professor espera na tela de geração.
+ *
+ * 4xx (fora 429) não repete: é erro nosso (modelo inválido, body ruim) e
+ * repetir não muda nada. O caller classifica o status final como sempre.
+ */
+const GROQ_MAX_ATTEMPTS = 2;
+
+async function fetchGroqWithRetry(
+  requestBody: string,
+  groqApiKey: string,
+): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${groqApiKey}`,
+      },
+      body: requestBody,
+    });
+
+    if (
+      res.ok ||
+      attempt >= GROQ_MAX_ATTEMPTS ||
+      !isRetryableGroqStatus(res.status)
+    ) {
+      return res;
+    }
+
+    // Transiente: descarta o corpo desta tentativa e espera um pouco antes de
+    // repetir. Backoff curto porque o professor está esperando síncrono.
+    console.warn(
+      `[plan-generator] Groq ${res.status} na tentativa ${attempt}, repetindo...`,
+    );
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+}
+
 export async function generatePlan(
   // deno-lint-ignore no-explicit-any
   supabase: SupabaseClient<any, 'public', any>,
@@ -672,27 +719,22 @@ export async function generatePlan(
     jsonField: 'rationale',
   });
 
-  const groqRes = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: `${systemPrompt}${referencesBlock}` },
-        { role: 'user', content: userBlock },
-      ],
-      temperature: 0.4,
-      // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
-      // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
-      // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
-      max_tokens: 3500,
-      top_p: 0.9,
-      response_format: { type: 'json_object' },
-    }),
+  const requestBody = JSON.stringify({
+    model,
+    messages: [
+      { role: 'system', content: `${systemPrompt}${referencesBlock}` },
+      { role: 'user', content: userBlock },
+    ],
+    temperature: 0.4,
+    // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
+    // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
+    // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
+    max_tokens: 3500,
+    top_p: 0.9,
+    response_format: { type: 'json_object' },
   });
+
+  const groqRes = await fetchGroqWithRetry(requestBody, groqApiKey);
 
   if (!groqRes.ok) {
     const errText = await groqRes.text();
