@@ -2,6 +2,52 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Cadastro de aluno: 500 "Instabilidade" com e-mail malformado (2026-08-27, fim de tarde)
+
+**Sintoma:** professor Reginaldo não conseguia cadastrar aluno — sempre "Tivemos
+uma instabilidade neste recurso". Só com ele; o dev cadastra normal pro
+`coach@teste`. Nenhum aluno criado pra ele (0 rows). Ele colava um e-mail com
+`.coms` no fim (typo copiado de algum lugar).
+
+**Caça à causa (o que NÃO era, pra registro):**
+- Senha curta/política de senha → descartado: alunos `@nutrion.test` existem com
+  `123456789` (9 dígitos, sem símbolo/maiúscula). Política não exige classes.
+- `resolve_entitlement` lançando → descartado: a função é robusta (SELECT INTO
+  sem STRICT, coalesce em tudo, cai pra 'free'; não lança).
+- **Auto-correção honesta:** cheguei a apostar em "regex de formato pega o
+  `.coms`" — ERRADO. `nome@gmail.coms` é *bem formado*; o GoTrue aceita (não faz
+  MX/DNS). Freei antes de deployar fix baseado em premissa errada.
+
+**Causa raiz provável (a confirmar com log/SQL):** deletar a conta antiga
+`.coms` (sabrina) tirou só o `profiles`, o `auth.users` ficou. Ao recolar o
+mesmo `.coms`, `admin.createUser` bate na constraint unique de e-mail e o GoTrue
+devolve erro CRU de banco que NÃO contém "already/registered" → nosso código
+classificava como `create_user_failed` → **500 genérico → "Instabilidade"**.
+
+**Por que ficamos cegos:** o path de falha do `createUser` retornava SEM
+`console.error`. No dashboard só aparecia "500", sem `detail`. Lição: todo path
+de erro de edge function tem que logar contexto estruturado.
+
+**Fix implementado (branch `bugfix/cadastro-aluno-email`, testado local 302/302,
+deploy+OTA PENDENTES):**
+- `src/lib/email.ts` (novo, com testes) — `isValidEmail`, fonte única; `auth.ts`
+  passou a usar (removida regex duplicada).
+- Cliente `aluno-novo.tsx` — `canSubmitForm` valida formato de verdade (era
+  `email.length > 3`) + borda/texto vermelho no campo (o `Input` já suporta
+  `error`). Pega `nome@`, espaço, sem `@` — NÃO pega `.coms` (é bem formado),
+  por isso a mensagem mostra o e-mail pro professor revisar.
+- Servidor `coach-create-student` — guard de formato (`invalid_email` 400);
+  classificação de duplicado ampliada (`duplicate|unique` + code `email_exists`)
+  pra pegar o conflito de banco → 409 claro em vez de 500; `console.error`
+  estruturado em todo path de falha (createUser + profile_update).
+- `parseError` — branch `invalid_email` + mensagem de "e-mail já cadastrado"
+  reforçada ("um caractere sobrando no fim é comum").
+
+**Pendências pra fechar:** (1) SQL hard-delete do `auth.users` órfão do `.coms`;
+(2) `fn deploy coach-create-student`; (3) OTA production (conta EAS estava em
+`dizerodireito` — trocar pra `solanusdev`); (4) confirmar com o log real o
+`detail` exato do GoTrue (agora que loga).
+
 ### Três pontas resolvidas (2026-08-27, tarde)
 
 1. **Foto do sanity check mais robusta.** `chat-ai` ganhou retry (era o único

@@ -36,6 +36,7 @@ import DisabilityFields, {
 } from '@/components/DisabilityFields';
 import { isDisabilityValid } from '@/lib/disability';
 import { colors } from '@/lib/theme';
+import { isValidEmail } from '@/lib/email';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
   useCreateStudent,
@@ -170,8 +171,12 @@ export default function AlunoNovo() {
 
   const isTemplatesMode = creationMode === 'templates';
 
+  // Só marca erro depois que o usuário digitou algo — campo vazio não fica
+  // vermelho antes da hora. Formato inválido bloqueia o submit e pinta a borda.
+  const emailInvalid = email.trim().length > 0 && !isValidEmail(email);
+
   const canSubmitForm =
-    email.length > 3 &&
+    isValidEmail(email) &&
     password.length >= 8 &&
     fullName.trim().length >= 2 &&
     sex !== null &&
@@ -428,6 +433,11 @@ export default function AlunoNovo() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              error={
+                emailInvalid
+                  ? 'E-mail inválido. Confira o endereço (ex: nome@dominio.com).'
+                  : undefined
+              }
             />
             <View className="gap-2">
               <Input

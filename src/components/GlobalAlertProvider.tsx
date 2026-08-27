@@ -62,9 +62,16 @@ function parseError(err: unknown): { title: string; message: string } {
     lower.includes('user already')
   ) {
     return {
-      title: 'Email já cadastrado',
+      title: 'E-mail já cadastrado',
       message:
-        'Esse email já tem uma conta no Persona Fit. Use outro email ou faça login com a conta existente.',
+        'Esse e-mail já tem uma conta no Persona Fit. Confira se digitou certo (um caractere sobrando no fim é comum), use outro e-mail ou faça login com a conta existente.',
+    };
+  }
+  if (lower.includes('invalid_email')) {
+    return {
+      title: 'E-mail inválido',
+      message:
+        'Confira o endereço de e-mail (ex: nome@dominio.com) e tente de novo.',
     };
   }
   if (lower.includes('weak_password')) {
