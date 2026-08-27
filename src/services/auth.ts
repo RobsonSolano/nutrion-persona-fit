@@ -1,4 +1,5 @@
 import { IS_EXPO_GO } from '@/lib/platform';
+import { isValidEmail } from '@/lib/email';
 import { supabase } from './supabase';
 import { unregisterPushNotifications } from './pushNotifications';
 
@@ -119,15 +120,15 @@ export async function signOut() {
 
 function normalizeEmail(raw: string) {
   const clean = raw.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+  if (!isValidEmail(clean)) {
     throw new Error('Email inválido.');
   }
   return clean;
 }
 
 function validatePassword(password: string) {
-  if (!password || password.length < 6) {
-    throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+  if (!password || password.length < 8) {
+    throw new Error('A senha precisa ter pelo menos 8 caracteres.');
   }
 }
 

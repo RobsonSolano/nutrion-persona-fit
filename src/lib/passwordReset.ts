@@ -9,6 +9,6 @@ export function isResetFormValid(params: {
 }): boolean {
   const { token, password, confirm } = params;
   return (
-    token.trim().length >= 6 && password.length >= 6 && password === confirm
+    token.trim().length >= 6 && password.length >= 8 && password === confirm
   );
 }

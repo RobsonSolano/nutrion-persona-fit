@@ -62,15 +62,22 @@ function parseError(err: unknown): { title: string; message: string } {
     lower.includes('user already')
   ) {
     return {
-      title: 'Email já cadastrado',
+      title: 'E-mail já cadastrado',
       message:
-        'Esse email já tem uma conta no Persona Fit. Use outro email ou faça login com a conta existente.',
+        'Esse e-mail já tem uma conta no Persona Fit. Confira se digitou certo (um caractere sobrando no fim é comum), use outro e-mail ou faça login com a conta existente.',
+    };
+  }
+  if (lower.includes('invalid_email')) {
+    return {
+      title: 'E-mail inválido',
+      message:
+        'Confira o endereço de e-mail (ex: nome@dominio.com) e tente de novo.',
     };
   }
   if (lower.includes('weak_password')) {
     return {
       title: 'Senha fraca',
-      message: 'A senha precisa ter pelo menos 6 caracteres.',
+      message: 'A senha precisa ter pelo menos 8 caracteres.',
     };
   }
   if (lower.includes('invalid_body')) {
@@ -83,7 +90,7 @@ function parseError(err: unknown): { title: string; message: string } {
     return {
       title: 'Não consegui criar o acesso do aluno',
       message:
-        'Verifique se o e-mail é válido (ex: nome@dominio.com) e se a senha tem pelo menos 6 caracteres, e tente de novo.',
+        'Verifique se o e-mail é válido (ex: nome@dominio.com) e se a senha tem pelo menos 8 caracteres, e tente de novo.',
     };
   }
   if (lower.includes('student_limit_reached')) {

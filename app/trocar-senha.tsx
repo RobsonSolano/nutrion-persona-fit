@@ -28,7 +28,7 @@ export default function TrocarSenhaScreen() {
   const [loading, setLoading] = useState(false);
 
   const valid =
-    newPassword.length >= 6 && newPassword === confirm;
+    newPassword.length >= 8 && newPassword === confirm;
 
   const mismatch =
     confirm.length > 0 && newPassword !== confirm;
@@ -93,7 +93,7 @@ export default function TrocarSenhaScreen() {
                   Senha de acesso
                 </Text>
                 <Text className="text-text-muted text-[11px] mt-0.5 leading-relaxed">
-                  Mínimo 6 caracteres. Use uma senha forte que você consiga
+                  Mínimo 8 caracteres. Use uma senha forte que você consiga
                   lembrar.
                 </Text>
               </View>
