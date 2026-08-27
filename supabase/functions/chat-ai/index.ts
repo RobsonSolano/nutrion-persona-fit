@@ -12,6 +12,10 @@ import {
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
+  DEFAULT_TEXT_MODEL,
+  groqFetchWithRetry,
+} from '../_shared/groqRetry.ts';
+import {
   aplicarTetoDensidade,
   extrairJsonDoTexto,
   itemsComoTexto,
@@ -24,11 +28,12 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
 
-// Modelos Groq (trocáveis via env var sem redeploy):
-//   llama-3.3-70b-versatile  — melhor qualidade geral
-//   llama-3.1-8b-instant     — resposta mais rápida
-//   meta-llama/llama-4-scout-17b-16e-instruct — multimodal com visão
-const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+// Modelos Groq (trocáveis via env var sem redeploy). Defaults verificados
+// disponíveis na conta em 2026-08-27 — llama-3.3/llama-4-scout foram
+// descontinuados (404). VISION_MODEL default também precisa de revisão: ver
+// nota em _shared/groqRetry.ts.
+//   openai/gpt-oss-120b — texto (default atual)
+const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? DEFAULT_TEXT_MODEL;
 const VISION_MODEL =
   Deno.env.get('GROQ_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -428,13 +433,7 @@ serve(async (req: Request) => {
     // continuam síncronos (devolvem JSON estrito de uma vez).
     const useStream = !!body.stream && isChatMode && !isMultimodal;
 
-    const groqRes = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
+    const requestBody = JSON.stringify({
         model: modelToUse,
         messages,
         // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
@@ -460,8 +459,22 @@ serve(async (req: Request) => {
         // Resolve definitivamente o problema do modelo retornar texto livre
         // que o parser nao consegue extrair.
         ...(isChatMode ? {} : { response_format: { type: 'json_object' } }),
-      }),
-    });
+      });
+
+    // Stream (chat texto) segue direto — não dá pra repetir um corpo já
+    // consumido. Sanity check (texto e FOTO) é síncrono e ganha retry: era o
+    // único caminho de IA sem nenhuma resiliência, e o de foto roda num
+    // modelo de visão instável com JSON.
+    const groqRes = useStream
+      ? await fetch(GROQ_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: requestBody,
+        })
+      : await groqFetchWithRetry(GROQ_URL, GROQ_API_KEY, requestBody);
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();

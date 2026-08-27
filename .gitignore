@@ -60,3 +60,6 @@ BACKLOG.md
 # documentos-fonte de referência (TACO etc) — usados pra gerar migration,
 # não fazem parte do build
 taco_*.pdf
+
+# artefatos do deno check nas edge functions
+supabase/functions/**/deno.lock

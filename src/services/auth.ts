@@ -186,9 +186,36 @@ export async function changePassword(newPassword: string) {
 
 export async function requestPasswordReset(rawEmail: string) {
   const email = normalizeEmail(rawEmail);
-  // Supabase manda email com link nativo (template configuravel no dashboard).
+  // Fluxo mobile por OTP: o template de "Reset Password" no dashboard usa
+  // {{ .Token }} → o usuário recebe um código de 6 dígitos por e-mail e o digita
+  // no app (confirmPasswordReset). Sem deep link.
   const { error } = await supabase.auth.resetPasswordForEmail(email);
   if (error) throw error;
+}
+
+/**
+ * Conclui a recuperação de senha: verifica o código (OTP type 'recovery') que
+ * cria uma sessão de recovery, define a nova senha e desloga (login limpo).
+ */
+export async function confirmPasswordReset(
+  rawEmail: string,
+  token: string,
+  newPassword: string,
+) {
+  validatePassword(newPassword);
+  const email = normalizeEmail(rawEmail);
+  const { error: verifyErr } = await supabase.auth.verifyOtp({
+    email,
+    token: token.trim(),
+    type: 'recovery',
+  });
+  if (verifyErr) throw verifyErr;
+  const { error: updateErr } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  if (updateErr) throw updateErr;
+  // Sai da sessão de recovery pra o usuário logar com a senha nova.
+  await supabase.auth.signOut();
 }
 
 export type DeleteMyAccountError =
