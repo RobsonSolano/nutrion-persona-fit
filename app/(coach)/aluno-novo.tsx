@@ -480,12 +480,12 @@ export default function AlunoNovo() {
               label="Ano de nascimento"
               value={birthYear}
               onChangeText={setBirthYear}
-              placeholder="Ex: 1999 (o ano, não a idade)"
+              placeholder="Ex: 1999"
               keyboardType="number-pad"
               maxLength={4}
               error={
                 birthYearInvalid
-                  ? `Ano inválido. Use o ano completo entre 1900 e ${currentYear} (ex: 1999).`
+                  ? `Use um ano entre 1900 e ${currentYear}.`
                   : undefined
               }
             />

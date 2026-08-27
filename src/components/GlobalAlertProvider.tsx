@@ -77,8 +77,7 @@ function parseError(err: unknown): { title: string; message: string } {
   if (lower.includes('invalid_birth_year')) {
     return {
       title: 'Ano de nascimento inválido',
-      message:
-        'Use o ano completo de nascimento (ex: 1999), não a idade. Entre 1900 e o ano atual.',
+      message: 'Informe um ano entre 1900 e o ano atual (ex: 1999).',
     };
   }
   if (lower.includes('weak_password')) {
