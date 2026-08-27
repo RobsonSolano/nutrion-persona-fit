@@ -2,6 +2,44 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Instabilidade no cadastro de aluno = Groq 5xx transiente sem retry (2026-08-27)
+
+**Sintoma:** dev relatou "de novo com instabilidade no cadastro de aluno... modelo
+de novo". Segunda vez que o cadastro pela IA falha.
+
+**Diagnóstico (evidência real, não palpite):** `ai_usage_log` feature `coach_plan`
+mostra `groq_api_error` recorrente — 08-27 07:58, 08-26 19:10, 08-22, sequência
+em 07-22 — sempre ~8-9s. Reproduzi a chamada contra o Groq: `openai/gpt-oss-120b`
+responde **200** com prompt curto e grande. Ou seja, o modelo funciona; as falhas
+são **5xx transiente do servidor sob carga**.
+
+**Causa raiz:** `plan-generator.ts` fazia UMA chamada e desistia no primeiro erro.
+`coach-generate-plan` não tem fallback (decisão: coach quer plano por IA), então o
+5xx virava "instabilidade" na cara do professor. `onboarding-plan` mascarava com o
+fallback genérico.
+
+**Correção:** `fetchGroqWithRetry` — 1 retry com backoff curto (600ms) em 429/5xx.
+4xx fora 429 não repete (erro nosso). Beneficia coach e onboarding (bundlam o
+plan-generator). Deployado nas 4 functions.
+
+**Bomba adjacente desarmada:** o default de modelo de texto no código era
+`llama-3.3-70b-versatile` — **descontinuado no Groq (404)**. Produção sobrepõe via
+secret `GROQ_MODEL=openai/gpt-oss-120b`, então não estava quebrado, mas se o secret
+cair, 4 functions 404am juntas. Trocado por `DEFAULT_TEXT_MODEL` compartilhado.
+
+**⚠️ ACHADO SEM CORREÇÃO — precisa de decisão:** o **modelo de VISÃO default
+(`meta-llama/llama-4-scout-17b-16e-instruct`) também está 404**. A lista atual da
+conta Groq (puxada da API em 2026-08-27) NÃO tem modelo multimodal óbvio:
+`gpt-oss-120b/20b` são texto; `groq/compound` é agêntico (talvez aceite imagem,
+não verificado). O sanity check COM FOTO depende do secret `GROQ_VISION_MODEL`
+estar setado e apontando pra algo que exista. **Se esse secret cair ou o modelo
+sair, a análise por foto quebra sem fallback de modelo.** Verificar o valor do
+secret em produção e definir um vision model atual válido.
+
+**Rate limit é outra coisa:** no teste, 3 gerações em 20s deram 429 (TPM do free
+tier). Não é bug — é uso irreal. Um retry não vence rate limit sustentado, e coach
+sem fallback falha nesse caso por decisão de produto.
+
 ### AAB de polimento 1.4.0 — preparado, build e submit pendentes (2026-08-26)
 
 **`version` 1.3.0 → 1.4.0, e isso é a decisão mais consequente daqui.**
