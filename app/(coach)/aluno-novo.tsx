@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -50,6 +50,7 @@ import TemplatePicker from '@/components/coach/TemplatePicker';
 import PaywallNotice from '@/components/ui/PaywallNotice';
 import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
 import { isStudentLimitReached } from '@/lib/studentLimit';
+import { computeBaselineGoals } from '@/lib/baselineGoals';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { Profile, Sex, GoalType, WeeklyFrequency } from '@/types/database';
 import { captureError } from '@/lib/sentry';
@@ -123,7 +124,12 @@ export default function AlunoNovo() {
     : false;
 
   const [phase, setPhase] = useState<Phase>('form');
+  // Coach FREE não tem IA de professor: só cadastra por template, com metas
+  // determinísticas. Começa (e fica) em 'templates'.
   const [creationMode, setCreationMode] = useState<CreationMode>('ai');
+  useEffect(() => {
+    if (aiCoachLocked) setCreationMode('templates');
+  }, [aiCoachLocked]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -185,7 +191,9 @@ export default function AlunoNovo() {
       openPaywall('student_limit');
       return;
     }
-    if (aiCoachLocked) {
+    // Só o modo IA exige ai_coach. Template funciona no free (metas
+    // determinísticas + rotinas copiadas do template).
+    if (creationMode === 'ai' && aiCoachLocked) {
       openPaywall('coach_generate_plan');
       return;
     }
@@ -216,10 +224,27 @@ export default function AlunoNovo() {
       setStudentId(student.id);
       setStudentPassword(password);
 
-      const { plan: generated } = await generateMutation.mutateAsync({
-        studentId: student.id,
-        skipRoutines: creationMode === 'templates',
-      });
+      // Metas: coach free (sem IA) calcula localmente; premium usa a IA.
+      const generated =
+        creationMode === 'templates' && aiCoachLocked
+          ? {
+              ...computeBaselineGoals({
+                sex,
+                birthYear: birthYear ? Number(birthYear) : null,
+                weightKg: weight ? Number(weight) : null,
+                heightCm: height ? Number(height) : null,
+                goalType,
+              }),
+              routines: [],
+              rationale:
+                'Metas calculadas pela fórmula de Mifflin-St Jeor. Treinos aplicados a partir dos templates selecionados.',
+            }
+          : (
+              await generateMutation.mutateAsync({
+                studentId: student.id,
+                skipRoutines: creationMode === 'templates',
+              })
+            ).plan;
 
       if (creationMode === 'templates') {
         // Ordem importa: coach-save-student-plan ARQUIVA todas as
@@ -545,11 +570,21 @@ export default function AlunoNovo() {
           <Section title="Como gerar os treinos">
             <SegmentedControl
               options={[
-                { value: 'ai', label: 'IA gera tudo' },
+                {
+                  value: 'ai',
+                  label: aiCoachLocked ? 'IA gera tudo 🔒' : 'IA gera tudo',
+                },
                 { value: 'templates', label: 'Usar templates' },
               ]}
               value={creationMode}
-              onChange={setCreationMode}
+              onChange={(v) => {
+                // Free não entra no modo IA — toca e vê o upsell.
+                if (v === 'ai' && aiCoachLocked) {
+                  openPaywall('coach_generate_plan');
+                  return;
+                }
+                setCreationMode(v);
+              }}
             />
 
             {isTemplatesMode && (
@@ -589,8 +624,8 @@ export default function AlunoNovo() {
           ) : aiCoachLocked ? (
             <PaywallNotice
               feature="coach_generate_plan"
-              title="IA de professor é um recurso Pro"
-              description="Gere planos e metas dos seus alunos com IA. Assine pra desbloquear. Toque pra ver os planos."
+              title="Gerar treino com IA é um recurso Pro"
+              description="No plano free você cadastra o aluno aplicando seus templates de treino. Pra IA montar treino e metas automaticamente, assine. Toque pra ver os planos."
             />
           ) : null}
 
