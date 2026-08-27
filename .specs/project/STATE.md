@@ -2,6 +2,27 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Três pontas resolvidas (2026-08-27, tarde)
+
+1. **Foto do sanity check mais robusta.** `chat-ai` ganhou retry (era o único
+   caminho de IA sem nenhuma resiliência) e o secret `GROQ_VISION_MODEL` mudou
+   de `qwen/qwen3.6-27b` → `qwen/qwen3.8-27b`. Ambos aceitam imagem (testado com
+   JPEG real), mas o 3.8 é mais rápido e mais robusto com JSON estrito (o 3.6
+   falhava JSON no meu teste de plano). Verificado: foto via função → 200,
+   modelo qwen3.8. Degradação graciosa em parse-fail já existia (macros null →
+   aviso amigável, não crash).
+
+2. **Coach FREE cadastra aluno por template.** Era contradição: free tinha 2
+   slots mas o `aiCoachLocked` barrava tudo. Agora só o modo IA exige premium
+   (aparece com cadeado + upsell); template funciona no free, com metas por
+   Mifflin-St Jeor no cliente (`computeBaselineGoals`) em vez de IA. Verificado
+   ponta a ponta como free: save 200 + apply-template 200, sem chamada de IA.
+   **Cadastro de exercício próprio segue premium-only** (useCanCreateExercise +
+   RLS) — barreira anti-spam, como o dev pediu.
+
+3. **git push destravado.** Era `gh auth switch` (alias trocar_git) pra a conta
+   pessoal RobsonSolano. Feito, push OK.
+
 ### Auditoria de pontas soltas (2026-08-27, pós-incidente do cadastro)
 
 Dev perguntou direto: "vai ter outra surpresa dessas?". Auditei em vez de
