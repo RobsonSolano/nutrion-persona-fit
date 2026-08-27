@@ -27,6 +27,11 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Mesmo formato do src/lib/email.ts (fonte única no cliente). Não valida se o
+// TLD existe — só formato. Typos de TLD ("nome@gmail.coms") passam aqui de
+// propósito; o cliente mostra o e-mail digitado pro professor revisar.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type Body = {
   email: string;
   password: string;
@@ -117,6 +122,13 @@ serve(async (req: Request) => {
         400,
       );
     }
+    const email = body.email.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      return json(
+        { error: 'invalid_email', detail: 'E-mail com formato inválido.' },
+        400,
+      );
+    }
 
     // 3. Limite de alunos (entitlement vs count atual).
     const ent = await getEntitlement(supabaseAuth);
@@ -130,7 +142,6 @@ serve(async (req: Request) => {
     }
 
     // 4. Cria auth.users (já confirmado, sem flow de email).
-    const email = body.email.trim().toLowerCase();
     const { data: created, error: createErr } =
       await supabaseService.auth.admin.createUser({
         email,
@@ -140,14 +151,31 @@ serve(async (req: Request) => {
       });
     if (createErr || !created.user) {
       const detail = createErr?.message ?? 'unknown';
-      const isDup = /already|exists|registered/i.test(detail);
-      return json(
-        {
-          error: isDup ? 'email_already_registered' : 'create_user_failed',
-          detail,
-        },
-        isDup ? 409 : 500,
-      );
+      const code = (createErr as { code?: string } | null)?.code ?? null;
+      const status = (createErr as { status?: number } | null)?.status ?? null;
+      // Classificação por mensagem/código do GoTrue. "duplicate"/"unique" cobre
+      // o caso em que um profile foi deletado mas o auth.users ficou → o insert
+      // bate na constraint e o GoTrue devolve o erro cru de banco.
+      const isDup =
+        /already|exists|registered|duplicate|unique/i.test(detail) ||
+        code === 'email_exists';
+      const isBadEmail = /invalid.*email|email.*(invalid|not valid)/i.test(detail);
+      const kind = isDup
+        ? 'email_already_registered'
+        : isBadEmail
+          ? 'invalid_email'
+          : 'create_user_failed';
+      const httpStatus = isDup ? 409 : isBadEmail ? 400 : 500;
+      // Log estruturado — sem isso o dashboard só mostra "500" sem causa.
+      console.error('[coach-create-student] createUser falhou', {
+        kind,
+        httpStatus,
+        email,
+        gotrue_code: code,
+        gotrue_status: status,
+        detail,
+      });
+      return json({ error: kind, detail }, httpStatus);
     }
 
     const studentId = created.user.id;
@@ -185,6 +213,11 @@ serve(async (req: Request) => {
       .single();
 
     if (updateErr) {
+      console.error('[coach-create-student] update do profile falhou', {
+        studentId,
+        coachId: caller.id,
+        detail: updateErr.message,
+      });
       // Tenta rollback (deletar auth.users criado) pra não deixar lixo.
       await supabaseService.auth.admin.deleteUser(studentId).catch(() => {});
       return json(
