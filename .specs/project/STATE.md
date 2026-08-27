@@ -2,6 +2,47 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Auditoria de pontas soltas (2026-08-27, pós-incidente do cadastro)
+
+Dev perguntou direto: "vai ter outra surpresa dessas?". Auditei em vez de
+tranquilizar no vácuo.
+
+**FECHADO hoje:**
+- Failover de modelo no gerador de plano (coach-generate-plan, onboarding-plan) — deployado.
+- Retry no chat-ai (sanity texto + FOTO) — era o único caminho de IA sem
+  resiliência nenhuma; deployado e verificado.
+- Cache do "aplicar template mostrava 0 treinos" — invalidava `routines` em vez
+  de `student_detail`; corrigido, OTA publicado.
+- Default de modelo de texto morto (llama-3.3) → gpt-oss-120b em 4 functions.
+
+**Auditado e OK (não é bug):**
+- Criar/editar/reordenar/deletar rotina do aluno pelo coach e save do plano JÁ
+  invalidam `student_detail`. O template era o único dessa classe.
+
+**AINDA ARMADO — riscos conhecidos, por prioridade:**
+
+1. **Modelo de visão fraco pra JSON.** O sanity check COM FOTO roda em
+   `qwen/qwen3.6-27b` (via secret GROQ_VISION_MODEL). Esse modelo FALHOU meu
+   teste de JSON estrito ("400: Failed to validate JSON") — o mesmo tipo de erro
+   que já assombrou o caminho de foto. O retry absorve 5xx transiente, mas NÃO
+   um 400 de JSON inválido. Curioso: `qwen/qwen3.8-27b` PASSOU o teste de JSON —
+   pode ser um vision model melhor SE aceitar imagem (não verificado). Não há
+   vision model dedicado na conta Groq (llama-4-scout saiu). **Ação: validar se
+   qwen3.8-27b aceita imagem e, se sim, trocar o secret. É mudança de secret, sem
+   deploy.**
+2. **Cadastro de aluno por coach FREE** continua bloqueado (aiCoachLocked barra
+   antes de criar, mesmo com 2 slots de direito). Decisão de monetização pendente
+   — não toca quem demonstra como premium.
+3. **git push 403** — conta errada do gh ativa (robsonsolano-nano). `develop`
+   local à frente do origin; funções e OTA já publicados, então runtime não
+   depende disso. Trocar a conta e push.
+4. **Play Console**: edge-to-edge (não acionável, camada Expo) e resizability
+   (feita, aguarda próximo build) — advisory, não bloqueiam.
+
+**Causa-mãe de tudo hoje:** dependência de modelos externos do Groq que são
+descontinuados sem aviso + falta de failover. Agora os caminhos de plano e
+sanity têm retry/failover. O de visão é o elo mais fraco que resta.
+
 ### Instabilidade no cadastro de aluno = Groq 5xx transiente sem retry (2026-08-27)
 
 **Sintoma:** dev relatou "de novo com instabilidade no cadastro de aluno... modelo
