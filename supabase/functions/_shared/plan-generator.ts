@@ -16,6 +16,10 @@ import {
   resolveBodyRestrictions,
   type BodyRestrictions,
 } from './bodyRestrictions.ts';
+import {
+  FALLBACK_TEXT_MODELS,
+  isRetryableGroqStatus,
+} from './groqRetry.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -634,6 +638,81 @@ export type GeneratePlanResponse =
  * loga, não persiste. Caller decide cota, log e save. As referências
  * bibliográficas são injetadas no system prompt automaticamente.
  */
+/** Uma chamada ao Groq com retry no MESMO modelo, para soluço momentâneo. */
+async function fetchWithRetry(
+  body: string,
+  groqApiKey: string,
+  maxAttempts: number,
+): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${groqApiKey}`,
+      },
+      body,
+    });
+
+    if (
+      res.ok ||
+      attempt >= maxAttempts ||
+      !isRetryableGroqStatus(res.status)
+    ) {
+      return res;
+    }
+    console.warn(
+      `[plan-generator] Groq ${res.status} na tentativa ${attempt}, repetindo...`,
+    );
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+}
+
+/**
+ * Gera o plano com resiliência em dois níveis:
+ *   1. Retry no modelo primário (1 extra) — cobre soluço momentâneo de 5xx.
+ *   2. Failover de MODELO — se o primário está em surto (ainda 5xx/429 após o
+ *      retry), troca pro próximo da cadeia. Foi o que faltou em 2026-08-27:
+ *      o gpt-oss-120b 502ou duas vezes seguidas e o retry sozinho não salvou;
+ *      trocar pro gpt-oss-20b (mesma família, mesmo schema) resolve.
+ *
+ * Latência limitada: primário 2 tentativas + 1 por fallback. 4xx (fora 429)
+ * não troca de modelo — é erro nosso, repetir noutro modelo não ajuda.
+ */
+async function fetchGroqPlan(
+  payload: Record<string, unknown>,
+  primaryModel: string,
+  groqApiKey: string,
+): Promise<Response> {
+  const chain = [
+    primaryModel,
+    ...FALLBACK_TEXT_MODELS.filter((m) => m !== primaryModel),
+  ];
+
+  let res!: Response;
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    const isPrimary = i === 0;
+    res = await fetchWithRetry(
+      JSON.stringify({ ...payload, model }),
+      groqApiKey,
+      isPrimary ? 2 : 1,
+    );
+
+    if (res.ok || !isRetryableGroqStatus(res.status)) return res;
+
+    // Ainda há próximo modelo? Descarta o corpo e faz failover.
+    if (i < chain.length - 1) {
+      console.warn(
+        `[plan-generator] ${model} indisponível (${res.status}), trocando de modelo...`,
+      );
+      await res.body?.cancel();
+    }
+  }
+  return res;
+}
+
 export async function generatePlan(
   // deno-lint-ignore no-explicit-any
   supabase: SupabaseClient<any, 'public', any>,
@@ -672,27 +751,21 @@ export async function generatePlan(
     jsonField: 'rationale',
   });
 
-  const groqRes = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: `${systemPrompt}${referencesBlock}` },
-        { role: 'user', content: userBlock },
-      ],
-      temperature: 0.4,
-      // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
-      // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
-      // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
-      max_tokens: 3500,
-      top_p: 0.9,
-      response_format: { type: 'json_object' },
-    }),
-  });
+  const payload = {
+    messages: [
+      { role: 'system', content: `${systemPrompt}${referencesBlock}` },
+      { role: 'user', content: userBlock },
+    ],
+    temperature: 0.4,
+    // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
+    // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
+    // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
+    max_tokens: 3500,
+    top_p: 0.9,
+    response_format: { type: 'json_object' },
+  };
+
+  const groqRes = await fetchGroqPlan(payload, model, groqApiKey);
 
   if (!groqRes.ok) {
     const errText = await groqRes.text();

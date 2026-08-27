@@ -11,6 +11,7 @@ import {
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
+import { DEFAULT_TEXT_MODEL } from '../_shared/groqRetry.ts';
 import {
   aplicarTetoDensidade,
   extrairJsonDoTexto,
@@ -24,11 +25,12 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
 
-// Modelos Groq (trocáveis via env var sem redeploy):
-//   llama-3.3-70b-versatile  — melhor qualidade geral
-//   llama-3.1-8b-instant     — resposta mais rápida
-//   meta-llama/llama-4-scout-17b-16e-instruct — multimodal com visão
-const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+// Modelos Groq (trocáveis via env var sem redeploy). Defaults verificados
+// disponíveis na conta em 2026-08-27 — llama-3.3/llama-4-scout foram
+// descontinuados (404). VISION_MODEL default também precisa de revisão: ver
+// nota em _shared/groqRetry.ts.
+//   openai/gpt-oss-120b — texto (default atual)
+const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? DEFAULT_TEXT_MODEL;
 const VISION_MODEL =
   Deno.env.get('GROQ_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
 
