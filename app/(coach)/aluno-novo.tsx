@@ -213,6 +213,10 @@ export default function AlunoNovo() {
       return;
     }
     setPhase('generating');
+    // Rastreia se o aluno já foi criado: se um passo POSTERIOR (gerar plano,
+    // aplicar treinos) falhar, o aluno existe e não pode virar "Instabilidade"
+    // genérico — senão o coach recadastra e bate em "e-mail já cadastrado".
+    let createdStudentId: string | null = null;
     try {
       // 1. Cria a conta + ficha completa
       const { student } = await createMutation.mutateAsync({
@@ -236,6 +240,7 @@ export default function AlunoNovo() {
         disability_notes: disability.notes.trim() || null,
         bio: bio.trim() || null,
       });
+      createdStudentId = student.id;
       setStudentId(student.id);
       setStudentPassword(password);
 
@@ -291,6 +296,18 @@ export default function AlunoNovo() {
       // Gating do billing-core: 402 (student_limit ou coach_generate_plan) → paywall.
       if (handleNeedsUpgrade(err)) return;
       captureError(err, { feature: 'coach_create_student' });
+      // Sucesso parcial: aluno criado, mas gerar plano/aplicar treinos falhou.
+      // Manda pra lista pra gerar o plano na tela do aluno (não recadastrar).
+      if (createdStudentId) {
+        alert.showAlert({
+          title: 'Aluno cadastrado — plano pendente',
+          message:
+            'O aluno foi criado, mas não conseguimos montar o plano agora. Abra o aluno na sua lista e gere o plano (e aplique os treinos).',
+          type: 'warning',
+          onConfirm: () => router.back(),
+        });
+        return;
+      }
       alert.showError(err);
     }
   }
@@ -327,7 +344,13 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_save_plan' });
       setPhase('preview');
-      alert.showError(err);
+      // Aluno já existe (handleSave só roda com studentId): sucesso parcial.
+      alert.showAlert({
+        title: 'Aluno cadastrado — plano não salvo',
+        message:
+          'O aluno foi criado, mas o plano não foi salvo. Tente salvar de novo; se persistir, abra o aluno na sua lista e gere o plano por lá.',
+        type: 'warning',
+      });
     }
   }
 
@@ -346,7 +369,15 @@ export default function AlunoNovo() {
         onConfirm: () => router.back(),
       });
     } catch (err) {
-      alert.showError(err);
+      captureError(err, { feature: 'coach_send_credentials' });
+      // Aluno já criado: e-mail é o último passo. Mostra os dados pro coach
+      // enviar manualmente em vez de "Instabilidade".
+      alert.showAlert({
+        title: 'Aluno cadastrado — e-mail não enviado',
+        message: `O aluno foi criado com sucesso, mas não conseguimos enviar o e-mail. Envie os dados de acesso manualmente:\n\nE-mail: ${email.trim().toLowerCase()}\nSenha: ${studentPassword}`,
+        type: 'warning',
+        onConfirm: () => router.back(),
+      });
     }
   }
 
