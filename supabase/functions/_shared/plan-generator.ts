@@ -16,7 +16,10 @@ import {
   resolveBodyRestrictions,
   type BodyRestrictions,
 } from './bodyRestrictions.ts';
-import { isRetryableGroqStatus } from './groqRetry.ts';
+import {
+  FALLBACK_TEXT_MODELS,
+  isRetryableGroqStatus,
+} from './groqRetry.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -635,23 +638,11 @@ export type GeneratePlanResponse =
  * loga, não persiste. Caller decide cota, log e save. As referências
  * bibliográficas são injetadas no system prompt automaticamente.
  */
-/**
- * Chama o Groq com retry em erro transiente (5xx / 429).
- *
- * Uma chamada só transformava um soluço de servidor do Groq em falha dura —
- * e o coach-generate-plan, sem fallback, repassava isso como "instabilidade"
- * no cadastro do aluno. 1 retry com backoff curto absorve a esmagadora
- * maioria dos casos (o modelo funciona; é o servidor que oscila), sem estourar
- * o tempo que o professor espera na tela de geração.
- *
- * 4xx (fora 429) não repete: é erro nosso (modelo inválido, body ruim) e
- * repetir não muda nada. O caller classifica o status final como sempre.
- */
-const GROQ_MAX_ATTEMPTS = 2;
-
-async function fetchGroqWithRetry(
-  requestBody: string,
+/** Uma chamada ao Groq com retry no MESMO modelo, para soluço momentâneo. */
+async function fetchWithRetry(
+  body: string,
   groqApiKey: string,
+  maxAttempts: number,
 ): Promise<Response> {
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(GROQ_URL, {
@@ -660,25 +651,66 @@ async function fetchGroqWithRetry(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${groqApiKey}`,
       },
-      body: requestBody,
+      body,
     });
 
     if (
       res.ok ||
-      attempt >= GROQ_MAX_ATTEMPTS ||
+      attempt >= maxAttempts ||
       !isRetryableGroqStatus(res.status)
     ) {
       return res;
     }
-
-    // Transiente: descarta o corpo desta tentativa e espera um pouco antes de
-    // repetir. Backoff curto porque o professor está esperando síncrono.
     console.warn(
       `[plan-generator] Groq ${res.status} na tentativa ${attempt}, repetindo...`,
     );
     await res.body?.cancel();
     await new Promise((r) => setTimeout(r, 600 * attempt));
   }
+}
+
+/**
+ * Gera o plano com resiliência em dois níveis:
+ *   1. Retry no modelo primário (1 extra) — cobre soluço momentâneo de 5xx.
+ *   2. Failover de MODELO — se o primário está em surto (ainda 5xx/429 após o
+ *      retry), troca pro próximo da cadeia. Foi o que faltou em 2026-08-27:
+ *      o gpt-oss-120b 502ou duas vezes seguidas e o retry sozinho não salvou;
+ *      trocar pro gpt-oss-20b (mesma família, mesmo schema) resolve.
+ *
+ * Latência limitada: primário 2 tentativas + 1 por fallback. 4xx (fora 429)
+ * não troca de modelo — é erro nosso, repetir noutro modelo não ajuda.
+ */
+async function fetchGroqPlan(
+  payload: Record<string, unknown>,
+  primaryModel: string,
+  groqApiKey: string,
+): Promise<Response> {
+  const chain = [
+    primaryModel,
+    ...FALLBACK_TEXT_MODELS.filter((m) => m !== primaryModel),
+  ];
+
+  let res!: Response;
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    const isPrimary = i === 0;
+    res = await fetchWithRetry(
+      JSON.stringify({ ...payload, model }),
+      groqApiKey,
+      isPrimary ? 2 : 1,
+    );
+
+    if (res.ok || !isRetryableGroqStatus(res.status)) return res;
+
+    // Ainda há próximo modelo? Descarta o corpo e faz failover.
+    if (i < chain.length - 1) {
+      console.warn(
+        `[plan-generator] ${model} indisponível (${res.status}), trocando de modelo...`,
+      );
+      await res.body?.cancel();
+    }
+  }
+  return res;
 }
 
 export async function generatePlan(
@@ -719,8 +751,7 @@ export async function generatePlan(
     jsonField: 'rationale',
   });
 
-  const requestBody = JSON.stringify({
-    model,
+  const payload = {
     messages: [
       { role: 'system', content: `${systemPrompt}${referencesBlock}` },
       { role: 'user', content: userBlock },
@@ -732,9 +763,9 @@ export async function generatePlan(
     max_tokens: 3500,
     top_p: 0.9,
     response_format: { type: 'json_object' },
-  });
+  };
 
-  const groqRes = await fetchGroqWithRetry(requestBody, groqApiKey);
+  const groqRes = await fetchGroqPlan(payload, model, groqApiKey);
 
   if (!groqRes.ok) {
     const errText = await groqRes.text();

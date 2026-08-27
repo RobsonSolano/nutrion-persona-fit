@@ -11,6 +11,7 @@ import {
   updateTemplate,
 } from '@/services/templates';
 import { queryKeys } from '@/lib/queryKeys';
+import { studentDetailKey } from './useStudents';
 import { useAuth } from './useAuth';
 import type {
   Modality,
@@ -145,7 +146,11 @@ export function useApplyTemplates() {
     mutationFn: (params: { studentId: string; templateIds: string[] }) =>
       applyTemplates(params),
     onSuccess: (_data, vars) => {
-      // Invalida rotinas do aluno (lista no detalhe + dashboard).
+      // A aba Plano do aluno lê as rotinas do `student_detail` (getStudentDetail
+      // traz profile + routines juntos), NÃO de `routines`. Invalidar só
+      // `routines` deixava a tela em 0 treinos até navegar e voltar — o
+      // template era aplicado no servidor, mas a UI não recarregava.
+      void qc.invalidateQueries({ queryKey: studentDetailKey(vars.studentId) });
       void qc.invalidateQueries({
         queryKey: queryKeys.routines(vars.studentId),
       });

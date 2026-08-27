@@ -15,6 +15,13 @@
  *  modelo que exista. Verificado disponível na conta em 2026-08-27. */
 export const DEFAULT_TEXT_MODEL = 'openai/gpt-oss-120b';
 
+/** Modelos de texto para failover quando o primário está em surto de 5xx.
+ *  `gpt-oss-20b` é da mesma família do default, aceita o mesmo schema JSON e
+ *  responde rápido (~2s) — verificado gerando plano válido em 2026-08-27.
+ *  Ordem = preferência. O primário é tentado primeiro (com retry); só se ele
+ *  cair de vez a cadeia entra. */
+export const FALLBACK_TEXT_MODELS = ['openai/gpt-oss-20b'];
+
 /** Status HTTP que valem retry: rate limit e erros de servidor. 4xx (fora
  *  429) é culpa nossa — modelo inválido, body malformado — e não melhora
  *  repetindo. */

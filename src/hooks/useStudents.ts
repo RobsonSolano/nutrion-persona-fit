@@ -29,7 +29,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from './useAuth';
 
 const studentsKey = (coachId: string) => ['students', coachId] as const;
-const studentDetailKey = (studentId: string) =>
+export const studentDetailKey = (studentId: string) =>
   ['student_detail', studentId] as const;
 const studentTrackingKey = (studentId: string) =>
   ['student_tracking', studentId] as const;
