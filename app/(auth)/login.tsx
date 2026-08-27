@@ -76,26 +76,20 @@ export default function LoginScreen() {
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
 
   async function handleForgotPassword() {
-    if (!email.trim()) {
-      alert.showAlert({
-        title: 'Informe o email',
-        message:
-          'Digite seu email no campo acima e tente "Esqueci a senha" de novo.',
-        type: 'warning',
-      });
-      return;
-    }
+    const target = resetEmail.trim();
+    if (!target) return; // o botão fica desabilitado; guarda defensiva
     setForgotLoading(true);
     try {
-      await requestPasswordReset(email);
+      await requestPasswordReset(target);
       setForgotOpen(false);
       // Rota nova: os tipos do expo-router só regeneram no prebuild/start, então
       // o cast via unknown é necessário até lá (a rota existe e resolve em runtime).
       router.push({
         pathname: '/(auth)/recuperar-senha',
-        params: { email: email.trim() },
+        params: { email: target },
       } as unknown as Href);
     } catch (err) {
       alert.showError(err);
@@ -297,7 +291,10 @@ export default function LoginScreen() {
 
             {mode === 'login' && (
               <Pressable
-                onPress={() => setForgotOpen(true)}
+                onPress={() => {
+                  setResetEmail(email);
+                  setForgotOpen(true);
+                }}
                 hitSlop={6}
                 className="self-center mt-1 px-2 py-1 active:opacity-70"
               >
@@ -356,10 +353,20 @@ export default function LoginScreen() {
         visible={forgotOpen}
         onClose={() => setForgotOpen(false)}
         title="Esqueci a senha"
-        message={
-          email.trim()
-            ? `Vamos enviar um código pra "${email.trim()}" definir uma nova senha.`
-            : 'Digite seu email no campo de login antes de continuar.'
+        message="Enviaremos um código de 6 dígitos pra este e-mail pra você definir uma nova senha."
+        content={
+          <View className="w-full mt-4">
+            <Input
+              value={resetEmail}
+              onChangeText={setResetEmail}
+              placeholder="voce@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
+              leftIcon={<Mail size={18} color={colors.textMuted} />}
+            />
+          </View>
         }
         actions={[
           {
@@ -367,7 +374,7 @@ export default function LoginScreen() {
             variant: 'primary',
             onPress: handleForgotPassword,
             loading: forgotLoading,
-            disabled: !email.trim(),
+            disabled: !resetEmail.trim(),
           },
           {
             label: 'Cancelar',
