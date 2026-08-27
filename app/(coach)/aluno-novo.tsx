@@ -172,7 +172,7 @@ export default function AlunoNovo() {
 
   const canSubmitForm =
     email.length > 3 &&
-    password.length >= 6 &&
+    password.length >= 8 &&
     fullName.trim().length >= 2 &&
     sex !== null &&
     weight.length > 0 &&
@@ -433,7 +433,7 @@ export default function AlunoNovo() {
               <Input
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Senha (mín. 6 caracteres)"
+                placeholder="Senha (mín. 8 caracteres)"
                 autoCapitalize="none"
                 autoCorrect={false}
               />

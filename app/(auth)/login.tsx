@@ -143,7 +143,7 @@ export default function LoginScreen() {
 
   const canSubmit =
     email.length > 3 &&
-    password.length >= 6 &&
+    password.length >= 8 &&
     (mode === 'login' ||
       (fullName.trim().length >= 2 && acceptedTerms && healthConsent));
 
@@ -261,7 +261,7 @@ export default function LoginScreen() {
 
             {mode === 'signup' && (
               <Text className="text-text-muted text-[11px] px-1">
-                Mínimo de 6 caracteres.
+                Mínimo de 8 caracteres.
               </Text>
             )}
 

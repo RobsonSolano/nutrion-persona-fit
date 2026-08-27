@@ -111,9 +111,9 @@ serve(async (req: Request) => {
         400,
       );
     }
-    if (body.password.length < 6) {
+    if (body.password.length < 8) {
       return json(
-        { error: 'weak_password', detail: 'A senha precisa ter pelo menos 6 caracteres.' },
+        { error: 'weak_password', detail: 'A senha precisa ter pelo menos 8 caracteres.' },
         400,
       );
     }

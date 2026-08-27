@@ -99,7 +99,7 @@ export default function SignupProfessorScreen() {
 
   const canSubmit =
     email.length > 3 &&
-    password.length >= 6 &&
+    password.length >= 8 &&
     fullName.trim().length >= 2 &&
     cref.trim().length >= 4 &&
     cref.length <= MAX_CREF &&
@@ -177,7 +177,7 @@ export default function SignupProfessorScreen() {
               ref={passwordRef}
               value={password}
               onChangeText={setPassword}
-              placeholder="Sua senha (mín. 6)"
+              placeholder="Sua senha (mín. 8)"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
