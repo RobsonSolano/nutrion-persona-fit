@@ -70,7 +70,7 @@ function parseError(err: unknown): { title: string; message: string } {
   if (lower.includes('weak_password')) {
     return {
       title: 'Senha fraca',
-      message: 'A senha precisa ter pelo menos 6 caracteres.',
+      message: 'A senha precisa ter pelo menos 8 caracteres.',
     };
   }
   if (lower.includes('invalid_body')) {
@@ -83,7 +83,7 @@ function parseError(err: unknown): { title: string; message: string } {
     return {
       title: 'Não consegui criar o acesso do aluno',
       message:
-        'Verifique se o e-mail é válido (ex: nome@dominio.com) e se a senha tem pelo menos 6 caracteres, e tente de novo.',
+        'Verifique se o e-mail é válido (ex: nome@dominio.com) e se a senha tem pelo menos 8 caracteres, e tente de novo.',
     };
   }
   if (lower.includes('student_limit_reached')) {

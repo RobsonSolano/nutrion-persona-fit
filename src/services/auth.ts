@@ -126,8 +126,8 @@ function normalizeEmail(raw: string) {
 }
 
 function validatePassword(password: string) {
-  if (!password || password.length < 6) {
-    throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+  if (!password || password.length < 8) {
+    throw new Error('A senha precisa ter pelo menos 8 caracteres.');
   }
 }
 
