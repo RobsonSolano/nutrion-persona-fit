@@ -98,7 +98,10 @@ const config: ExpoConfig = {
     releaseNotes: {
       novidades: [],
       melhorias: [],
-      ajustes: [],
+      ajustes: [
+        'Treino aplicado por template aparece na hora no plano do aluno',
+        'Geração de plano por IA mais estável (troca de modelo se um falhar)',
+      ],
     },
   },
 };
