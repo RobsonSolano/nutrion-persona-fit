@@ -32,6 +32,11 @@ const variantClass: Record<Variant, string> = {
   danger: 'bg-transparent border-border-strong active:bg-surface',
 };
 
+// Desabilitado tem look próprio (cinza), não a cor do variant apagada: um
+// primary verde-néon a 50% ainda lê como "clicável". Cinza comunica "trava".
+const disabledContainerClass = 'bg-surface-muted border-border';
+const disabledTextClass = 'text-text-muted';
+
 const textVariantClass: Record<Variant, string> = {
   primary: 'text-text-inverse',
   secondary: 'text-text',
@@ -72,16 +77,24 @@ export default function Button({
     await onPress();
   }
 
-  const spinnerColor = variant === 'primary' ? colors.textInverse : colors.text;
+  // Desabilitado = fundo cinza escuro; o spinner do primary (textInverse, quase
+  // preto) sumiria nele. Loading conta como desabilitado, então usa textMuted.
+  const spinnerColor = isDisabled
+    ? colors.textMuted
+    : variant === 'primary'
+      ? colors.textInverse
+      : colors.text;
 
   return (
     <Pressable
       {...rest}
       disabled={isDisabled}
       onPress={handlePress}
-      className={`${containerBase} ${variantClass[variant]} ${sizeClass[size]} ${
+      className={`${containerBase} ${
+        isDisabled ? disabledContainerClass : variantClass[variant]
+      } ${sizeClass[size]} ${
         fullWidth ? 'w-full' : 'self-start'
-      } ${isDisabled ? 'opacity-50' : ''}`}
+      } ${isDisabled ? 'opacity-70' : ''}`}
       style={
         variant === 'primary' && !isDisabled
           ? {
@@ -99,7 +112,11 @@ export default function Button({
       ) : (
         <>
           {icon ? <View>{icon}</View> : null}
-          <Text className={`${textVariantClass[variant]} ${textSizeClass[size]}`}>
+          <Text
+            className={`${
+              isDisabled ? disabledTextClass : textVariantClass[variant]
+            } ${textSizeClass[size]}`}
+          >
             {label}
           </Text>
         </>
