@@ -100,7 +100,9 @@ const config: ExpoConfig = {
         'Professor pode editar as metas do aluno (calorias, proteína, água) direto no plano',
       ],
       melhorias: [],
-      ajustes: [],
+      ajustes: [
+        'Ao montar treino, o grupo Cardio mostra todos os exercícios (esteira, bike, corrida, esteira...) em qualquer rotina',
+      ],
     },
   },
 };
