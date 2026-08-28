@@ -184,19 +184,27 @@ export default function AlunoNovo() {
     birthYear.trim().length > 0 &&
     !isValidBirthYear(Number(birthYear), currentYear);
 
-  const canSubmitForm =
-    isValidEmail(email) &&
-    !birthYearInvalid &&
-    password.length >= 8 &&
-    fullName.trim().length >= 2 &&
-    sex !== null &&
-    weight.length > 0 &&
-    height.length > 0 &&
-    goalType !== null &&
-    sports.length > 0 &&
-    frequency !== null &&
-    isDisabilityValid(disability) &&
-    (!isTemplatesMode || selectedTemplateIds.length > 0);
+  // Fonte única do que trava o cadastro: alimenta o `disabled` do botão E a
+  // linha vermelha "Preencha os campos: ..." acima dele. Sem essa lista o coach
+  // via só o botão cinza e não sabia qual campo faltava — no modo template a
+  // intuição é que selecionar o template basta, mas a biometria é obrigatória
+  // pras metas.
+  const missingFields: string[] = [];
+  if (fullName.trim().length < 2) missingFields.push('nome');
+  if (!isValidEmail(email)) missingFields.push('e-mail');
+  if (password.length < 8) missingFields.push('senha');
+  if (sex === null) missingFields.push('sexo');
+  if (birthYearInvalid) missingFields.push('ano de nascimento');
+  if (weight.length === 0) missingFields.push('peso');
+  if (height.length === 0) missingFields.push('altura');
+  if (goalType === null) missingFields.push('objetivo');
+  if (sports.length === 0) missingFields.push('modalidade');
+  if (frequency === null) missingFields.push('frequência');
+  if (!isDisabilityValid(disability)) missingFields.push('deficiência');
+  if (isTemplatesMode && selectedTemplateIds.length === 0)
+    missingFields.push('templates');
+
+  const canSubmitForm = missingFields.length === 0;
 
   async function handleCreateAndGenerate() {
     if (!canSubmitForm) return;
@@ -686,6 +694,12 @@ export default function AlunoNovo() {
               description="No plano free você cadastra o aluno aplicando seus templates de treino. Pra IA montar treino e metas automaticamente, assine. Toque pra ver os planos."
             />
           ) : null}
+
+          {!canSubmitForm && (
+            <Text className="text-danger text-xs text-center leading-relaxed px-2">
+              Preencha os campos: {missingFields.join(', ')}.
+            </Text>
+          )}
 
           <Button
             label={
