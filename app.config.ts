@@ -96,13 +96,11 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [],
-      melhorias: [
-        'Cadastro de aluno: mensagens de erro mais claras e campo de ano de nascimento com exemplo',
+      novidades: [
+        'Professor pode editar as metas do aluno (calorias, proteína, água) direto no plano',
       ],
-      ajustes: [
-        'Se o plano ou o e-mail falhar depois de criar o aluno, o app avisa o que fazer',
-      ],
+      melhorias: [],
+      ajustes: [],
     },
   },
 };

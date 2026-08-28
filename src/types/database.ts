@@ -31,6 +31,7 @@ export type Profile = {
   goal_weight_kg: number | null;
   daily_calorie_goal: number | null;
   protein_goal_g: number | null;
+  carbs_goal_g: number | null;
   water_goal_ml: number | null;
   sex: Sex | null;
   birth_year: number | null;

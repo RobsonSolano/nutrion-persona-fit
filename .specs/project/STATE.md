@@ -2,6 +2,24 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+
+### Professor edita metas do aluno (2026-08-27)
+
+Lápis na card "Metas atuais" (aba Plano do coach) → popup com calorias,
+proteína e água preenchidas. Gate: cliente mostra cadeado+upsell pro coach
+free; servidor (coach-update-student) rejeita 402 quando um campo de meta
+MUDA e o coach não é pro/premium — só na mudança de fato, pra não travar o
+free editando nome/peso pelo mesmo endpoint. Verificado ponta a ponta.
+
+**Só existem 3 metas** no modelo: daily_calorie_goal, protein_goal_g,
+water_goal_ml. NÃO há meta de gordura (fats_g é por refeição no food_logs).
+Carboidrato também não existia; criei a coluna `carbs_goal_g` (nullable) +
+allowlist + patch como terreno, mas SEM UI a pedido do dev ("editar o que
+tem"). Ligar carbo = 1 campo no popup + 1 linha na card + display no
+lado do aluno (home/perfil), sem migração nova.
+
+Gate = `ai_coach` (pro OU premium). OTA publicado (runtime 1.4.0).
+
 ### Cadastro de aluno: sucesso parcial tratado (2026-08-27, noite)
 
 Desdobramento do incidente do 502: o cadastro é multi-passo (criar aluno → gerar
