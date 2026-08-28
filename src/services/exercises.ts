@@ -25,20 +25,27 @@ export async function listExerciseGroups(): Promise<ExerciseGroup[]> {
 export async function listExercisesByGroup(
   groupId: string,
   modality: Modality,
+  opts: { allModalities?: boolean } = {},
 ): Promise<Exercise[]> {
   // Modalidade 'generico' (alongamentos, mobilidade, foam roll) sempre
   // acompanha a modalidade selecionada — útil pra preparar/finalizar
   // treinos de musculação, calistenia, crossfit ou corrida sem
   // precisar mudar a modalidade da rotina.
-  const modalities =
-    modality === 'generico' ? ['generico'] : [modality, 'generico'];
+  //
+  // `allModalities` mostra o grupo inteiro sem filtrar modalidade. Usado no
+  // cardio: as máquinas (esteira, bike, elíptico) estão como 'musculacao'
+  // porque a IA usa matching monomodal, mas na montagem MANUAL de rotina o
+  // usuário quer ver todo o cardio — corrida, máquina, ar livre — junto,
+  // independente da modalidade da rotina.
+  let query = supabase.from('exercises').select('*').eq('group_id', groupId);
 
-  const { data, error } = await supabase
-    .from('exercises')
-    .select('*')
-    .eq('group_id', groupId)
-    .in('modality', modalities)
-    .order('name', { ascending: true });
+  if (!opts.allModalities) {
+    const modalities =
+      modality === 'generico' ? ['generico'] : [modality, 'generico'];
+    query = query.in('modality', modalities);
+  }
+
+  const { data, error } = await query.order('name', { ascending: true });
 
   if (error) throw error;
   return data ?? [];

@@ -23,12 +23,13 @@ export function useExerciseGroups() {
 export function useExercisesByGroup(
   groupId: string | null | undefined,
   modality: Modality,
+  allModalities = false,
 ) {
   return useQuery({
     queryKey: groupId
-      ? queryKeys.exercisesByGroup(groupId, modality)
-      : ['exercises-by-group', 'none', modality],
-    queryFn: () => listExercisesByGroup(groupId!, modality),
+      ? [...queryKeys.exercisesByGroup(groupId, modality), allModalities]
+      : ['exercises-by-group', 'none', modality, allModalities],
+    queryFn: () => listExercisesByGroup(groupId!, modality, { allModalities }),
     enabled: !!groupId,
     staleTime: 5 * 60 * 1000,
   });
