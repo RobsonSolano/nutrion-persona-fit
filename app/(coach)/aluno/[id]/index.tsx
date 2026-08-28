@@ -18,6 +18,7 @@ import {
   Dumbbell,
   Target,
   Pencil,
+  Lock,
   Plus,
   ChevronRight,
   Trash2,
@@ -46,7 +47,11 @@ import {
   useSaveStudentPlan,
   useStudentDetail,
   useStudentTracking,
+  useUpdateStudent,
 } from '@/hooks/useStudents';
+import { useAiCoachLocked } from '@/hooks/useEntitlement';
+import EditGoalsModal from '@/components/coach/EditGoalsModal';
+import { openPaywall } from '@/lib/paywall';
 import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { useApplyTemplates } from '@/hooks/useTemplates';
 import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
@@ -481,6 +486,29 @@ function PlanoTab({
 }) {
   const router = useRouter();
   const deficiencia = formatDisability(profile);
+  const alert = useAlert();
+  const aiCoachLocked = useAiCoachLocked(); // true = coach free (sem pro/premium)
+  const updateStudent = useUpdateStudent();
+  const [goalsOpen, setGoalsOpen] = useState(false);
+
+  function onPencil() {
+    // Editar meta é recurso de professor pro/premium. Free vê o cadeado e o
+    // upsell; o servidor recusa a mudança de qualquer forma.
+    if (aiCoachLocked) {
+      openPaywall('coach_edit_goals');
+      return;
+    }
+    setGoalsOpen(true);
+  }
+
+  async function saveGoals(patch: import('@/services/students').UpdateStudentPatch) {
+    try {
+      await updateStudent.mutateAsync({ studentId, patch });
+      setGoalsOpen(false);
+    } catch (err) {
+      alert.showError(err);
+    }
+  }
 
   return (
     <ScrollView
@@ -493,9 +521,22 @@ function PlanoTab({
       showsVerticalScrollIndicator={false}
     >
       <Card padding="md">
-        <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
-          Metas atuais
-        </Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+            Metas atuais
+          </Text>
+          <Pressable
+            onPress={onPencil}
+            hitSlop={10}
+            className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
+          >
+            {aiCoachLocked ? (
+              <Lock size={13} color={colors.textMuted} />
+            ) : (
+              <Pencil size={14} color={colors.accent} />
+            )}
+          </Pressable>
+        </View>
         <View className="gap-2.5">
           <MetaRow
             icon={<Flame size={14} color={colors.accent} />}
@@ -514,6 +555,18 @@ function PlanoTab({
           />
         </View>
       </Card>
+
+      <EditGoalsModal
+        visible={goalsOpen}
+        onClose={() => setGoalsOpen(false)}
+        initial={{
+          daily_calorie_goal: profile.daily_calorie_goal,
+          protein_goal_g: profile.protein_goal_g,
+          water_goal_ml: profile.water_goal_ml,
+        }}
+        onSave={saveGoals}
+        saving={updateStudent.isPending}
+      />
 
       {(deficiencia ||
         profile.allergies ||
