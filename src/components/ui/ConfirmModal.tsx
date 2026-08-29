@@ -25,7 +25,7 @@ type Props = {
   icon?: ReactNode;
   /** Ações em ordem visual (top-down). Convenção: cancelar por último. */
   actions: ConfirmAction[];
-  /** Se true, fechar pelo backdrop é bloqueado (forçar uso dos botões). */
+  /** Se false, fechar pelo backdrop é bloqueado (forçar uso dos botões). */
   dismissable?: boolean;
 };
 
