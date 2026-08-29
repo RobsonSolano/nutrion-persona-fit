@@ -35,7 +35,7 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
 
     const res = await callFn('signup-professor', user.accessToken, {
       bio: 'Professor de teste',
-      cref: '000000-G/SP',
+      cref: '045821-G/SP',
     });
     expect(res.ok).toBe(true);
     expect(res.body.coach).toBeDefined();

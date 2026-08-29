@@ -13,6 +13,7 @@ await import('./suites/logs.mjs');
 await import('./suites/routines.mjs');
 await import('./suites/coach.mjs');
 await import('./suites/requests.mjs');
+await import('./suites/enrollment.mjs');
 await import('./suites/notes.mjs');
 await import('./suites/data-export.mjs');
 

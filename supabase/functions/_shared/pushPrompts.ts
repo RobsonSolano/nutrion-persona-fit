@@ -14,7 +14,9 @@ export type PushType =
   | 'daily_workout_check'
   | 'streak_warning'
   | 'student_account_deleted'
-  | 'coach_unlinked';
+  | 'coach_unlinked'
+  | 'enrollment_accepted'
+  | 'enrollment_declined';
 
 export const PERSONA_SYSTEM = `Você é a voz do NutriOn — um app de nutrição e treino com pegada brasileira, direta, sem fofura. Fala "você", não "tu". Não usa emoji. Não usa frases clichês de coach motivacional ("acredite em você", "vamos juntos"). É um amigo que entende do assunto: curto, específico, e que conhece a pessoa.
 
@@ -54,6 +56,10 @@ export function aiUsageFeature(type: PushType): string {
       return 'push_account_deleted';
     case 'coach_unlinked':
       return 'push_coach_unlinked';
+    case 'enrollment_accepted':
+      return 'push_enrollment_accepted';
+    case 'enrollment_declined':
+      return 'push_enrollment_declined';
   }
 }
 
@@ -181,6 +187,18 @@ Você está escrevendo pra um PROFESSOR (coach), avisando que um aluno acabou de
 ${ctx.trial_granted ? `- Ganhou ${ctx.trial_days ?? 7} dias de teste grátis do plano Pro (Chat IA + Sanity Check)` : ''}
 
 Você está escrevendo pra um ALUNO que acabou de ser desvinculado pelo professor dele. Tom: factual, sem culpa nem dramatização. Reconhece a mudança e enfatiza que agora ele gerencia o próprio plano.${ctx.trial_granted ? ' Mencione, de forma breve e animadora, que ele ganhou dias de teste grátis do Pro pra continuar usando a IA.' : ''} NÃO use emoji. NÃO julga o motivo do desvínculo.`;
+
+    case 'enrollment_accepted':
+      return `Contexto:
+- Professor: ${ctx.coach_name ?? 'seu professor'}
+
+Você está escrevendo pra um usuário que pediu pra ser aluno desse professor e acabou de ser ACEITO. Tom: direto e concreto. Diz que a partir de agora o professor monta e ajusta o plano dele (treino, calorias, água). NÃO use emoji. NÃO prometa resultado.`;
+
+    case 'enrollment_declined':
+      return `Contexto:
+- Professor: ${ctx.coach_name ?? 'o professor'}
+
+Você está escrevendo pra um usuário cuja solicitação pra virar aluno NÃO foi aceita. Tom: factual e curto, sem lamento, sem pedir desculpa, sem julgar o motivo. Deixa claro que a conta dele continua igual e que ele pode procurar outro professor. NÃO use emoji.`;
   }
 }
 
@@ -254,6 +272,16 @@ export function staticTemplate(
       return {
         title: 'Plano agora é seu',
         body: 'Seu professor encerrou o vínculo. Você continua com seus treinos e agora pode editá-los.',
+      };
+    case 'enrollment_accepted':
+      return {
+        title: 'Solicitação aceita',
+        body: `${ctx.coach_name ?? 'Seu professor'} aceitou você como aluno. O plano agora é acompanhado por ele.`,
+      };
+    case 'enrollment_declined':
+      return {
+        title: 'Solicitação não aceita',
+        body: 'Sua conta continua como está. Você pode procurar outro professor quando quiser.',
       };
   }
 }
