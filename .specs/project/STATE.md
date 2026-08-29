@@ -3,6 +3,44 @@
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
 
+### Aluno contrata professor (2026-08-29)
+
+Épico #8 do BACKLOG implementado numa branch (`feature/aluno-contrata-professor`),
+8 commits. Spec em `.specs/features/2026-08-29-aluno-contrata-professor/`.
+
+**Decisões que valem além desta feature:**
+
+- **CREF não tem API pública.** Verificado em 2026-08-29: CONFEF só expõe busca
+  web; cada regional tem portal próprio (vários em `implanta.net.br`,
+  `spiderware`), nenhum com API documentada. A validação implementada é
+  ESTRUTURAL (formato `NNNNNN-G/UF`, UF real, anti-degenerado) — barra lixo
+  óbvio, não fraude. **Próximo passo registrado:** fila de revisão manual por
+  admin ("aguarde enquanto validamos"), único caminho que prova o registro.
+  Existe `admin_users` desde 2026-05-14 pra construir em cima.
+- **Aluno agora recebe `max(tier próprio, tier do coach)`** no
+  `_resolve_entitlement`. Antes só herdava `ai_personal`. Sem isso, quem já
+  pagava Pro viraria aluno e continuaria sendo cobrado sem contrapartida — o
+  app não cancela assinatura da loja.
+- **`expo-clipboard` é nativo.** Foi cortado do botão "copiar telefone" porque
+  forçaria `.aab`. `Linking` (WhatsApp, tel:) sai por OTA.
+
+**Armadilha que custou tempo — mover tela de Stack pra Tab:** ao converter
+`(coach)/perfil.tsx` em aba, o `<Stack.Screen options>` ficou no JSX e derrubou
+o app na montagem (`addViewAt: failed to insert view` / `The specified child
+already has a parent`, via `ReactClippingViewManager`). O primeiro palpite
+(Modal vs `removeClippedSubviews` do ScrollView) foi testado e NÃO era. Sempre
+remover `<Stack.Screen>` ao mover uma tela para dentro de `Tabs`.
+
+**Limitação do ambiente local (pré-existente, não da feature):** o
+`supabase functions serve` não resolve bare specifiers (`@supabase/supabase-js`)
+dentro de `_shared/` — qualquer function que importe de lá não boota localmente.
+A suíte Coach antiga falha igual. Testar edge function exige `fn:deploy`.
+Tentativas com `--import-map` e `deno.json` não resolveram.
+
+**Estado da entrega:** nada publicado. Falta `db:push` (9 migrations),
+`fn:deploy` (`coach-respond-enrollment` + `signup-professor`), rodar os 6 e-2-e
+que dependem da function, e OTA. Nada aqui é nativo — sai sem `.aab`.
+
 ### Professor edita metas do aluno (2026-08-27)
 
 Lápis na card "Metas atuais" (aba Plano do coach) → popup com calorias,
