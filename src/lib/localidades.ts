@@ -11,6 +11,7 @@
 // (Bom Jesus existe em 8 UFs) — é ele que identifica o município sem ambiguidade.
 
 import data from '@/data/municipios.json';
+import { foldText } from './text';
 
 export type Municipio = { nome: string; ibge: number };
 
@@ -45,24 +46,16 @@ export function municipiosDaUf(uf: string | null | undefined): Municipio[] {
   return rows.map(([nome, ibge]) => ({ nome, ibge }));
 }
 
-/** Compara ignorando acento e caixa — "sao paulo" acha "São Paulo". */
-function fold(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .trim();
-}
 
 /** Filtra a lista de uma UF pelo que o usuário digitou. Vazio = lista toda. */
 export function filtrarMunicipios(uf: string, termo: string): Municipio[] {
   const todos = municipiosDaUf(uf);
-  const t = fold(termo);
+  const t = foldText(termo);
   if (!t) return todos;
-  return todos.filter((m) => fold(m.nome).includes(t));
+  return todos.filter((m) => foldText(m.nome).includes(t));
 }
 
 export function findMunicipio(uf: string, nome: string): Municipio | null {
-  const alvo = fold(nome);
-  return municipiosDaUf(uf).find((m) => fold(m.nome) === alvo) ?? null;
+  const alvo = foldText(nome);
+  return municipiosDaUf(uf).find((m) => foldText(m.nome) === alvo) ?? null;
 }

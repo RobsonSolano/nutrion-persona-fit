@@ -118,35 +118,15 @@ export type MyEnrollmentRequest = {
 };
 
 /**
- * As solicitações do próprio usuário. O nome do professor vem da RPC de
- * perfil público, não de um join: a RLS de profiles não deixa ler o nome
- * de quem ainda não é seu coach.
+ * As solicitações do próprio usuário, com o nome do professor já junto.
+ * A RPC existe pra evitar o N+1: esta lista roda na abertura do app (é
+ * ela que alimenta o aviso de desfecho), e buscar o nome de cada
+ * professor à parte custaria uma ida ao servidor por solicitação.
  */
 export async function listMyRequests(): Promise<MyEnrollmentRequest[]> {
-  const { data, error } = await supabase
-    .from('coach_enrollment_requests')
-    .select(
-      'id, coach_id, status, message, cancel_reason, created_at, responded_at, seen_by_student_at',
-    )
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.rpc('list_my_enrollment_requests');
   if (error) throw error;
-
-  const rows = (data ?? []) as Omit<MyEnrollmentRequest, 'coach_name'>[];
-  const nomes = new Map<string, string | null>();
-  await Promise.all(
-    [...new Set(rows.map((r) => r.coach_id))].map(async (id) => {
-      try {
-        const p = await getCoachPublicProfile(id);
-        nomes.set(id, p?.full_name ?? null);
-      } catch {
-        // Professor que saiu da busca (ficou privado, caiu de plano, bloqueou)
-        // continua no histórico — só sem nome.
-        nomes.set(id, null);
-      }
-    }),
-  );
-
-  return rows.map((r) => ({ ...r, coach_name: nomes.get(r.coach_id) ?? null }));
+  return (data ?? []) as MyEnrollmentRequest[];
 }
 
 export async function cancelMyRequest(id: string): Promise<void> {

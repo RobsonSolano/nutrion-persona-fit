@@ -4,6 +4,7 @@
 // de "isso é válido?" e "qual linha vai pro banco?" fica aqui, testável.
 
 import { normalizeYouTubeUrl } from './youtubeUrl';
+import { foldText } from './text';
 import type {
   Exercise,
   ExerciseVisibility,
@@ -45,12 +46,7 @@ export type ExerciseRowInsert = {
 /** Chave de comparação pro dedup: sem acento, sem caixa, espaço colapsado.
  *  "Supino  RÉTO " e "supino reto" são o mesmo exercício pro professor. */
 export function normalizeExerciseName(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
+  return foldText(name);
 }
 
 /**

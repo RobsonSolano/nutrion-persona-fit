@@ -114,6 +114,15 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
     });
     expect(second.ok).toBe(false);
     expect(second.error).toBe('already_requested');
+
+    // A lista do aluno traz o nome do professor na MESMA query (sem N+1).
+    const { data: minhas } = await student.client.rpc(
+      'list_my_enrollment_requests',
+    );
+    expect(minhas.length).toBe(1);
+    expect(minhas[0].coach_id).toBe(coach.id);
+    expect(typeof minhas[0].coach_name).toBe('string');
+    expect(minhas[0].status).toBe('pendente');
   });
 
   test('request_coach exige telefone de contato', async (ctx) => {
