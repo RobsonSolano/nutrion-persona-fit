@@ -83,16 +83,19 @@ const REQUEST_ERROS: Record<string, string> = {
   invalid_role: 'Esta conta não pode virar aluno.',
   coach_unavailable: 'Este professor não está disponível no momento.',
   already_requested: 'Você já tem uma solicitação aberta com este professor.',
+  invalid_phone: 'Informe um telefone válido com DDD (10 a 13 dígitos).',
   unauthorized: 'Sessão expirada. Entre de novo.',
 };
 
 export async function requestCoach(
   coachId: string,
+  contactPhone: string,
   message?: string | null,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('request_coach', {
     p_coach_id: coachId,
     p_message: message ?? null,
+    p_contact_phone: contactPhone,
   });
   if (error) throw error;
   const res = data as { ok: boolean; id?: string; error?: string };
@@ -196,6 +199,8 @@ export type CoachEnrollmentRequest = {
   responded_at: string | null;
   student_name: string | null;
   student_email: string | null;
+  /** Telefone que o usuário deu PRA ESTE professor. Some quando recusado. */
+  contact_phone: string | null;
 };
 
 /**
@@ -247,6 +252,16 @@ export async function respondToEnrollment(
     }
     throw new Error(detail ?? 'Não consegui responder a solicitação.');
   }
+}
+
+/**
+ * Último telefone que o usuário informou. Pré-preenche a próxima
+ * solicitação — ninguém quer redigitar o próprio número.
+ */
+export async function getMyLastContactPhone(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('my_last_contact_phone');
+  if (error) throw error;
+  return (data as string | null) ?? null;
 }
 
 /**

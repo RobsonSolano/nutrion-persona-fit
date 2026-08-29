@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import {
   Ban,
   Bell,
@@ -156,9 +156,6 @@ export default function CoachPerfilScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ headerShown: false, animation: 'slide_from_right' }}
-      />
       <Screen variant="hero" edges={['top']}>
         <View className="px-5 py-4 border-b border-border-subtle">
           <Text className="text-text text-2xl font-bold">Meu perfil</Text>

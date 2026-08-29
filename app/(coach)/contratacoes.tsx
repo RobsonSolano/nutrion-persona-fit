@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,10 +10,18 @@ import {
   View,
 } from 'react-native';
 import { Stack, useRouter, type Href } from 'expo-router';
-import { ArrowLeft, Ban, Inbox, Mail } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Ban,
+  Inbox,
+  Mail,
+  MessageCircle,
+  Phone,
+} from 'lucide-react-native';
 import { Button, Card, ConfirmModal, Screen, SegmentedControl } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
+import { formatPhoneBR, whatsappUrl } from '@/lib/phone';
 import {
   useBlockUser,
   useCoachEnrollmentRequests,
@@ -285,6 +294,34 @@ function RequestCard({
           </Text>
         </View>
       </View>
+
+      {request.contact_phone ? (
+        <View className="mt-3 rounded-2xl border border-border bg-surface-muted p-3">
+          <View className="flex-row items-center gap-2">
+            <Phone size={13} color={colors.textDim} />
+            <Text className="text-text text-sm font-semibold flex-1">
+              {formatPhoneBR(request.contact_phone)}
+            </Text>
+          </View>
+          {/* O combinado acontece fora do app — não existe chat aqui. */}
+          <View className="flex-row gap-2 mt-3">
+            <Pressable
+              onPress={() => void Linking.openURL(whatsappUrl(request.contact_phone!))}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl border border-accent/40 bg-accent/10 py-2.5 active:opacity-70"
+            >
+              <MessageCircle size={14} color={colors.accent} />
+              <Text className="text-accent text-xs font-semibold">WhatsApp</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void Linking.openURL(`tel:${request.contact_phone}`)}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface py-2.5 active:opacity-70"
+            >
+              <Phone size={14} color={colors.textDim} />
+              <Text className="text-text-dim text-xs font-semibold">Ligar</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {request.message ? (
         <View className="mt-3 rounded-2xl border border-border bg-surface-muted p-3">

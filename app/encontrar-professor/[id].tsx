@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -15,18 +15,21 @@ import {
   Eye,
   Lock,
   MapPin,
+  Phone,
   Sparkles,
 } from 'lucide-react-native';
-import { Avatar, Button, Card, Screen } from '@/components/ui';
+import { Avatar, Button, Card, Input, Screen } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import StarRating from '@/components/coach/StarRating';
 import { colors } from '@/lib/theme';
 import { especialidadeLabel, SERVICE_MODE_LABELS, type ServiceMode } from '@/lib/especialidades';
 import {
   useCoachPublicProfile,
+  useMyLastContactPhone,
   useRateCoach,
   useRequestCoach,
 } from '@/hooks/useEnrollment';
+import { formatPhoneBR, isValidPhone, parsePhoneInput } from '@/lib/phone';
 import { useProfile } from '@/hooks/useProfile';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { recordLegalAcceptanceSafe } from '@/services/legal';
@@ -46,6 +49,20 @@ export default function PerfilPublicoProfessorScreen() {
 
   const [confirmando, setConfirmando] = useState(false);
 
+  // Telefone é obrigatório: sem canal de contato o professor recebe o
+  // pedido e não tem como responder — não existe chat no app.
+  const lastPhoneQ = useMyLastContactPhone();
+  const [phoneRaw, setPhoneRaw] = useState('');
+  useEffect(() => {
+    if (lastPhoneQ.data && !phoneRaw) setPhoneRaw(lastPhoneQ.data);
+  }, [lastPhoneQ.data]);
+  const phoneDigits = parsePhoneInput(phoneRaw);
+  const phoneOk = isValidPhone(phoneDigits);
+  const phoneError =
+    phoneDigits.length > 0 && !phoneOk
+      ? 'Telefone inválido. Use DDD + número (ou DDI + DDD + número).'
+      : null;
+
   const coach = q.data;
   const role = profileQ.data?.role;
   const jaEhAluno = role === 'aluno';
@@ -58,7 +75,10 @@ export default function PerfilPublicoProfessorScreen() {
       // Consentimento de dado sensível de saúde: o professor passa a ver
       // todo o histórico, inclusive o anterior ao vínculo.
       await recordLegalAcceptanceSafe();
-      await requestM.mutateAsync({ coachId: coach.coach_id });
+      await requestM.mutateAsync({
+        coachId: coach.coach_id,
+        contactPhone: phoneDigits,
+      });
       setConfirmando(false);
       alert.showAlert({
         title: 'Solicitação enviada',
@@ -277,6 +297,24 @@ export default function PerfilPublicoProfessorScreen() {
                   </View>
                 )}
 
+                <View className="mt-5">
+                  <Input
+                    label="Seu telefone para contato"
+                    value={phoneRaw}
+                    onChangeText={setPhoneRaw}
+                    placeholder="11999999999"
+                    keyboardType="number-pad"
+                    maxLength={13}
+                    leftIcon={<Phone size={16} color={colors.textMuted} />}
+                    error={phoneError ?? undefined}
+                  />
+                  <Text className="text-text-muted text-[11px] mt-2 leading-relaxed">
+                    {phoneOk
+                      ? `${formatPhoneBR(phoneDigits)} — o professor usa este número pra falar com você.`
+                      : 'O professor combina tudo com você por fora do app (WhatsApp ou ligação). Só ele vê este número, e só enquanto a solicitação estiver de pé.'}
+                  </Text>
+                </View>
+
                 <Text className="text-text-muted text-[11px] mt-4 leading-relaxed">
                   O pagamento do professor, se houver, é combinado direto com ele —
                   o app não intermedeia.
@@ -287,6 +325,7 @@ export default function PerfilPublicoProfessorScreen() {
                     label="Confirmar e enviar solicitação"
                     onPress={enviar}
                     loading={requestM.isPending}
+                    disabled={!phoneOk}
                     fullWidth
                   />
                   <Button

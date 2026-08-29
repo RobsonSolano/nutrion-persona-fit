@@ -6,6 +6,7 @@ import {
   listBlockedUsers,
   listCoachRequests,
   getMyCoachRating,
+  getMyLastContactPhone,
   listMyRequests,
   markRequestSeen,
   rateCoach,
@@ -70,12 +71,30 @@ export function useUnseenEnrollmentOutcomes() {
   return { ...q, unseen };
 }
 
+/** Telefone da última solicitação, pra pré-preencher o campo. */
+export function useMyLastContactPhone() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['my_last_contact_phone', user?.id ?? 'anon'],
+    queryFn: getMyLastContactPhone,
+    enabled: !!user?.id,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useRequestCoach() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: ({ coachId, message }: { coachId: string; message?: string | null }) =>
-      requestCoach(coachId, message),
+    mutationFn: ({
+      coachId,
+      contactPhone,
+      message,
+    }: {
+      coachId: string;
+      contactPhone: string;
+      message?: string | null;
+    }) => requestCoach(coachId, contactPhone, message),
     onSuccess: async (_id, vars) => {
       await qc.invalidateQueries({ queryKey: myRequestsKey(user?.id ?? 'anon') });
       await qc.invalidateQueries({ queryKey: coachPublicKey(vars.coachId) });

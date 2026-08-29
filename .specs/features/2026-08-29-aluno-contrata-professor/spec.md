@@ -83,6 +83,13 @@ depende de permissão de push.
 **[SOLI]-10** — QUANDO o usuário cancela a própria solicitação `pendente`, ENTÃO ela vira
 `cancelado` sem notificar o professor.
 
+**[SOLI]-11** — A solicitação exige **telefone de contato** do usuário. Sem ele o professor
+recebe o pedido e não tem como responder — não existe chat no app, e o combinado (incluindo
+pagamento, que é fora do app) acontece por WhatsApp ou ligação. O telefone fica **na
+solicitação**, não no perfil: assim é compartilhado com aquele professor naquele pedido, e some
+da fila quando a solicitação é recusada. O campo é pré-preenchido com o último número usado.
+A fila do professor mostra o número com ação de WhatsApp e de ligar.
+
 ## 3. Transição comum → aluno
 
 **[TRAN]-01** — A mudança de `role`/`coach_id` acontece **só** na edge function
@@ -177,7 +184,10 @@ retroativamente no login, mas não aparecem na busca ([DESC]-03) até corrigir.
 - Pagamento do aluno ao professor pelo app (D7).
 - Comentário em texto nas avaliações (D6).
 - Denúncia/moderação de professor.
-- Chat aluno↔professor antes do vínculo (a conversa acontece fora do app).
+- Chat aluno↔professor dentro do app — decisão do dev: não se paga agora. O contato é o
+  telefone da solicitação ([SOLI]-11).
+- Botão de copiar o telefone: exigiria `expo-clipboard`, que é módulo NATIVO e forçaria `.aab`
+  novo. WhatsApp e ligar usam `Linking`, que sai por OTA.
 - Play In-App Updates (exige build nativo, não faz parte desta leva).
 
 ## Riscos

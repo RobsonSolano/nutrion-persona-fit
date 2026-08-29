@@ -104,14 +104,43 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
     const { data: first } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
       p_message: 'Quero treinar com você',
+      p_contact_phone: '11999998888',
     });
     expect(first.ok).toBe(true);
 
     const { data: second } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     expect(second.ok).toBe(false);
     expect(second.error).toBe('already_requested');
+  });
+
+  test('request_coach exige telefone de contato', async (ctx) => {
+    const coach = await createDiscoverableCoach(ctx);
+    const student = await createTestUser({ prefix: 'aluno-enr' });
+    ctx.defer(() => cleanupUser(student));
+
+    for (const phone of [null, '', '119999', 'abcdefghij']) {
+      const { data } = await student.client.rpc('request_coach', {
+        p_coach_id: coach.id,
+        p_contact_phone: phone,
+      });
+      expect(data.ok).toBe(false);
+      expect(data.error).toBe('invalid_phone');
+    }
+
+    // Com telefone válido passa, e o número chega na fila do professor.
+    const { data: ok } = await student.client.rpc('request_coach', {
+      p_coach_id: coach.id,
+      p_contact_phone: '(11) 99999-8888',
+    });
+    expect(ok.ok).toBe(true);
+
+    const { data: fila } = await coach.client.rpc(
+      'list_coach_enrollment_requests',
+    );
+    expect(fila[0].contact_phone).toBe('11999998888');
   });
 
   test('efetuado vincula o aluno e trava a edição de treino', async (ctx) => {
@@ -129,6 +158,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     expect(req.ok).toBe(true);
 
@@ -180,6 +210,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     expect(req.ok).toBe(true);
 
@@ -219,6 +250,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     const res = await callFn('coach-respond-enrollment', coach.accessToken, {
       request_id: req.id,
@@ -251,6 +283,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     const res = await callFn('coach-respond-enrollment', intruso.accessToken, {
       request_id: req.id,
@@ -280,6 +313,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     await callFn('coach-respond-enrollment', coach.accessToken, {
       request_id: req.id,
@@ -309,6 +343,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     await callFn('coach-respond-enrollment', coach.accessToken, {
       request_id: req.id,
@@ -327,6 +362,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
 
     const { data: req } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     expect(req.ok).toBe(true);
 
@@ -356,6 +392,7 @@ suite('Enrollment (contratação de professor)', ({ test }) => {
     // E não consegue mais solicitar.
     const { data: retry } = await student.client.rpc('request_coach', {
       p_coach_id: coach.id,
+      p_contact_phone: '11999998888',
     });
     expect(retry.ok).toBe(false);
     expect(retry.error).toBe('coach_unavailable');
