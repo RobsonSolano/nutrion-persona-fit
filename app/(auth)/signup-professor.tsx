@@ -35,6 +35,7 @@ import TermsAcceptance from '@/components/TermsAcceptance';
 import HealthDataConsent from '@/components/HealthDataConsent';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
+import { validateCredential, CREF_EXAMPLE } from '@/lib/cref';
 
 const MAX_BIO = 300;
 const MAX_CREF = 30;
@@ -79,7 +80,7 @@ export default function SignupProfessorScreen() {
       // 2) Promove pra role=professor + cria row em coaches.
       await promoteToProfessor({
         bio: bio.trim() || null,
-        cref: cref.trim() || null,
+        cref: credencial.ok ? credencial.value : null,
       });
       // 3) Força refetch do profile ANTES de redirecionar.
       const { data: { user } } = await supabase.auth.getUser();
@@ -97,11 +98,16 @@ export default function SignupProfessorScreen() {
     }
   }
 
+  // Mesma regra do servidor (supabase/functions/_shared/credencial.ts): o erro
+  // aparece antes do envio em vez de voltar como 400.
+  const credencial = validateCredential(cref);
+  const crefError = cref.trim().length > 0 && !credencial.ok ? credencial.reason : null;
+
   const canSubmit =
     email.length > 3 &&
     password.length >= 8 &&
     fullName.trim().length >= 2 &&
-    cref.trim().length >= 4 &&
+    credencial.ok &&
     cref.length <= MAX_CREF &&
     bio.length <= MAX_BIO &&
     acceptedTerms &&
@@ -197,15 +203,19 @@ export default function SignupProfessorScreen() {
             <Input
               value={cref}
               onChangeText={setCref}
-              placeholder="CREF (Ed. Física) ou CRN (Nutrição)"
+              placeholder={`CREF (ex: ${CREF_EXAMPLE}) ou CRN`}
               autoCapitalize="characters"
               autoCorrect={false}
               leftIcon={<IdCard size={18} color={colors.textMuted} />}
             />
-            <Text className="text-text-muted text-[11px] px-1">
-              Obrigatório — credencial profissional. Aparece no seu perfil
-              pra você e seus alunos identificarem.
-            </Text>
+            {crefError ? (
+              <Text className="text-danger text-[11px] px-1">{crefError}</Text>
+            ) : (
+              <Text className="text-text-muted text-[11px] px-1">
+                Obrigatório — credencial profissional. Aparece no seu perfil
+                pra você e seus alunos identificarem.
+              </Text>
+            )}
 
             <Input
               value={bio}

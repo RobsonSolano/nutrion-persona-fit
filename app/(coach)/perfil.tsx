@@ -24,6 +24,7 @@ import {
   useUpdateCoachSettings,
 } from '@/hooks/useCoachContact';
 import { formatPhoneBR, isValidPhone, parsePhoneInput } from '@/lib/phone';
+import { validateCredential, CREF_EXAMPLE } from '@/lib/cref';
 import { colors } from '@/lib/theme';
 
 export default function CoachPerfilScreen() {
@@ -50,6 +51,11 @@ export default function CoachPerfilScreen() {
     }
   }, [coachQ.data]);
 
+  // O CREF é editável aqui — sem a mesma validação do cadastro, qualquer
+  // professor trocaria o registro válido por lixo depois de entrar.
+  const credencial = validateCredential(cref);
+  const crefError = !credencial.ok ? credencial.reason : null;
+
   const phoneDigits = parsePhoneInput(phoneRaw);
   const phoneError =
     showContact && phoneDigits.length > 0 && !isValidPhone(phoneDigits)
@@ -58,6 +64,7 @@ export default function CoachPerfilScreen() {
 
   const canSave =
     !update.isPending &&
+    !crefError &&
     !phoneError &&
     !(showContact && phoneDigits.length === 0);
 
@@ -66,7 +73,7 @@ export default function CoachPerfilScreen() {
     try {
       await update.mutateAsync({
         bio: bio.trim() || null,
-        cref: cref.trim() || null,
+        cref: credencial.ok ? credencial.value : null,
         show_contact_to_students: showContact,
         contact_phone: showContact ? phoneDigits : null,
       });
@@ -145,12 +152,17 @@ export default function CoachPerfilScreen() {
                   style={{ minHeight: 100, textAlignVertical: 'top' }}
                 />
                 <Input
-                  label="CREF"
+                  label="CREF ou CRN"
                   value={cref}
                   onChangeText={setCref}
-                  placeholder="Ex: 012345-G/SP"
+                  placeholder={`Ex: ${CREF_EXAMPLE}`}
                   autoCapitalize="characters"
                 />
+                {crefError ? (
+                  <Text className="text-danger text-[11px] px-1 mt-1">
+                    {crefError}
+                  </Text>
+                ) : null}
               </View>
             </Card>
 
