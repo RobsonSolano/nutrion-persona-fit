@@ -5,6 +5,7 @@ import {
   getCoachPublicProfile,
   listBlockedUsers,
   listCoachRequests,
+  getMyCoachRating,
   listMyRequests,
   markRequestSeen,
   rateCoach,
@@ -154,6 +155,16 @@ export function useRespondToEnrollment() {
       await qc.invalidateQueries({ queryKey: ['students', user?.id ?? 'anon'] });
       await qc.invalidateQueries({ queryKey: queryKeys.entitlement(user?.id ?? 'anon') });
     },
+  });
+}
+
+/** Média de estrelas do professor logado (agregado, sem notas individuais). */
+export function useCoachRating(coachId: string | null) {
+  return useQuery({
+    queryKey: ['my_coach_rating', coachId ?? 'anon'],
+    queryFn: getMyCoachRating,
+    enabled: !!coachId,
+    staleTime: 5 * 60_000,
   });
 }
 

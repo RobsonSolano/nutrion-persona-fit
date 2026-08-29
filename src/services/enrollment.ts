@@ -249,6 +249,17 @@ export async function respondToEnrollment(
   }
 }
 
+/**
+ * Média do próprio professor. Vem por RPC porque a RLS de coach_ratings
+ * não deixa nem o avaliado ler as notas — só o agregado, sem quem deu o quê.
+ */
+export async function getMyCoachRating(): Promise<{ avg: number; count: number }> {
+  const { data, error } = await supabase.rpc('my_coach_rating');
+  if (error) throw error;
+  const r = data as { avg: number; count: number } | null;
+  return { avg: Number(r?.avg ?? 0), count: Number(r?.count ?? 0) };
+}
+
 // ---------------------------------------------------------------------
 // Bloqueio
 // ---------------------------------------------------------------------
