@@ -78,6 +78,7 @@ export const TACO_ALIMENTOS: readonly AlimentoTaco[] = [
   { nome: 'Brócolis, cozido', kcal: 25, prot: 2.1, carb: 4.4, gord: 0.5 },
   { nome: 'Cebola, crua', kcal: 39, prot: 1.7, carb: 8.9, gord: 0.1 },
   { nome: 'Banana, crua', kcal: 98, prot: 1.3, carb: 26, gord: 0.1 },
+  { nome: 'Morango, cru', kcal: 30, prot: 0.9, carb: 6.8, gord: 0.3 },
   { nome: 'Maçã, com casca, crua', kcal: 56, prot: 0.3, carb: 15.2, gord: 0 },
   { nome: 'Laranja, crua', kcal: 37, prot: 1, carb: 8.9, gord: 0.1 },
   { nome: 'Mamão, cru', kcal: 45, prot: 0.8, carb: 11.6, gord: 0.1 },

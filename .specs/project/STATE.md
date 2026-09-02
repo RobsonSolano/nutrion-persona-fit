@@ -2,6 +2,34 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Sanity check: total determinístico (2026-09-02)
+
+Continuação do 121-vs-290. O fix só-de-prompt (mandar o modelo calcular) NÃO
+resolveu: testando 6x ao vivo (harness que cria/apaga user temp + insere sub
+premium), o modelo **omitia itens** (largava o pão francês, o de 165 kcal) e
+variava formato (objeto vs string) — é confiabilidade de modelo, o épico "IA
+robusta". Solução robusta e determinística, toda **server-side (fn:deploy, sem
+OTA)**:
+
+- **Itens vêm da DESCRIÇÃO, não do modelo.** `parseDescricao` (sanityMath.ts)
+  extrai "N g|ml de <alimento>" — lista TODOS os itens de forma determinística
+  quando o coach digita a gramagem. Vence o modelo quando tem mais itens;
+  descrição livre/foto → cai no modelo (sem regressão).
+- **kcal por código:** `matchReferencia` + `enrichWithReferencia` casam o item
+  com a TACO e calculam kcal = tabela × gramas / 100. Fim do "cálculo de cabeça".
+- `mergeKcalDoModelo` aproveita o kcal do modelo pra itens fora da TACO.
+- Morango adicionado à TACO. `parseSanityItems` passou a extrair qty_g de item
+  string ("pão francês (55 g)").
+- **Resiliência 502:** retry do sanity 2→3; e se o Groq cair, fallback que
+  computa o total pela descrição e devolve 200 degradado (feedback genérico) em
+  vez de "instabilidade".
+
+Verificado ao vivo: refeição do jhonatan → 200, 6 itens, **271 kcal**, pão
+francês presente (era 121). Total agora independe do modelo. Testes: 324 (com 16
+novos em sanityMathTaco.test.ts). Limite conhecido: item fora da TACO sem kcal
+do modelo fica sem kcal (contribui 0) — pequeno; ampliar a TACO resolve caso a
+caso. Foto/descrição livre ainda dependem do modelo (é o épico IA robusta).
+
 ### Sanity check subestimava kcal (2026-08-27, noite)
 
 Jhonatan registrou café da manhã (90g banana, 55g pão francês, morango, granola,
