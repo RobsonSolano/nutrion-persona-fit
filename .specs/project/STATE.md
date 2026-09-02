@@ -2,6 +2,84 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Sanity check: total determinístico (2026-09-02)
+
+Continuação do 121-vs-290. O fix só-de-prompt (mandar o modelo calcular) NÃO
+resolveu: testando 6x ao vivo (harness que cria/apaga user temp + insere sub
+premium), o modelo **omitia itens** (largava o pão francês, o de 165 kcal) e
+variava formato (objeto vs string) — é confiabilidade de modelo, o épico "IA
+robusta". Solução robusta e determinística, toda **server-side (fn:deploy, sem
+OTA)**:
+
+- **Itens vêm da DESCRIÇÃO, não do modelo.** `parseDescricao` (sanityMath.ts)
+  extrai "N g|ml de <alimento>" — lista TODOS os itens de forma determinística
+  quando o coach digita a gramagem. Vence o modelo quando tem mais itens;
+  descrição livre/foto → cai no modelo (sem regressão).
+- **kcal por código:** `matchReferencia` + `enrichWithReferencia` casam o item
+  com a TACO e calculam kcal = tabela × gramas / 100. Fim do "cálculo de cabeça".
+- `mergeKcalDoModelo` aproveita o kcal do modelo pra itens fora da TACO.
+- Morango adicionado à TACO. `parseSanityItems` passou a extrair qty_g de item
+  string ("pão francês (55 g)").
+- **Resiliência 502:** retry do sanity 2→3; e se o Groq cair, fallback que
+  computa o total pela descrição e devolve 200 degradado (feedback genérico) em
+  vez de "instabilidade".
+
+Verificado ao vivo: refeição do jhonatan → 200, 6 itens, **271 kcal**, pão
+francês presente (era 121). Total agora independe do modelo. Testes: 324 (com 16
+novos em sanityMathTaco.test.ts). Limite conhecido: item fora da TACO sem kcal
+do modelo fica sem kcal (contribui 0) — pequeno; ampliar a TACO resolve caso a
+caso. Foto/descrição livre ainda dependem do modelo (é o épico IA robusta).
+
+### Sanity check subestimava kcal (2026-08-27, noite)
+
+Jhonatan registrou café da manhã (90g banana, 55g pão francês, morango, granola,
+aveia, chia, mel, café) e a IA deu **121 kcal** — o real é ~**290** (só o pão de
+55g já dá ~165). Causa: o prompt do `chat-ai` (SANITY_PERSONA_PROMPT) pedia kcal
+por item mas só dizia "estime" — o modelo chutava baixo mesmo tendo qty_g E a
+referência TACO (que tem banana=98, pão francês=300, aveia=394, mel=309 por 100g).
+O `sanityMath` soma os itens em código certinho, mas soma lixo se o kcal/item vier
+chutado. Fix: instrução de CÁLCULO OBRIGATÓRIO no prompt — `kcal = round(kcal_100g
+× qty_g / 100)` com exemplos (pão 55g→165, banana 90g→88). **Server-side: fn:deploy
+do chat-ai, sem OTA** (cliente não muda). Se ainda ficar impreciso, próximo passo é
+recalcular kcal em código a partir de qty_g × match na TACO (determinístico), em vez
+de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (parado até
+faturamento) — isto é ajuste cirúrgico de prompt.
+
+
+### Professor edita metas do aluno (2026-08-27)
+
+Lápis na card "Metas atuais" (aba Plano do coach) → popup com calorias,
+proteína e água preenchidas. Gate: cliente mostra cadeado+upsell pro coach
+free; servidor (coach-update-student) rejeita 402 quando um campo de meta
+MUDA e o coach não é pro/premium — só na mudança de fato, pra não travar o
+free editando nome/peso pelo mesmo endpoint. Verificado ponta a ponta.
+
+**Só existem 3 metas** no modelo: daily_calorie_goal, protein_goal_g,
+water_goal_ml. NÃO há meta de gordura (fats_g é por refeição no food_logs).
+Carboidrato também não existia; criei a coluna `carbs_goal_g` (nullable) +
+allowlist + patch como terreno, mas SEM UI a pedido do dev ("editar o que
+tem"). Ligar carbo = 1 campo no popup + 1 linha na card + display no
+lado do aluno (home/perfil), sem migração nova.
+
+Gate = `ai_coach` (pro OU premium). OTA publicado (runtime 1.4.0).
+
+### Cadastro de aluno: sucesso parcial tratado (2026-08-27, noite)
+
+Desdobramento do incidente do 502: o cadastro é multi-passo (criar aluno → gerar
+plano/aplicar treinos → enviar e-mail). Se um passo POSTERIOR à criação falhava,
+o coach via "Instabilidade" genérico e recadastrava → batia em "e-mail já
+cadastrado" (o aluno já existia). Agora `aluno-novo.tsx` trata os 3 pontos com
+mensagem de sucesso parcial (`type: warning`):
+- Gerar plano/aplicar treinos falha → "Aluno cadastrado — plano pendente. Abra o
+  aluno e gere o plano" + volta pra lista (via `createdStudentId` local, porque o
+  state `studentId` ainda não atualizou no closure do catch).
+- Salvar plano falha → "Aluno cadastrado — plano não salvo".
+- Enviar e-mail falha → "Aluno cadastrado — e-mail não enviado" + mostra e-mail e
+  senha pro coach enviar manualmente.
+Sabrina (aluna do reginaldo) teve as metas populadas manualmente via SQL com a
+fórmula `computeBaselineGoals` (1560 kcal / 137g), já que a IA 502-ou; treinos o
+reginaldo vincula depois.
+
 ### CAUSA RAIZ REAL do 500 do reginaldo: ano de nascimento inválido (2026-08-27, noite)
 
 **Correção da entrada anterior:** a hipótese "leftover `.coms` no auth.users" estava

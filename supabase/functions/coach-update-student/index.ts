@@ -9,6 +9,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -43,6 +44,7 @@ type Body = {
     water_goal_ml?: number | null;
     daily_calorie_goal?: number | null;
     protein_goal_g?: number | null;
+    carbs_goal_g?: number | null;
     allergies?: string | null;
     physical_limitations?: string | null;
     has_disability?: boolean | null;
@@ -67,6 +69,7 @@ const ALLOWED_KEYS = new Set<keyof Body['patch']>([
   'water_goal_ml',
   'daily_calorie_goal',
   'protein_goal_g',
+  'carbs_goal_g',
   'allergies',
   'physical_limitations',
   'has_disability',
@@ -118,7 +121,7 @@ serve(async (req: Request) => {
     // Valida que aluno existe e é do professor.
     const { data: student, error: studentErr } = await supabaseService
       .from('profiles')
-      .select('id, role, coach_id')
+      .select('id, role, coach_id, daily_calorie_goal, protein_goal_g, carbs_goal_g, water_goal_ml')
       .eq('id', body.student_id)
       .single();
     if (studentErr || !student) {
@@ -138,6 +141,26 @@ serve(async (req: Request) => {
     }
     if (Object.keys(sanitized).length === 0) {
       return json({ error: 'empty_patch', detail: 'Nada pra atualizar.' }, 400);
+    }
+
+    // Editar META (kcal/proteína/carbo/água) é recurso de professor pago.
+    // Só barra se o valor REALMENTE muda — assim o free segue editando
+    // nome/peso/etc pelo mesmo endpoint sem tropeçar (o editar.tsx manda as
+    // metas mesmo quando o coach não mexeu nelas).
+    const GOAL_KEYS = [
+      'daily_calorie_goal',
+      'protein_goal_g',
+      'carbs_goal_g',
+      'water_goal_ml',
+    ] as const;
+    const mudaMeta = GOAL_KEYS.some(
+      (k) => k in sanitized && sanitized[k] !== (student as Record<string, unknown>)[k],
+    );
+    if (mudaMeta) {
+      const ent = await getEntitlement(supabaseAuth);
+      if (!ent.ai_coach) {
+        return needsUpgrade('coach_edit_goals', CORS);
+      }
     }
 
     const { data: updated, error: updateErr } = await supabaseService

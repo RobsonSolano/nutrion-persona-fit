@@ -60,7 +60,15 @@ export default function ExercisePickerModal({
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [search, setSearch] = useState('');
   const groupsQ = useExerciseGroups();
-  const exercisesQ = useExercisesByGroup(groupId, modality);
+  // Cardio é cross-modalidade na montagem manual: mostra o grupo inteiro
+  // (esteira, bike, corrida, protocolos) independente da modalidade da rotina.
+  const selectedSlug =
+    (groupsQ.data ?? []).find((g) => g.id === groupId)?.slug ?? null;
+  const exercisesQ = useExercisesByGroup(
+    groupId,
+    modality,
+    selectedSlug === 'cardio',
+  );
 
   // Sempre que o modal abre, sincroniza o grupo com o preferido do form
   // e limpa a busca anterior — evita confusão de estado antigo.

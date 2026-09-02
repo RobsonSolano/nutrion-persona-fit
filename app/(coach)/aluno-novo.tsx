@@ -184,19 +184,27 @@ export default function AlunoNovo() {
     birthYear.trim().length > 0 &&
     !isValidBirthYear(Number(birthYear), currentYear);
 
-  const canSubmitForm =
-    isValidEmail(email) &&
-    !birthYearInvalid &&
-    password.length >= 8 &&
-    fullName.trim().length >= 2 &&
-    sex !== null &&
-    weight.length > 0 &&
-    height.length > 0 &&
-    goalType !== null &&
-    sports.length > 0 &&
-    frequency !== null &&
-    isDisabilityValid(disability) &&
-    (!isTemplatesMode || selectedTemplateIds.length > 0);
+  // Fonte única do que trava o cadastro: alimenta o `disabled` do botão E a
+  // linha vermelha "Preencha os campos: ..." acima dele. Sem essa lista o coach
+  // via só o botão cinza e não sabia qual campo faltava — no modo template a
+  // intuição é que selecionar o template basta, mas a biometria é obrigatória
+  // pras metas.
+  const missingFields: string[] = [];
+  if (fullName.trim().length < 2) missingFields.push('nome');
+  if (!isValidEmail(email)) missingFields.push('e-mail');
+  if (password.length < 8) missingFields.push('senha');
+  if (sex === null) missingFields.push('sexo');
+  if (birthYearInvalid) missingFields.push('ano de nascimento');
+  if (weight.length === 0) missingFields.push('peso');
+  if (height.length === 0) missingFields.push('altura');
+  if (goalType === null) missingFields.push('objetivo');
+  if (sports.length === 0) missingFields.push('modalidade');
+  if (frequency === null) missingFields.push('frequência');
+  if (!isDisabilityValid(disability)) missingFields.push('deficiência');
+  if (isTemplatesMode && selectedTemplateIds.length === 0)
+    missingFields.push('templates');
+
+  const canSubmitForm = missingFields.length === 0;
 
   async function handleCreateAndGenerate() {
     if (!canSubmitForm) return;
@@ -213,6 +221,10 @@ export default function AlunoNovo() {
       return;
     }
     setPhase('generating');
+    // Rastreia se o aluno já foi criado: se um passo POSTERIOR (gerar plano,
+    // aplicar treinos) falhar, o aluno existe e não pode virar "Instabilidade"
+    // genérico — senão o coach recadastra e bate em "e-mail já cadastrado".
+    let createdStudentId: string | null = null;
     try {
       // 1. Cria a conta + ficha completa
       const { student } = await createMutation.mutateAsync({
@@ -236,6 +248,7 @@ export default function AlunoNovo() {
         disability_notes: disability.notes.trim() || null,
         bio: bio.trim() || null,
       });
+      createdStudentId = student.id;
       setStudentId(student.id);
       setStudentPassword(password);
 
@@ -291,6 +304,18 @@ export default function AlunoNovo() {
       // Gating do billing-core: 402 (student_limit ou coach_generate_plan) → paywall.
       if (handleNeedsUpgrade(err)) return;
       captureError(err, { feature: 'coach_create_student' });
+      // Sucesso parcial: aluno criado, mas gerar plano/aplicar treinos falhou.
+      // Manda pra lista pra gerar o plano na tela do aluno (não recadastrar).
+      if (createdStudentId) {
+        alert.showAlert({
+          title: 'Aluno cadastrado — plano pendente',
+          message:
+            'O aluno foi criado, mas não conseguimos montar o plano agora. Abra o aluno na sua lista e gere o plano (e aplique os treinos).',
+          type: 'warning',
+          onConfirm: () => router.back(),
+        });
+        return;
+      }
       alert.showError(err);
     }
   }
@@ -327,7 +352,13 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_save_plan' });
       setPhase('preview');
-      alert.showError(err);
+      // Aluno já existe (handleSave só roda com studentId): sucesso parcial.
+      alert.showAlert({
+        title: 'Aluno cadastrado — plano não salvo',
+        message:
+          'O aluno foi criado, mas o plano não foi salvo. Tente salvar de novo; se persistir, abra o aluno na sua lista e gere o plano por lá.',
+        type: 'warning',
+      });
     }
   }
 
@@ -346,7 +377,15 @@ export default function AlunoNovo() {
         onConfirm: () => router.back(),
       });
     } catch (err) {
-      alert.showError(err);
+      captureError(err, { feature: 'coach_send_credentials' });
+      // Aluno já criado: e-mail é o último passo. Mostra os dados pro coach
+      // enviar manualmente em vez de "Instabilidade".
+      alert.showAlert({
+        title: 'Aluno cadastrado — e-mail não enviado',
+        message: `O aluno foi criado com sucesso, mas não conseguimos enviar o e-mail. Envie os dados de acesso manualmente:\n\nE-mail: ${email.trim().toLowerCase()}\nSenha: ${studentPassword}`,
+        type: 'warning',
+        onConfirm: () => router.back(),
+      });
     }
   }
 
@@ -655,6 +694,12 @@ export default function AlunoNovo() {
               description="No plano free você cadastra o aluno aplicando seus templates de treino. Pra IA montar treino e metas automaticamente, assine. Toque pra ver os planos."
             />
           ) : null}
+
+          {!canSubmitForm && (
+            <Text className="text-danger text-xs text-center leading-relaxed px-2">
+              Preencha os campos: {missingFields.join(', ')}.
+            </Text>
+          )}
 
           <Button
             label={

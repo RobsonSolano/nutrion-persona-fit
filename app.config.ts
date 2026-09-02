@@ -96,14 +96,11 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [
-        'Professor no plano free agora cadastra aluno aplicando seus templates de treino',
-      ],
-      melhorias: [
-        'Análise de refeição por foto mais estável',
-      ],
+      novidades: [],
+      melhorias: [],
       ajustes: [
-        'Treino aplicado por template aparece na hora no plano do aluno',
+        'No cadastro de aluno, quando o botão de cadastrar fica travado, ele mostra em vermelho quais campos obrigatórios ainda faltam preencher',
+        'Botões inativos agora aparecem em cinza — antes o botão desabilitado ainda parecia clicável',
       ],
     },
   },

@@ -216,6 +216,7 @@ export type UpdateStudentPatch = Partial<{
   water_goal_ml: number | null;
   daily_calorie_goal: number | null;
   protein_goal_g: number | null;
+  carbs_goal_g: number | null;
   allergies: string | null;
   physical_limitations: string | null;
   has_disability: boolean | null;
