@@ -2,6 +2,21 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Sanity check subestimava kcal (2026-08-27, noite)
+
+Jhonatan registrou café da manhã (90g banana, 55g pão francês, morango, granola,
+aveia, chia, mel, café) e a IA deu **121 kcal** — o real é ~**290** (só o pão de
+55g já dá ~165). Causa: o prompt do `chat-ai` (SANITY_PERSONA_PROMPT) pedia kcal
+por item mas só dizia "estime" — o modelo chutava baixo mesmo tendo qty_g E a
+referência TACO (que tem banana=98, pão francês=300, aveia=394, mel=309 por 100g).
+O `sanityMath` soma os itens em código certinho, mas soma lixo se o kcal/item vier
+chutado. Fix: instrução de CÁLCULO OBRIGATÓRIO no prompt — `kcal = round(kcal_100g
+× qty_g / 100)` com exemplos (pão 55g→165, banana 90g→88). **Server-side: fn:deploy
+do chat-ai, sem OTA** (cliente não muda). Se ainda ficar impreciso, próximo passo é
+recalcular kcal em código a partir de qty_g × match na TACO (determinístico), em vez
+de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (parado até
+faturamento) — isto é ajuste cirúrgico de prompt.
+
 
 ### Professor edita metas do aluno (2026-08-27)
 
