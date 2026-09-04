@@ -96,12 +96,11 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [],
-      melhorias: [],
-      ajustes: [
-        'No cadastro de aluno, quando o botão de cadastrar fica travado, ele mostra em vermelho quais campos obrigatórios ainda faltam preencher',
-        'Botões inativos agora aparecem em cinza — antes o botão desabilitado ainda parecia clicável',
+      novidades: [
+        '🎁 Obrigado por testar o Persona Fit! Quem participou do período de testes ganhou 90 dias de assinatura — aproveite à vontade.',
       ],
+      melhorias: [],
+      ajustes: [],
     },
   },
 };
