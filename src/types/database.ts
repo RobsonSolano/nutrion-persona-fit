@@ -132,6 +132,10 @@ export type ExerciseGroup = {
  *  distância/RPM/tempo. */
 export type MetricType = 'strength' | 'cardio';
 
+/** Papel do exercício numa série conjunta (bi-set). O principal é o primeiro
+ *  do par; o conjunto é emendado logo depois, sem descanso entre eles. */
+export type PairRole = 'principal' | 'conjunto';
+
 export type Modality =
   | 'musculacao'
   | 'calistenia'
@@ -166,6 +170,9 @@ export type Exercise = {
    *  segurança também sai dos planos de quem declara restrição, porque o
    *  filtro do gerador é `eq.false` e `null = false` não é verdadeiro. */
   requires_lower_limbs: boolean | null;
+  /** Descrição breve (2-3 linhas): como executar e o erro comum. Exibida no
+   *  olhinho. Null = cai no texto genérico do modal. */
+  description: string | null;
 };
 
 export type WaterLog = {
@@ -224,6 +231,10 @@ export type TemplateExercise = {
   distance_max_m: number | null;
   /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
   cadence_rpm: number | null;
+  /** Liga as duas linhas de uma série conjunta. Null = exercício solto. */
+  pair_key: string | null;
+  /** principal ou conjunto. Sempre null junto com pair_key. */
+  pair_role: PairRole | null;
   notes: string | null;
 };
 
@@ -264,6 +275,10 @@ export type RoutineExercise = {
   distance_max_m: number | null;
   /** Só em cardio. Bike, elíptico e remo usam; esteira e corrida não. */
   cadence_rpm: number | null;
+  /** Liga as duas linhas de uma série conjunta. Null = exercício solto. */
+  pair_key: string | null;
+  /** principal ou conjunto. Sempre null junto com pair_key. */
+  pair_role: PairRole | null;
   notes: string | null;
 };
 

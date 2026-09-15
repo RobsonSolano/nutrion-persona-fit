@@ -8,14 +8,9 @@ import {
   View,
   type TextInput,
 } from 'react-native';
-import { Plus, Trash2, Save, CirclePlay } from 'lucide-react-native';
-import { openExerciseVideo } from '@/lib/youtube';
+import { Plus, Trash2, Save, Link2, Link2Off } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import {
-  useExerciseGroups,
-  useExerciseImagesMap,
-  useExerciseVideoMap,
-} from '@/hooks/useExercises';
+import { useCatalogoMaps, useExerciseGroups } from '@/hooks/useExercises';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
@@ -26,6 +21,13 @@ import {
   minutosParaHoraMin,
   validateCardioMetrics,
 } from '@/lib/cardioMetrics';
+import { TEXTO_SERIE_CONJUNTA, type CardConjunto } from '@/lib/conjuntos';
+import { novoIdLocal } from '@/lib/idLocal';
+import {
+  montarCardsExibiveis,
+  type ExercicioExibivelDe,
+  type PreviewConjunto,
+} from '@/lib/exercicioCard';
 import {
   MODALITY_LABELS,
   type Exercise,
@@ -36,6 +38,8 @@ import {
 import ExercisePickerModal from './ExercisePickerModal';
 import ExerciseImagesModal from './ExerciseImagesModal';
 import PreviewEyeButton from './PreviewEyeButton';
+import SerieConjuntaBadge from './SerieConjuntaBadge';
+import VideoPlayButton from './VideoPlayButton';
 
 type Draft = RoutineExerciseInsert & { localId: string };
 
@@ -64,10 +68,6 @@ type Props = {
   }) => void | Promise<void>;
 };
 
-function uid() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function toInt(v: string): number | null {
   if (v.trim() === '') return null;
   const n = Math.round(Number(v.replace(',', '.')));
@@ -83,8 +83,7 @@ function toNum(v: string): number | null {
 export default function RoutineEditor(props: Props) {
   const kbHeight = useKeyboardHeight();
   const groupsQ = useExerciseGroups();
-  const imagesMap = useExerciseImagesMap();
-  const videoMap = useExerciseVideoMap();
+  const catalogo = useCatalogoMaps();
 
   const [name, setName] = useState(props.initialName ?? '');
   const [description, setDescription] = useState(props.initialDescription ?? '');
@@ -95,17 +94,27 @@ export default function RoutineEditor(props: Props) {
     props.initialGroupId ?? null,
   );
   const [drafts, setDrafts] = useState<Draft[]>(
-    (props.initialExercises ?? []).map((e) => ({ ...e, localId: uid() })),
+    (props.initialExercises ?? []).map((e) => ({ ...e, localId: novoIdLocal() })),
   );
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    name: string;
-    equipment: string | null;
-    images: string[];
-    video: string | null;
+  /**
+   * Estado único do picker: null = fechado. `conjuntoDe` guarda o localId do
+   * principal quando o picker foi aberto por "Adicionar conjunto".
+   *
+   * Um estado só, e não `pickerOpen` + `pedindoConjuntoDe`: os dois mudavam
+   * sempre juntos e cada ponto de abertura precisava lembrar de limpar o outro
+   * — invariante que o "Adicionar exercício" avulso já tinha esquecido.
+   */
+  const [picker, setPicker] = useState<{ conjuntoDe: string | null } | null>(
+    null,
+  );
+  /** Foco no campo Séries do recém-adicionado. `aoFim` evita rolar a tela até o
+   *  rodapé quando o exercício entrou no meio da lista (caso do conjunto). */
+  const [pendingFocus, setPendingFocus] = useState<{
+    localId: string;
+    aoFim: boolean;
   } | null>(null);
+  const [preview, setPreview] = useState<PreviewConjunto | null>(null);
   const alert = useAlert();
   const scrollRef = useRef<ScrollView>(null);
   const seriesRefs = useRef<Map<string, TextInput>>(new Map());
@@ -122,51 +131,94 @@ export default function RoutineEditor(props: Props) {
   );
 
   function handleAddExercise(ex: Exercise) {
-    const localId = uid();
+    const localId = novoIdLocal();
     // O tipo vem do grupo do EXERCÍCIO escolhido, não do grupo da rotina: o
     // picker permite pegar de outro grupo, e uma rotina de musculação com
     // esteira no fim é caso comum.
     const grupoDoExercicio =
       groupsQ.data?.find((g) => g.id === ex.group_id) ?? null;
-    setDrafts((prev) => [
-      ...prev,
-      {
-        localId,
-        exercise_id: ex.id,
-        exercise_name: ex.name,
-        equipment: ex.equipment,
-        sort_order: prev.length,
-        sets: null,
-        reps_min: null,
-        reps_max: null,
-        weight_min_kg: null,
-        weight_max_kg: null,
-        duration_min: null,
-        metric_type: metricTypeFromGroup(grupoDoExercicio?.slug),
-        distance_min_m: null,
-        distance_max_m: null,
-        cadence_rpm: null,
-        notes: null,
-      },
-    ]);
-    setPendingFocusId(localId);
+    const novo: Draft = {
+      localId,
+      exercise_id: ex.id,
+      exercise_name: ex.name,
+      equipment: ex.equipment,
+      sort_order: 0, // reatribuído pela posição no array em handleSubmit
+      sets: null,
+      reps_min: null,
+      reps_max: null,
+      weight_min_kg: null,
+      weight_max_kg: null,
+      duration_min: null,
+      metric_type: metricTypeFromGroup(grupoDoExercicio?.slug),
+      distance_min_m: null,
+      distance_max_m: null,
+      cadence_rpm: null,
+      pair_key: null,
+      pair_role: null,
+      notes: null,
+    };
+
+    const conjuntoDe = picker?.conjuntoDe ?? null;
+
+    setDrafts((prev) => {
+      // Fluxo normal: exercício novo vai pro fim da lista.
+      if (!conjuntoDe) return [...prev, novo];
+
+      // CONJ-05: veio de "Adicionar conjunto" — entra NO card que pediu, logo
+      // depois do principal, compartilhando a chave do par.
+      const idx = prev.findIndex((d) => d.localId === conjuntoDe);
+      if (idx === -1) return [...prev, novo];
+
+      const principal = prev[idx];
+      const chave = principal.pair_key ?? novoIdLocal();
+      const out = [...prev];
+      out[idx] = { ...principal, pair_key: chave, pair_role: 'principal' };
+      out.splice(idx + 1, 0, {
+        ...novo,
+        pair_key: chave,
+        pair_role: 'conjunto',
+      });
+      return out;
+    });
+
+    setPendingFocus({ localId, aoFim: !conjuntoDe });
     void Haptics.selectionAsync();
-    setPickerOpen(false);
+    setPicker(null);
   }
 
-  // Quando o exercício recém adicionado monta, rola até o fim e foca o input de Séries.
+  /** CONJ-05: abre o picker sabendo que o escolhido vira conjunto deste card. */
+  function handleAddConjunto(principalLocalId: string) {
+    setPicker({ conjuntoDe: principalLocalId });
+  }
+
+  // Quando o exercício recém adicionado monta, foca o input de Séries. Só rola
+  // até o fim quando ele FOI pro fim: um conjunto entra no meio da lista, e
+  // arrastar a tela pro rodapé nesse caso tira o card de vista.
   useEffect(() => {
-    if (!pendingFocusId) return;
+    if (!pendingFocus) return;
     const t = setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-      seriesRefs.current.get(pendingFocusId)?.focus();
-      setPendingFocusId(null);
+      if (pendingFocus.aoFim) scrollRef.current?.scrollToEnd({ animated: true });
+      seriesRefs.current.get(pendingFocus.localId)?.focus();
+      setPendingFocus(null);
     }, 120);
     return () => clearTimeout(t);
-  }, [pendingFocusId]);
+  }, [pendingFocus]);
 
   function handleRemoveExercise(localId: string) {
-    setDrafts((prev) => prev.filter((d) => d.localId !== localId));
+    setDrafts((prev) => {
+      const alvo = prev.find((d) => d.localId === localId);
+      const restante = prev.filter((d) => d.localId !== localId);
+      if (!alvo?.pair_key) return restante;
+
+      // A irmã ficou sozinha, então volta a ser exercício solto. Cobre os dois
+      // casos: remover o conjunto (CONJ-06, o principal continua) e remover o
+      // principal (CONJ-07, o conjunto é promovido em vez de sumir junto).
+      return restante.map((d) =>
+        d.pair_key === alvo.pair_key
+          ? { ...d, pair_key: null, pair_role: null }
+          : d,
+      );
+    });
     seriesRefs.current.delete(localId);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -225,6 +277,10 @@ export default function RoutineEditor(props: Props) {
       weight_min_kg: d.weight_min_kg,
       weight_max_kg: d.weight_max_kg,
       duration_min: d.duration_min,
+      // CONJ-09: o conjunto fica logo depois do principal no array, então o
+      // sort_order sequencial acima já os deixa adjacentes no banco.
+      pair_key: d.pair_key,
+      pair_role: d.pair_role,
       notes: d.notes,
     }));
     try {
@@ -309,7 +365,7 @@ export default function RoutineEditor(props: Props) {
             Exercícios ({drafts.length})
           </Text>
           <Pressable
-            onPress={() => setPickerOpen(true)}
+            onPress={() => setPicker({ conjuntoDe: null })}
             hitSlop={8}
             className="flex-row items-center gap-1.5 rounded-full bg-accent/10 border border-accent/40 px-3 py-1 active:opacity-70"
           >
@@ -326,39 +382,21 @@ export default function RoutineEditor(props: Props) {
           </Text>
         ) : (
           <View className="gap-3">
-            {drafts.map((d, i) => {
-              const imgs = d.exercise_id
-                ? imagesMap.get(d.exercise_id) ?? null
-                : null;
-              return (
-                <ExerciseDraftRow
-                  key={d.localId}
-                  draft={d}
-                  index={i}
-                  imageUrls={imgs}
-                  videoUrl={
-                    d.exercise_id ? videoMap.get(d.exercise_id) ?? null : null
-                  }
-                  onChange={(patch) => updateDraft(d.localId, patch)}
-                  onRemove={() => handleRemoveExercise(d.localId)}
-                  onPreview={() => {
-                    if (!imgs) return;
-                    setPreview({
-                      name: d.exercise_name,
-                      equipment: d.equipment,
-                      images: imgs,
-                      video: d.exercise_id
-                        ? videoMap.get(d.exercise_id) ?? null
-                        : null,
-                    });
-                  }}
-                  setsRef={(el) => {
-                    if (el) seriesRefs.current.set(d.localId, el);
-                    else seriesRefs.current.delete(d.localId);
-                  }}
-                />
-              );
-            })}
+            {montarCardsExibiveis(drafts, catalogo).map((card, i) => (
+              <ExerciseDraftCard
+                key={card.principal.exercise.localId}
+                card={card}
+                index={i}
+                onChange={updateDraft}
+                onRemove={handleRemoveExercise}
+                onAddConjunto={handleAddConjunto}
+                onPreview={setPreview}
+                setsRef={(localId, el) => {
+                  if (el) seriesRefs.current.set(localId, el);
+                  else seriesRefs.current.delete(localId);
+                }}
+              />
+            ))}
           </View>
         )}
       </Card>
@@ -371,22 +409,15 @@ export default function RoutineEditor(props: Props) {
       />
 
       <ExercisePickerModal
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        visible={picker !== null}
+        onClose={() => setPicker(null)}
         modality={modality}
         preferredGroupId={groupId}
         addedExerciseIds={addedExerciseIds}
         onSelect={handleAddExercise}
       />
 
-      <ExerciseImagesModal
-        visible={!!preview}
-        onClose={() => setPreview(null)}
-        exerciseName={preview?.name ?? ''}
-        equipment={preview?.equipment}
-        imageUrls={preview?.images ?? []}
-        videoUrl={preview?.video ?? null}
-      />
+      <ExerciseImagesModal onClose={() => setPreview(null)} preview={preview} />
     </ScrollView>
   );
 }
@@ -485,32 +516,119 @@ function GroupPicker({
   );
 }
 
-function ExerciseDraftRow({
-  draft,
+/**
+ * Card de exercício no editor — CONJ-05/06/07/10.
+ *
+ * Um card é um exercício solto OU uma série conjunta (principal + conjunto).
+ * Cada exercício do par mantém a prescrição própria: séries, reps e carga são
+ * por exercício, não do par.
+ */
+function ExerciseDraftCard({
+  card,
   index,
-  imageUrls,
-  videoUrl,
+  onChange,
+  onRemove,
+  onAddConjunto,
+  onPreview,
+  setsRef,
+}: {
+  card: CardConjunto<ExercicioExibivelDe<Draft>>;
+  index: number;
+  onChange: (localId: string, patch: Partial<Draft>) => void;
+  onRemove: (localId: string) => void;
+  onAddConjunto: (principalLocalId: string) => void;
+  onPreview: (preview: PreviewConjunto) => void;
+  setsRef: (localId: string, el: TextInput | null) => void;
+}) {
+  const { principal, conjunto } = card;
+  const abrirPreview = () => onPreview(card);
+
+  return (
+    <View className="rounded-2xl border border-border bg-surface-muted p-3">
+      {/* Cabeçalho próprio só quando há par: no card solto o #N fica colado no
+          nome, como sempre foi — uma linha a mais custa densidade na lista. */}
+      {conjunto && (
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-text-muted text-[10px]">#{index + 1}</Text>
+          <SerieConjuntaBadge />
+        </View>
+      )}
+
+      <BlocoExercicioDraft
+        numero={conjunto ? null : index + 1}
+        item={principal}
+        onChange={(patch) => onChange(principal.exercise.localId, patch)}
+        onRemove={() => onRemove(principal.exercise.localId)}
+        onPreview={abrirPreview}
+        setsRef={(el) => setsRef(principal.exercise.localId, el)}
+      />
+
+      {conjunto && (
+        <>
+          <View className="flex-row items-center gap-2 my-3">
+            <View className="h-px flex-1 bg-border" />
+            <Text className="text-accent text-[10px] font-semibold">+</Text>
+            <View className="h-px flex-1 bg-border" />
+          </View>
+
+          <BlocoExercicioDraft
+            item={conjunto}
+            onChange={(patch) => onChange(conjunto.exercise.localId, patch)}
+            onRemove={() => onRemove(conjunto.exercise.localId)}
+            onPreview={abrirPreview}
+            setsRef={(el) => setsRef(conjunto.exercise.localId, el)}
+          />
+
+          <Text className="text-text-muted text-[11px] leading-relaxed mt-3">
+            {TEXTO_SERIE_CONJUNTA}
+          </Text>
+        </>
+      )}
+
+      {/* CONJ-05: só exercício solto oferece formar par — o máximo é 1 + 1. */}
+      {!conjunto && (
+        <Pressable
+          onPress={() => onAddConjunto(principal.exercise.localId)}
+          hitSlop={8}
+          className="flex-row items-center justify-center gap-1.5 mt-3 rounded-xl border border-dashed border-accent/40 py-2 active:opacity-70"
+        >
+          <Link2 size={12} color={colors.accent} />
+          <Text className="text-accent text-[11px] font-semibold">
+            Adicionar conjunto
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+/** Um exercício dentro do card: cabeçalho com ações + campos da prescrição. */
+function BlocoExercicioDraft({
+  numero,
+  item,
   onChange,
   onRemove,
   onPreview,
   setsRef,
 }: {
-  draft: Draft;
-  index: number;
-  imageUrls: string[] | null;
-  /** Vídeo salvo no catálogo. Sem ele, o play cai na busca pelo nome. */
-  videoUrl?: string | null;
+  /** #N do card. Só o exercício solto mostra — no par o número fica no topo. */
+  numero?: number | null;
+  item: ExercicioExibivelDe<Draft>;
   onChange: (patch: Partial<Draft>) => void;
   onRemove: () => void;
   onPreview: () => void;
   setsRef?: (el: TextInput | null) => void;
 }) {
-  const hasImages = !!imageUrls && imageUrls.length > 0;
+  const draft = item.exercise;
+  const hasImages = (item.imageUrls?.length ?? 0) > 0;
+
   return (
-    <View className="rounded-2xl border border-border bg-surface-muted p-3">
+    <View>
       <View className="flex-row items-center justify-between mb-2">
         <View className="flex-1 pr-2">
-          <Text className="text-text-muted text-[10px]">#{index + 1}</Text>
+          {numero != null && (
+            <Text className="text-text-muted text-[10px]">#{numero}</Text>
+          )}
           <Text className="text-text text-sm font-semibold" numberOfLines={2}>
             {draft.exercise_name}
           </Text>
@@ -521,21 +639,27 @@ function ExerciseDraftRow({
           )}
         </View>
         {hasImages && <PreviewEyeButton onPress={onPreview} marginRight />}
-        <Pressable
-          onPress={() =>
-            openExerciseVideo({ videoUrl, exerciseName: draft.exercise_name })
-          }
-          hitSlop={8}
-          className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70 mr-2"
-        >
-          <CirclePlay size={14} color={colors.danger} />
-        </Pressable>
+        <View className="mr-2">
+          <VideoPlayButton
+            videoUrl={item.videoUrl}
+            exerciseName={draft.exercise_name}
+          />
+        </View>
         <Pressable
           onPress={onRemove}
           hitSlop={8}
+          accessibilityLabel={
+            draft.pair_role === 'conjunto'
+              ? 'Remover conjunto'
+              : 'Remover exercício'
+          }
           className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
         >
-          <Trash2 size={14} color={colors.danger} />
+          {draft.pair_role === 'conjunto' ? (
+            <Link2Off size={14} color={colors.danger} />
+          ) : (
+            <Trash2 size={14} color={colors.danger} />
+          )}
         </Pressable>
       </View>
 
