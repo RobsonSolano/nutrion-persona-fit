@@ -28,9 +28,13 @@ import {
   useUpdateTemplate,
 } from '@/hooks/useTemplates';
 import {
-  useExerciseImagesMap,
-  useExerciseVideoMap,
+  useCatalogoMaps,
 } from '@/hooks/useExercises';
+import {
+  cardTemImagens,
+  montarCardsExibiveis,
+  type PreviewConjunto,
+} from '@/lib/exercicioCard';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
@@ -47,16 +51,10 @@ export default function TemplateDetailScreen() {
   const archive = useArchiveTemplate();
   const unarchive = useUnarchiveTemplate();
   const remove = useDeleteTemplate();
-  const imagesMap = useExerciseImagesMap();
-  const videoMap = useExerciseVideoMap();
+  const catalogo = useCatalogoMaps();
 
   const [editing, setEditing] = useState(false);
-  const [preview, setPreview] = useState<{
-    name: string;
-    equipment: string | null;
-    images: string[];
-    video: string | null;
-  } | null>(null);
+  const [preview, setPreview] = useState<PreviewConjunto | null>(null);
 
   if (!id) return null;
 
@@ -218,34 +216,20 @@ export default function TemplateDetailScreen() {
                   </Text>
                 ) : (
                   <View className="gap-3">
-                    {detailQ.data.exercises.map((e, i) => {
-                      const imgs = e.exercise_id
-                        ? imagesMap.get(e.exercise_id) ?? null
-                        : null;
-                      const vid = e.exercise_id
-                        ? videoMap.get(e.exercise_id) ?? null
-                        : null;
-                      return (
-                        <ExerciseReadRow
-                          key={e.id}
-                          exercise={e}
-                          index={i}
-                          imageUrls={imgs}
-                          videoUrl={vid}
-                          onPreview={
-                            imgs
-                              ? () =>
-                                  setPreview({
-                                    name: e.exercise_name,
-                                    equipment: e.equipment,
-                                    images: imgs,
-                                    video: vid,
-                                  })
-                              : undefined
-                          }
-                        />
-                      );
-                    })}
+                    {montarCardsExibiveis(
+                      detailQ.data.exercises,
+                      catalogo,
+                    ).map((card, i) => (
+                      <ExerciseReadRow
+                        key={card.principal.exercise.id}
+                        principal={card.principal}
+                        conjunto={card.conjunto}
+                        index={i}
+                        onPreview={
+                          cardTemImagens(card) ? () => setPreview(card) : undefined
+                        }
+                      />
+                    ))}
                   </View>
                 )}
               </Card>
@@ -281,12 +265,8 @@ export default function TemplateDetailScreen() {
       </Screen>
 
       <ExerciseImagesModal
-        visible={!!preview}
         onClose={() => setPreview(null)}
-        exerciseName={preview?.name ?? ''}
-        equipment={preview?.equipment}
-        imageUrls={preview?.images ?? []}
-        videoUrl={preview?.video ?? null}
+        preview={preview}
       />
     </>
   );

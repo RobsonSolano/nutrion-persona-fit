@@ -179,6 +179,20 @@ serve(async (req: Request) => {
 
         const tplExs = exercisesByTemplate.get(tpl.id) ?? [];
         if (tplExs.length > 0) {
+          // CONJ-14: a série conjunta é preservada, mas com chave NOVA por
+          // rotina. Copiar a string do template faria duas rotinas de alunos
+          // diferentes carregarem a mesma pair_key — o unique é por rotina,
+          // então não quebraria, mas a chave deixaria de identificar o par
+          // dentro do aluno e viraria armadilha em qualquer consulta futura.
+          const chavePorTemplate = new Map<string, string>();
+          const novaChave = (antiga: string) => {
+            const existente = chavePorTemplate.get(antiga);
+            if (existente) return existente;
+            const gerada = crypto.randomUUID();
+            chavePorTemplate.set(antiga, gerada);
+            return gerada;
+          };
+
           const rows = tplExs.map((ex, i) => ({
             routine_id: routine.id,
             exercise_id: ex.exercise_id,
@@ -198,6 +212,12 @@ serve(async (req: Request) => {
             distance_min_m: ex.distance_min_m ?? null,
             distance_max_m: ex.distance_max_m ?? null,
             cadence_rpm: ex.cadence_rpm ?? null,
+            // Os dois campos andam juntos: o check routine_exercises_pair_complete
+            // recusa a linha se só um vier preenchido. Uma condição só, espalhada,
+            // deixa a invariante estrutural em vez de repetida.
+            ...(ex.pair_key && ex.pair_role
+              ? { pair_key: novaChave(ex.pair_key), pair_role: ex.pair_role }
+              : { pair_key: null, pair_role: null }),
             notes: ex.notes,
           }));
           const { error: exInsErr } = await supabaseService
