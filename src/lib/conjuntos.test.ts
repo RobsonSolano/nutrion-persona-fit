@@ -166,4 +166,11 @@ describe('TEXTO_SERIE_CONJUNTA', () => {
     expect(TEXTO_SERIE_CONJUNTA).toContain('sem descanso');
     expect(TEXTO_SERIE_CONJUNTA).toContain('fim do par');
   });
+
+  it('CONJ-11: chama de bi-set, não de série conjunta', () => {
+    // O nome que professor e aluno usam é bi-set; "conjunto" tem outra
+    // conotação. O identificador interno seguiu como está, só a UI mudou.
+    expect(TEXTO_SERIE_CONJUNTA).toContain('Bi-set');
+    expect(TEXTO_SERIE_CONJUNTA).not.toContain('conjunta');
+  });
 });

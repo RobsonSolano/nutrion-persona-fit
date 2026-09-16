@@ -81,6 +81,6 @@ export function agruparConjuntos<T extends Agrupavel>(
 
 /** Orientação de execução do par. Constante única, usada no card e no olhinho. */
 export const TEXTO_SERIE_CONJUNTA =
-  'Série conjunta: faça uma série do primeiro exercício e emende direto no ' +
+  'Bi-set: faça uma série do primeiro exercício e emende direto no ' +
   'segundo, sem descanso entre eles. Descanse só no fim do par, antes de ' +
   'começar a próxima série.';
