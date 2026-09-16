@@ -594,7 +594,7 @@ function ExerciseDraftCard({
         >
           <Link2 size={12} color={colors.accent} />
           <Text className="text-accent text-[11px] font-semibold">
-            Adicionar conjunto
+            Adicionar Bi-Set
           </Text>
         </Pressable>
       )}
@@ -650,7 +650,7 @@ function BlocoExercicioDraft({
           hitSlop={8}
           accessibilityLabel={
             draft.pair_role === 'conjunto'
-              ? 'Remover conjunto'
+              ? 'Remover bi-set'
               : 'Remover exercício'
           }
           className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
