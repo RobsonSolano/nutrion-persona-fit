@@ -23,6 +23,7 @@ import DisabilityFields, {
   type DisabilityValue,
 } from '@/components/DisabilityFields';
 import { colors } from '@/lib/theme';
+import { isValidBirthYear } from '@/lib/birthYear';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useStudentDetail, useUpdateStudent } from '@/hooks/useStudents';
 import type {
@@ -185,7 +186,16 @@ function EditForm({
     );
   }
 
+  // Mesma regra do cadastro (aluno-novo): ano opcional, mas quando preenchido
+  // precisa ser ANO (1900–atual). Espelha o CHECK do banco — sem isso a idade
+  // digitada no lugar do ano (ex: "46") ia pro servidor e estourava 500.
+  const currentYear = new Date().getFullYear();
+  const birthYearInvalid =
+    birthYear.trim().length > 0 &&
+    !isValidBirthYear(Number(birthYear), currentYear);
+
   function handleSave() {
+    if (birthYearInvalid) return;
     void onSave({
       full_name: fullName.trim() || null,
       sex,
@@ -256,29 +266,37 @@ function EditForm({
               value={sex ?? ''}
               onChange={(v) => setSex(v as Sex)}
             />
+            {/* Ano ocupa a linha inteira: espremido em 3 colunas o rótulo
+                cortava e o coach digitava a IDADE no lugar do ano. */}
+            <Input
+              label="Ano de nascimento"
+              value={birthYear}
+              onChangeText={setBirthYear}
+              placeholder="Ex: 1999"
+              keyboardType="number-pad"
+              maxLength={4}
+              error={
+                birthYearInvalid
+                  ? `Use um ano entre 1900 e ${currentYear}.`
+                  : undefined
+              }
+            />
             <View className="flex-row gap-2">
               <View className="flex-1">
                 <Input
-                  value={birthYear}
-                  onChangeText={setBirthYear}
-                  placeholder="Ano nasc. (ex: 1990)"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-              </View>
-              <View className="flex-1">
-                <Input
+                  label="Peso (kg)"
                   value={weight}
                   onChangeText={setWeight}
-                  placeholder="Peso (kg)"
+                  placeholder="Ex: 70"
                   keyboardType="decimal-pad"
                 />
               </View>
               <View className="flex-1">
                 <Input
+                  label="Altura (cm)"
                   value={height}
                   onChangeText={setHeight}
-                  placeholder="Altura (cm)"
+                  placeholder="Ex: 170"
                   keyboardType="number-pad"
                 />
               </View>
@@ -399,6 +417,7 @@ function EditForm({
           <Button
             label="Salvar alterações"
             onPress={handleSave}
+            disabled={birthYearInvalid}
             loading={saving}
             size="lg"
             icon={<Save size={18} color={colors.textInverse} />}
