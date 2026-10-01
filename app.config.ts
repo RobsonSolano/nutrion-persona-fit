@@ -96,13 +96,11 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [
-        '🧭 Painel do professor agora em abas: Home, Alunos e Perfil. A lista de alunos ganhou tela própria com busca, e as configurações saíram do meio do scroll da home.',
+      novidades: [],
+      melhorias: [
+        '🔔 Lembretes voltaram a funcionar: água, treino, proteína e aviso de sequência agora chegam no horário certo. Se você não recebe notificação, ative em Perfil → Ativar notificações.',
       ],
-      melhorias: [],
-      ajustes: [
-        '📅 Ano de nascimento na edição da ficha do aluno: o campo agora ocupa a linha inteira, com rótulo visível, e avisa se o ano for inválido em vez de dar erro ao salvar.',
-      ],
+      ajustes: [],
     },
   },
 };
