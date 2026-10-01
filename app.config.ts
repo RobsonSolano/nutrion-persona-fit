@@ -97,11 +97,12 @@ const config: ExpoConfig = {
     // aparecem do update seguinte em diante.
     releaseNotes: {
       novidades: [
-        '🔗 Bi-set: o professor pode juntar dois exercícios num card só (ex: elevação lateral + elevação frontal), cada um com suas séries, repetições e carga. Serve pra quem treina em 30-40 minutos.',
-        '👁️ Todo exercício do catálogo ganhou uma descrição curta no "Como executar": como fazer o movimento e qual o erro mais comum.',
+        '🧭 Painel do professor agora em abas: Home, Alunos e Perfil. A lista de alunos ganhou tela própria com busca, e as configurações saíram do meio do scroll da home.',
       ],
       melhorias: [],
-      ajustes: [],
+      ajustes: [
+        '📅 Ano de nascimento na edição da ficha do aluno: o campo agora ocupa a linha inteira, com rótulo visível, e avisa se o ano for inválido em vez de dar erro ao salvar.',
+      ],
     },
   },
 };
