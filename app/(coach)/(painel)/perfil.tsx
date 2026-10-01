@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, Save } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import {
+  Bell,
+  BellOff,
+  Download,
+  Lock,
+  LogOut,
+  Save,
+  TrendingUp,
+} from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Button, Card, Input, Screen } from '@/components/ui';
 import AvatarPicker from '@/components/AvatarPicker';
@@ -25,6 +32,7 @@ import {
 } from '@/hooks/useCoachContact';
 import { formatPhoneBR, isValidPhone, parsePhoneInput } from '@/lib/phone';
 import { colors } from '@/lib/theme';
+import { usePushToggle } from '@/hooks/usePushToggle';
 
 export default function CoachPerfilScreen() {
   const router = useRouter();
@@ -40,6 +48,9 @@ export default function CoachPerfilScreen() {
   const [cref, setCref] = useState('');
   const [showContact, setShowContact] = useState(false);
   const [phoneRaw, setPhoneRaw] = useState('');
+
+  const push = usePushToggle();
+  const { logout } = useAuth();
 
   useEffect(() => {
     if (coachQ.data) {
@@ -83,20 +94,9 @@ export default function CoachPerfilScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ headerShown: false, animation: 'slide_from_right' }}
-      />
-      <Screen variant="hero" edges={['top', 'bottom']}>
-        <View className="flex-row items-center justify-between px-5 py-3 border-b border-border-subtle">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
-          >
-            <ArrowLeft size={18} color={colors.textDim} />
-          </Pressable>
-          <Text className="text-text font-semibold">Meu perfil</Text>
-          <View style={{ width: 40 }} />
+      <Screen variant="hero" edges={['top']}>
+        <View className="px-5 py-4 border-b border-border-subtle">
+          <Text className="text-text text-2xl font-bold">Meu perfil</Text>
         </View>
 
         {coachQ.isLoading ? (
@@ -108,7 +108,7 @@ export default function CoachPerfilScreen() {
             contentContainerStyle={{
               padding: 20,
               gap: 14,
-              paddingBottom: 60,
+              paddingBottom: 140,
             }}
             keyboardShouldPersistTaps="handled"
           >
@@ -145,7 +145,7 @@ export default function CoachPerfilScreen() {
                   style={{ minHeight: 100, textAlignVertical: 'top' }}
                 />
                 <Input
-                  label="CREF"
+                  label="CREF ou CRN"
                   value={cref}
                   onChangeText={setCref}
                   placeholder="Ex: 012345-G/SP"
@@ -213,12 +213,69 @@ export default function CoachPerfilScreen() {
 
             <SubscriptionCard />
 
+            <Button
+              label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
+              onPress={push.toggle}
+              loading={push.loading}
+              variant="ghost"
+              size="md"
+              icon={
+                push.enabled ? (
+                  <BellOff size={16} color={colors.textDim} />
+                ) : (
+                  <Bell size={16} color={colors.textDim} />
+                )
+              }
+            />
+
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <Button
+                  label="Minha evolução"
+                  onPress={() => router.push('/evolucao' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<TrendingUp size={16} color={colors.accent} />}
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Trocar senha"
+                  onPress={() => router.push('/trocar-senha' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<Lock size={16} color={colors.textDim} />}
+                />
+              </View>
+            </View>
+
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <Button
+                  label="Exportar dados"
+                  onPress={() => router.push('/exportar-dados' as Href)}
+                  variant="ghost"
+                  size="md"
+                  icon={<Download size={16} color={colors.textDim} />}
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Sair"
+                  onPress={() => void logout()}
+                  variant="ghost"
+                  size="md"
+                  icon={<LogOut size={16} color={colors.textDim} />}
+                />
+              </View>
+            </View>
+
             <DangerZone
               blockedReason={
                 studentCount > 0
                   ? {
                       studentCount,
-                      seeStudentsHref: '/(coach)' as Href,
+                      seeStudentsHref: '/(coach)/alunos' as Href,
                     }
                   : null
               }
