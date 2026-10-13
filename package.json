@@ -17,6 +17,8 @@
     "seed:test-users": "node --env-file=.env.local scripts/seed-test-users.mjs",
     "audit:exercise-images": "node --env-file=.env.local scripts/audit-exercise-images.mjs",
     "audit:ai-usage": "node --env-file=.env.local scripts/audit-ai-usage.mjs",
+    "gerar:descricoes": "node --env-file=.env.local scripts/gerar-descricoes-exercicios.mjs",
+    "gerar:seed-descricoes": "node scripts/gerar-seed-descricoes.mjs",
     "update:preview": "eas update --branch preview --message",
     "update:production": "eas update --branch production --message",
     "test:e2e": "node --env-file=.env.local scripts/e2e/runner.mjs",

@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
-import { registerForPushNotifications } from '@/services/pushNotifications';
+import {
+  hasPushPermission,
+  registerForPushNotifications,
+} from '@/services/pushNotifications';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from './useAuth';
 import { useProfile } from './useProfile';
@@ -38,7 +41,24 @@ export function useAutoRequestPushPermission() {
     triedThisSessionRef.current = true;
 
     void (async () => {
-      // Cooldown — se já pediu recentemente, espera
+      // Permissão já concedida e token ausente: re-registra DIRETO, sem passar
+      // pelo cooldown. Nenhum prompt aparece nesse caminho — o cooldown existe
+      // pra não ficar perguntando a quem recusou, não pra impedir que o app
+      // recupere um token que ele mesmo apagou no logout.
+      //
+      // Era por aqui que a base vazava: 25 dos 47 perfis estavam sem token em
+      // 2026-10-01, a maioria com onboarding concluído. Quem aceitou um dia,
+      // saiu da conta e voltou dentro de 7 dias ficava mudo sem motivo.
+      if (await hasPushPermission()) {
+        const r = await registerForPushNotifications();
+        if (r.ok && user.id) {
+          await qc.invalidateQueries({ queryKey: queryKeys.profile(user.id) });
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        }
+        return;
+      }
+
+      // Daqui pra baixo o prompt do SO VAI aparecer — aí sim respeita cooldown.
       const lastAskedRaw = await AsyncStorage.getItem(STORAGE_KEY);
       const lastAsked = lastAskedRaw ? Number(lastAskedRaw) : 0;
       const cooldownMs = COOLDOWN_DAYS_AFTER_DENY * 24 * 60 * 60 * 1000;

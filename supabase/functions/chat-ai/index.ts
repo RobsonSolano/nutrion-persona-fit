@@ -10,15 +10,18 @@ import {
   formatReferencesForPrompt,
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
-import { formatTacoForPrompt } from '../_shared/tacoReference.ts';
+import { TACO_ALIMENTOS, formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
   DEFAULT_TEXT_MODEL,
   groqFetchWithRetry,
 } from '../_shared/groqRetry.ts';
 import {
   aplicarTetoDensidade,
+  enrichWithReferencia,
   extrairJsonDoTexto,
   itemsComoTexto,
+  mergeKcalDoModelo,
+  parseDescricao,
   parseSanityItems,
   reconcileMacros,
   type SanityItem,
@@ -129,6 +132,7 @@ Diretrizes:
 - Sempre responda em português brasileiro DENTRO do campo "feedback" do JSON.
 - Use a REFERÊNCIA NUTRICIONAL fornecida abaixo como base dos números. Ela traz kcal e macros por 100 g na forma em que o alimento é servido. Para o que não estiver lá, estime por analogia com o item mais parecido dela.
 - Preencha "items" com CADA alimento do prato: name, qty_g, kcal, protein_g, carbs_g, fats_g — nunca null, nunca string, nunca vazio, mesmo que a estimativa seja aproximada. É o "items" que o app usa para calcular o total.
+- CÁLCULO OBRIGATÓRIO por item, nesta ordem: (1) estime qty_g (gramas do item na porção); (2) DERIVE os macros da REFERÊNCIA por 100 g — NUNCA chute o kcal "de cabeça": kcal = arredondar(kcal_por_100g × qty_g / 100), e o MESMO para protein_g, carbs_g e fats_g com os valores por 100 g. Exemplos: 55 g de pão francês (300 kcal/100 g) → 300 × 55 / 100 = 165 kcal; 90 g de banana (98/100 g) → 88 kcal. Alimento fora da referência: pegue o kcal/100 g do mais parecido e faça a MESMA conta. Pular a multiplicação e subestimar a porção é o erro nº 1 a evitar.
 - Preencha "macros" também, com sua melhor estimativa do total, mas ele é só um cross-check secundário: o app soma os itens e ignora "macros" sempre que "items" trouxer números. Não gaste esforço fazendo "macros" bater com a soma — priorize a precisão de cada item.
 - "feedback" deve ser empático e curto (1-2 frases) — celebre acertos, sugira ajustes sem culpar.
 - Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.
@@ -474,7 +478,7 @@ serve(async (req: Request) => {
           },
           body: requestBody,
         })
-      : await groqFetchWithRetry(GROQ_URL, GROQ_API_KEY, requestBody);
+      : await groqFetchWithRetry(GROQ_URL, GROQ_API_KEY, requestBody, 3);
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
@@ -512,6 +516,25 @@ serve(async (req: Request) => {
             },
           },
         );
+      }
+
+      // Fallback de resiliência: se o Groq caiu MAS a descrição tem gramas,
+      // computa o total no código (TACO) e devolve 200 degradado — melhor que
+      // "instabilidade" quando dá pra calcular sem a IA. Só no sanity_check.
+      if (!isChatMode) {
+        const fb = resolveSanityOutput('', body.scaleWeightG, body.message ?? '');
+        if (fb.sanity && fb.sanity.items.length > 0) {
+          await logEvent({ status: 'success', errorCode: 'sanity_fallback_groq_down' });
+          return json({
+            text: JSON.stringify({
+              ...JSON.parse(fb.text),
+              feedback:
+                'Calculei pela tabela nutricional os itens e quantidades que você informou. A análise por IA está instável agora — confira e ajuste se precisar.',
+            }),
+            sanity: fb.sanity,
+            model: modelToUse,
+          });
+        }
       }
 
       await logEvent({ status: 'error', errorCode: 'groq_api_error' });
@@ -599,7 +622,7 @@ serve(async (req: Request) => {
       nota: sanityNota,
     } = isChatMode
       ? { text: aiText, sanity: null, nota: null }
-      : resolveSanityOutput(aiText, body.scaleWeightG);
+      : resolveSanityOutput(aiText, body.scaleWeightG, body.message ?? '');
 
     const usedTokens =
       typeof groqJson?.usage?.total_tokens === 'number'
@@ -802,16 +825,36 @@ function buildEnrichedUserMessage(
 function resolveSanityOutput(
   aiText: string,
   scaleWeightG: number | undefined,
+  descricao: string,
 ): {
   text: string;
   sanity: { items: SanityItem[]; source: string } | null;
   nota: string | null;
 } {
   const bruto = extrairJsonDoTexto(aiText);
-  if (!bruto) return { text: aiText, sanity: null, nota: 'sanity_parse_failed' };
 
-  const itens = parseSanityItems(bruto.items);
-  const reconciliado = reconcileMacros(itens, bruto.macros);
+  // Itens do modelo, com kcal recalculado via referência (tabela × gramas)
+  // quando casam — o modelo subestimava fazendo a conta "de cabeça".
+  const itensModelo = enrichWithReferencia(
+    parseSanityItems(bruto?.items),
+    TACO_ALIMENTOS,
+  );
+  // Itens direto da DESCRIÇÃO ("90 g de banana, ..."): determinístico, não
+  // depende de o modelo enumerar (ele largava itens, ex: o pão francês). Onde
+  // não há linha na referência, aproveita o kcal que o modelo deu pra esse item.
+  const itensDesc = mergeKcalDoModelo(
+    enrichWithReferencia(parseDescricao(descricao), TACO_ALIMENTOS),
+    itensModelo,
+  );
+  // A descrição vence quando lista MAIS itens (coach digitou a gramagem);
+  // descrição livre/sem gramas → itensDesc vazio → fica com o modelo (ex: foto).
+  const itens = itensDesc.length > itensModelo.length ? itensDesc : itensModelo;
+
+  if (!bruto && itens.length === 0) {
+    return { text: aiText, sanity: null, nota: 'sanity_parse_failed' };
+  }
+
+  const reconciliado = reconcileMacros(itens, bruto?.macros);
 
   // INS-02: último guard-rail, depois da reconciliação. Se o total sobreviveu
   // até aqui com densidade fisicamente impossível, corrige — e escala os
@@ -823,7 +866,7 @@ function resolveSanityOutput(
 
   return {
     text: JSON.stringify({
-      ...bruto,
+      ...(bruto ?? {}),
       items: itemsComoTexto(itens),
       ...(teto.macros ? { macros: teto.macros } : {}),
     }),
@@ -858,7 +901,7 @@ function buildSanityPrompt(body: ChatRequest) {
       '2. Verifique consistência entre descrição, peso e volume visual.',
       `3. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA}`,
       '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
-      'IMPORTANTE: cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
+      'IMPORTANTE: liste TODOS os itens visíveis, sem omitir nenhum. Cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. O app RECALCULA o kcal pela sua qty_g, então acerte a gramagem de cada item; o total é somado pelo app, não por você.',
       'Responda APENAS em JSON puro, sem markdown, sem ```:',
       '{ "items":[{"name":"...","qty_g":N,"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
     ].join('\n');
@@ -869,10 +912,10 @@ function buildSanityPrompt(body: ChatRequest) {
     `Descrição da refeição: "${body.message}"`,
     weightLine,
     'Tarefas:',
-    '1. Liste os itens da refeição a partir da descrição (em "items").',
+    '1. Liste TODOS os alimentos citados na descrição — um objeto por alimento, na MESMA ordem e SEM OMITIR nenhum (nem o último, nem bebidas). Se a descrição cita N alimentos separados por vírgula, "items" tem EXATAMENTE N objetos.',
     `2. Para CADA item, estime a quantidade em GRAMAS e depois os macros DAQUELE item (kcal, proteína g, carbo g, gordura g), ${REGRA_FORMA_PREPARADA} Se faltar quantidade explícita, assuma a porção típica brasileira daquele alimento.`,
     '3. Dê feedback empático curto (1-2 frases) sobre a refeição.',
-    'IMPORTANTE: NUNCA recuse a estimativa. Cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. Estime item por item; o total é somado pelo app, não por você.',
+    'IMPORTANTE: NUNCA recuse a estimativa. Cada elemento de "items" é um OBJETO com name, qty_g, kcal, protein_g, carbs_g e fats_g — todos numéricos, nunca null, nunca string, nunca vazio. O app RECALCULA o kcal a partir da sua qty_g, então o mais importante é acertar a gramagem de CADA item e não deixar nenhum de fora — o total é somado pelo app, não por você.',
     'Use "consistency":"ok" (não há foto pra divergir).',
     'Responda APENAS em JSON puro, sem markdown, sem ```:',
     '{ "items":[{"name":"...","qty_g":N,"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}], "consistency":"ok", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',

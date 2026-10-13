@@ -72,6 +72,26 @@ export type RegisterResult =
  * Em emulador iOS push real não funciona — retorna `not_device`.
  * Android emulator com Google Play Services funciona normal.
  */
+/**
+ * O SO já concedeu permissão de push? Consulta SEM abrir prompt.
+ *
+ * Serve pra distinguir "o usuário recusou" de "o token sumiu mas a permissão
+ * continua lá" — o segundo caso é re-registrável em silêncio, sem incomodar
+ * ninguém, e é o que acontece depois de todo logout (o signOut limpa o token
+ * de propósito, pra quem sai não receber push no aparelho de outra pessoa).
+ */
+export async function hasPushPermission(): Promise<boolean> {
+  const Notifications = loadNotifications();
+  const Device = loadDevice();
+  if (!Notifications || !Device?.isDevice) return false;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
+}
+
 export async function registerForPushNotifications(): Promise<RegisterResult> {
   const Notifications = loadNotifications();
   const Device = loadDevice();

@@ -235,6 +235,10 @@ export async function saveOnboardingResult(params: {
             distance_min_m: null,
             distance_max_m: null,
             cadence_rpm: null,
+            // O plano gerado no onboarding não prescreve série conjunta — o
+            // professor monta o bi-set depois, no editor.
+            pair_key: null,
+            pair_role: null,
             notes: ex.notes ?? null,
           }));
         const { error: exErr } = await supabase

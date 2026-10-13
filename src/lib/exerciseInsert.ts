@@ -32,6 +32,11 @@ export function toExerciseInsert(
     distance_min_m: e.distance_min_m ?? null,
     distance_max_m: e.distance_max_m ?? null,
     cadence_rpm: e.cadence_rpm ?? null,
+    // Série conjunta: preservar o par ao copiar/duplicar. Perder estes dois
+    // campos aqui desfaria o bi-set silenciosamente em qualquer tela que
+    // reaproveite a prescrição.
+    pair_key: e.pair_key ?? null,
+    pair_role: e.pair_role ?? null,
     notes: e.notes,
   };
 }

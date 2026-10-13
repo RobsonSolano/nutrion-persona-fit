@@ -32,6 +32,7 @@ function exercise(over: Partial<Exercise>): Exercise {
     owner_id: null,
     visibility: 'publico',
     requires_lower_limbs: false,
+    description: null,
     ...over,
   };
 }

@@ -60,6 +60,23 @@ function arredondar(m: Macros): Macros {
 }
 
 /**
+ * Item no formato antigo (string). Extrai a gramagem do sufixo "(55 g)" quando
+ * houver — o formato que `itemsComoTexto` gera e que o modelo às vezes devolve.
+ * Sem gramas, vira só `{ name }`.
+ */
+function parseStringItem(bruto: string): SanityItem | null {
+  const s = bruto.trim();
+  if (!s) return null;
+  const m = s.match(/^(.*?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*g\s*\)\s*$/i);
+  if (m) {
+    const name = m[1].trim();
+    const qty = coerceNumero(m[2]);
+    if (name) return qty !== undefined ? { name, qty_g: qty } : { name };
+  }
+  return { name: s };
+}
+
+/**
  * Normaliza o `items` que veio do modelo. Tolera o formato antigo (item era só
  * uma string com o nome) pra não quebrar resposta em voo nem cache antigo.
  */
@@ -69,8 +86,8 @@ export function parseSanityItems(raw: unknown): SanityItem[] {
   const itens: SanityItem[] = [];
   for (const bruto of raw) {
     if (typeof bruto === 'string') {
-      const name = bruto.trim();
-      if (name) itens.push({ name });
+      const item = parseStringItem(bruto);
+      if (item) itens.push(item);
       continue;
     }
     if (typeof bruto !== 'object' || bruto === null || Array.isArray(bruto)) continue;
@@ -147,6 +164,145 @@ export function reconcileMacros(
   if (doModelo) return { macros: doModelo, source: 'model' };
 
   return { macros: null, source: 'none' };
+}
+
+// ── Cálculo determinístico via referência (TACO) ──────────────────────────
+// O modelo é confiável em NOMEAR o item e dar a GRAMAGEM, mas não em calcular
+// kcal (subestimava). Então, quando o item casa com a referência e tem qty_g,
+// o kcal vira aritmética de código (tabela × gramas / 100), não chute do LLM.
+
+/** Só o que importa da linha da referência (mesma forma do AlimentoTaco). */
+export type ItemTabela = {
+  nome: string;
+  kcal: number;
+  prot: number;
+  carb: number;
+  gord: number;
+};
+
+// Preposições/ruído que não ajudam a casar nome; formas de preparo
+// (cru/cozido/grelhado) NÃO entram aqui de propósito — distinguem linhas.
+const STOP = new Set(['de', 'com', 'e', 'da', 'do', 'a', 'o', 'ao', 'em', 'tipo']);
+
+export function normalizarNome(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokens(s: string): string[] {
+  return normalizarNome(s)
+    .split(' ')
+    .filter((t) => t && !STOP.has(t));
+}
+
+/**
+ * Casa o nome de um item com uma linha da referência, conservador: exige que
+ * TODOS os tokens significativos do item estejam na linha (item ⊆ referência).
+ * Isso deixa "aveia" casar com "Aveia em flocos", mas impede "granola com aveia
+ * e chia" (tem granola/chia, que não estão na linha) de casar errado. Empate:
+ * vence quem tem mais overlap e o nome mais enxuto. Sem match confiante → null
+ * (mantém o valor que veio do modelo).
+ */
+export function matchReferencia(
+  nome: string,
+  tabela: readonly ItemTabela[],
+): ItemTabela | null {
+  const alvo = tokens(nome);
+  if (!alvo.length) return null;
+
+  let melhor: ItemTabela | null = null;
+  let melhorScore = -Infinity;
+  for (const item of tabela) {
+    const refTokens = tokens(item.nome);
+    const refSet = new Set(refTokens);
+    if (!alvo.every((t) => refSet.has(t))) continue; // item ⊆ referência
+    const overlap = alvo.filter((t) => refSet.has(t)).length;
+    const score = overlap * 100 - refTokens.length;
+    if (score > melhorScore) {
+      melhor = item;
+      melhorScore = score;
+    }
+  }
+  return melhor;
+}
+
+/**
+ * Recalcula os macros dos itens que casam com a referência e têm gramagem,
+ * usando tabela × qty_g / 100. Item sem match ou sem gramas fica como veio.
+ */
+export function enrichWithReferencia(
+  itens: SanityItem[],
+  tabela: readonly ItemTabela[],
+): SanityItem[] {
+  return itens.map((it) => {
+    if (it.qty_g === undefined || it.qty_g <= 0) return it;
+    const ref = matchReferencia(it.name, tabela);
+    if (!ref) return it;
+    const f = it.qty_g / 100;
+    return {
+      ...it,
+      kcal: Math.round(ref.kcal * f),
+      protein_g: Math.round(ref.prot * f),
+      carbs_g: Math.round(ref.carb * f),
+      fats_g: Math.round(ref.gord * f),
+    };
+  });
+}
+
+/**
+ * Extrai itens direto da DESCRIÇÃO textual ("90 g de banana, 55 g de pão
+ * francês, ..."). O modelo é inconstante em enumerar (largava o pão francês);
+ * quando o coach digita a gramagem, o código lista TODOS os itens de forma
+ * determinística. Casa "N g|gramas|ml de <alimento>" até a próxima vírgula.
+ * Descrição livre (sem gramas) → [] e o caller cai no que o modelo devolveu.
+ */
+export function parseDescricao(desc: unknown): SanityItem[] {
+  if (typeof desc !== 'string') return [];
+  const out: SanityItem[] = [];
+  const re =
+    /(\d+(?:[.,]\d+)?)\s*(?:g|gramas?|ml)\b\s*(?:de\s+)?([^,;.]+?)(?=\s*(?:[,;.]|$))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(desc)) !== null) {
+    const qty = coerceNumero(m[1]);
+    const name = m[2].trim().replace(/\s+/g, ' ');
+    if (qty !== undefined && name) out.push({ name, qty_g: qty });
+  }
+  return out;
+}
+
+/**
+ * Preenche kcal/macros ausentes dos itens da descrição a partir dos itens do
+ * modelo (casados por nome). Serve pros alimentos fora da referência (ex:
+ * granola): a gramagem vem da descrição, o kcal aproveita a estimativa do
+ * modelo quando ele citou aquele item. Sem match, fica como está.
+ */
+export function mergeKcalDoModelo(
+  base: SanityItem[],
+  modelo: SanityItem[],
+): SanityItem[] {
+  return base.map((b) => {
+    if (b.kcal !== undefined) return b;
+    const alvo = normalizarNome(b.name);
+    const m = modelo.find((mi) => {
+      const n = normalizarNome(mi.name);
+      return n === alvo || n.includes(alvo) || alvo.includes(n);
+    });
+    if (m && m.kcal !== undefined) {
+      return {
+        ...b,
+        kcal: m.kcal,
+        protein_g: m.protein_g,
+        carbs_g: m.carbs_g,
+        fats_g: m.fats_g,
+      };
+    }
+    return b;
+  });
 }
 
 /**

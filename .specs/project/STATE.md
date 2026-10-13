@@ -2,6 +2,91 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Exercícios em conjunto / bi-set (2026-09-15)
+
+Aluno com 30-40 min não termina o treino fazendo um exercício depois do outro. O
+professor passa série conjunta ("faz a 1ª do lateral, emenda na 1ª do frontal"),
+mas o app só sabia cadastrar exercícios soltos.
+
+**Modelagem — duas linhas irmãs, não tabela auxiliar.** O primeiro instinto (e a
+sugestão inicial) era uma tabela `exercicio_conjunto`. Não funciona:
+`replaceRoutineExercises` APAGA todas as linhas da rotina e reinsere a cada save,
+então os `id` de `workout_routine_exercises` não sobrevivem a uma edição e
+qualquer FK pra eles morre no primeiro "Editar treino". A saída foi marcar o par
+na própria linha: `pair_key` + `pair_role`, com
+`unique (routine_id, pair_key, pair_role)` — o banco recusa um terceiro no par,
+não é regra só do app. Verificado em Postgres local: as 3 constraints rejeitam
+terceiro exercício, meio preenchido e papel inválido.
+
+**`pair_key` é `text`, não `uuid`.** A chave é gerada no cliente (os dois lados do
+par entram no mesmo insert em lote). Não há lib de uuid no projeto e
+`expo-crypto` é módulo nativo — usar obrigaria a gerar APK novo, e a entrega é
+OTA. Reusa o formato do `uid()` que o `RoutineEditor` já tinha.
+
+**Gotcha do modelo Groq.** O script de geração das descrições copiou o default
+`llama-3.3-70b-versatile` do `pushAi.ts` e tomou 404 em 66 lotes: o modelo foi
+descontinuado. O certo é `DEFAULT_TEXT_MODEL` (`openai/gpt-oss-120b`) de
+`_shared/groqRetry.ts`. **O `pushAi.ts` ainda não foi corrigido** — está em
+`.specs/backlog/ajustes.md`.
+
+**Gotcha da cota Groq.** Tier `on_demand` dá 8000 tokens/minuto. Disparar lote
+atrás de lote gera 429 em série e cada retry custa até 70s, ficando mais lento do
+que esperar de propósito: o script pausa 9s entre lotes. E casar a resposta do
+modelo pelo NOME do exercício não funciona (ele reescreve o nome e o lote volta
+vazio) — a lista vai numerada e o casamento é por índice.
+
+**Teto de payload a vigiar.** `description` entra em todo `select('*')` de
+`exercises`, somando ~65 KB crus à query `all-exercises` (cacheada 60 min, gzip
+~18 KB) — ok hoje. Com os 1000+ exercícios que o roadmap mira vira ~215 KB por
+fetch; aí compensa estreitar o select dos consumidores de mídia para
+`id, image_urls, video_url, description`.
+
+**Lint:** a baseline registrada aqui ("6 erros + 34 warnings") estava
+desatualizada. Medição real na develop em 2026-09-15: **6 erros + 41 warnings**.
+
+### Sanity check: total determinístico (2026-09-02)
+
+Continuação do 121-vs-290. O fix só-de-prompt (mandar o modelo calcular) NÃO
+resolveu: testando 6x ao vivo (harness que cria/apaga user temp + insere sub
+premium), o modelo **omitia itens** (largava o pão francês, o de 165 kcal) e
+variava formato (objeto vs string) — é confiabilidade de modelo, o épico "IA
+robusta". Solução robusta e determinística, toda **server-side (fn:deploy, sem
+OTA)**:
+
+- **Itens vêm da DESCRIÇÃO, não do modelo.** `parseDescricao` (sanityMath.ts)
+  extrai "N g|ml de <alimento>" — lista TODOS os itens de forma determinística
+  quando o coach digita a gramagem. Vence o modelo quando tem mais itens;
+  descrição livre/foto → cai no modelo (sem regressão).
+- **kcal por código:** `matchReferencia` + `enrichWithReferencia` casam o item
+  com a TACO e calculam kcal = tabela × gramas / 100. Fim do "cálculo de cabeça".
+- `mergeKcalDoModelo` aproveita o kcal do modelo pra itens fora da TACO.
+- Morango adicionado à TACO. `parseSanityItems` passou a extrair qty_g de item
+  string ("pão francês (55 g)").
+- **Resiliência 502:** retry do sanity 2→3; e se o Groq cair, fallback que
+  computa o total pela descrição e devolve 200 degradado (feedback genérico) em
+  vez de "instabilidade".
+
+Verificado ao vivo: refeição do jhonatan → 200, 6 itens, **271 kcal**, pão
+francês presente (era 121). Total agora independe do modelo. Testes: 324 (com 16
+novos em sanityMathTaco.test.ts). Limite conhecido: item fora da TACO sem kcal
+do modelo fica sem kcal (contribui 0) — pequeno; ampliar a TACO resolve caso a
+caso. Foto/descrição livre ainda dependem do modelo (é o épico IA robusta).
+
+### Sanity check subestimava kcal (2026-08-27, noite)
+
+Jhonatan registrou café da manhã (90g banana, 55g pão francês, morango, granola,
+aveia, chia, mel, café) e a IA deu **121 kcal** — o real é ~**290** (só o pão de
+55g já dá ~165). Causa: o prompt do `chat-ai` (SANITY_PERSONA_PROMPT) pedia kcal
+por item mas só dizia "estime" — o modelo chutava baixo mesmo tendo qty_g E a
+referência TACO (que tem banana=98, pão francês=300, aveia=394, mel=309 por 100g).
+O `sanityMath` soma os itens em código certinho, mas soma lixo se o kcal/item vier
+chutado. Fix: instrução de CÁLCULO OBRIGATÓRIO no prompt — `kcal = round(kcal_100g
+× qty_g / 100)` com exemplos (pão 55g→165, banana 90g→88). **Server-side: fn:deploy
+do chat-ai, sem OTA** (cliente não muda). Se ainda ficar impreciso, próximo passo é
+recalcular kcal em código a partir de qty_g × match na TACO (determinístico), em vez
+de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (parado até
+faturamento) — isto é ajuste cirúrgico de prompt.
+
 
 ### Aluno contrata professor (2026-08-29)
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { CatalogoMaps } from '@/lib/exercicioCard';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteExercise,
@@ -39,26 +40,6 @@ export function useExercisesByGroup(
  * Retorna um Map<exerciseId, image_urls> pra consulta rápida de imagens de
  * demonstração a partir do exercise_id guardado no draft/rotina.
  */
-export function useExerciseImagesMap() {
-  const q = useQuery({
-    queryKey: queryKeys.allExercises(),
-    queryFn: listAllExercises,
-    staleTime: 60 * 60 * 1000,
-  });
-
-  const map = useMemo(() => {
-    const out = new Map<string, string[]>();
-    for (const e of q.data ?? []) {
-      if (e.image_urls && e.image_urls.length > 0) {
-        out.set(e.id, e.image_urls);
-      }
-    }
-    return out;
-  }, [q.data]);
-
-  return map;
-}
-
 /**
  * Catálogo inteiro visível ao usuário (RLS aplicada).
  *
@@ -76,27 +57,39 @@ export function useAllVisibleExercises() {
 }
 
 /**
- * Map<exerciseId, video_url> dos exercícios que têm vídeo.
+ * Os três mapas do catálogo por `exercise_id`, numa passada só.
  *
- * Mesma query cacheada do `useExerciseImagesMap` (`allExercises()`), então
- * não custa requisição nova. Existe porque as rotinas guardam só
- * `exercise_id` — o `video_url` mora no catálogo.
+ * As rotinas guardam apenas `exercise_id`; imagem, vídeo e descrição moram no
+ * catálogo. Nenhuma tela usa um desses mapas sozinho — as três que exibem
+ * prescrição (editor, detalhe da rotina, detalhe do template) querem os três —,
+ * então um hook devolve os três e o `staleTime` fica escrito num lugar só.
+ *
+ * Usa a mesma query cacheada de `useAllVisibleExercises`, então não custa
+ * requisição nova: o TanStack Query reaproveita a promise em voo quando vários
+ * observers pedem a mesma `queryKey` no mesmo render.
  */
-export function useExerciseVideoMap() {
-  const q = useQuery({
-    queryKey: queryKeys.allExercises(),
-    queryFn: listAllExercises,
-    staleTime: 60 * 60 * 1000,
-  });
+export function useCatalogoMaps(): CatalogoMaps {
+  const { data } = useAllVisibleExercises();
 
   return useMemo(() => {
-    const out = new Map<string, string>();
-    for (const e of q.data ?? []) {
-      if (e.video_url) out.set(e.id, e.video_url);
+    const imagesMap = new Map<string, string[]>();
+    const videoMap = new Map<string, string>();
+    const descriptionMap = new Map<string, string>();
+
+    for (const e of data ?? []) {
+      if (e.image_urls && e.image_urls.length > 0) {
+        imagesMap.set(e.id, e.image_urls);
+      }
+      if (e.video_url) videoMap.set(e.id, e.video_url);
+      if (e.description) descriptionMap.set(e.id, e.description);
     }
-    return out;
-  }, [q.data]);
+
+    return { imagesMap, videoMap, descriptionMap };
+  }, [data]);
 }
+
+
+
 
 /**
  * Invalida as DUAS keys de catálogo.

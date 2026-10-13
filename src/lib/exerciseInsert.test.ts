@@ -19,6 +19,8 @@ const base: RoutineExercise = {
   distance_min_m: null,
   distance_max_m: null,
   cadence_rpm: null,
+  pair_key: null,
+  pair_role: null,
   notes: 'cadência 2-1-2',
 };
 
@@ -43,6 +45,8 @@ describe('toExerciseInsert', () => {
       distance_min_m: null,
       distance_max_m: null,
       cadence_rpm: null,
+      pair_key: null,
+      pair_role: null,
       notes: 'cadência 2-1-2',
     });
   });
@@ -76,6 +80,8 @@ describe('toExerciseInsert', () => {
     delete antigo.distance_min_m;
     delete antigo.distance_max_m;
     delete antigo.cadence_rpm;
+    delete antigo.pair_key;
+    delete antigo.pair_role;
 
     const insert = toExerciseInsert(antigo as RoutineExercise);
 
@@ -83,5 +89,19 @@ describe('toExerciseInsert', () => {
     expect(insert.distance_min_m).toBeNull();
     expect(insert.distance_max_m).toBeNull();
     expect(insert.cadence_rpm).toBeNull();
+    expect(insert.pair_key).toBeNull();
+    expect(insert.pair_role).toBeNull();
+  });
+
+  it('CONJ-09: preserva o par ao copiar a prescrição', () => {
+    const insert = toExerciseInsert({
+      ...base,
+      exercise_name: 'Elevação lateral',
+      pair_key: '1757960000000-1-a1b2c3',
+      pair_role: 'principal',
+    });
+
+    expect(insert.pair_key).toBe('1757960000000-1-a1b2c3');
+    expect(insert.pair_role).toBe('principal');
   });
 });

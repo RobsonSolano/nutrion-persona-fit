@@ -97,11 +97,10 @@ const config: ExpoConfig = {
     // aparecem do update seguinte em diante.
     releaseNotes: {
       novidades: [],
-      melhorias: [],
-      ajustes: [
-        'No cadastro de aluno, quando o botão de cadastrar fica travado, ele mostra em vermelho quais campos obrigatórios ainda faltam preencher',
-        'Botões inativos agora aparecem em cinza — antes o botão desabilitado ainda parecia clicável',
+      melhorias: [
+        '🔔 Lembretes voltaram a funcionar: água, treino, proteína e aviso de sequência agora chegam no horário certo. Se você não recebe notificação, ative em Perfil → Ativar notificações.',
       ],
+      ajustes: [],
     },
   },
 };
