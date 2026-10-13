@@ -55,6 +55,8 @@ export default function PerfilPublicoProfessorScreen() {
   const [phoneRaw, setPhoneRaw] = useState('');
   useEffect(() => {
     if (lastPhoneQ.data && !phoneRaw) setPhoneRaw(lastPhoneQ.data);
+    // Preenche uma vez só: com phoneRaw nas deps, apagar o campo o reencheria.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastPhoneQ.data]);
   const phoneDigits = parsePhoneInput(phoneRaw);
   const phoneOk = isValidPhone(phoneDigits);

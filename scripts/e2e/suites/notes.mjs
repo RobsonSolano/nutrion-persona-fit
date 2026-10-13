@@ -1,31 +1,17 @@
 import { suite, expect } from '../lib/runner.mjs';
 import {
   adminClient,
+  callFn,
   cleanupUser,
   createTestUser,
-  userClient,
+  promoteToCoach,
+  signInAs,
 } from '../lib/clients.mjs';
-
-const FN_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1`;
-const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-async function callFn(name, accessToken, body) {
-  const res = await fetch(`${FN_URL}/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: ANON,
-    },
-    body: JSON.stringify(body),
-  });
-  return { status: res.status, ok: res.ok, body: await res.json() };
-}
 
 async function setupCoachAndStudent(ctx, prefix) {
   const coach = await createTestUser({ prefix: `${prefix}-coach` });
   ctx.defer(() => cleanupUser(coach));
-  await callFn('signup-professor', coach.accessToken, {});
+  await promoteToCoach(coach);
 
   const email = `e2e-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@nutrion-test.local`;
   const password = 'test-1234';
@@ -37,19 +23,8 @@ async function setupCoachAndStudent(ctx, prefix) {
   const studentId = create.body.student.id;
   ctx.defer(() => adminClient.auth.admin.deleteUser(studentId).catch(() => {}));
 
-  const { data: signIn } = await adminClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  return {
-    coach,
-    student: {
-      id: studentId,
-      accessToken: signIn.session.access_token,
-      client: userClient(signIn.session.access_token),
-    },
-  };
+  const student = await signInAs(email, password);
+  return { coach, student: { id: studentId, ...student } };
 }
 
 suite('Coach notes (privacidade)', ({ test }) => {

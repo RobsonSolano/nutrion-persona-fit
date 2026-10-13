@@ -1,32 +1,13 @@
 import { suite, expect } from '../lib/runner.mjs';
 import {
   adminClient,
+  callFn,
   cleanupUser,
   createTestUser,
+  promoteToCoach,
+  signInAs,
+  TEST_CREF,
 } from '../lib/clients.mjs';
-
-const FN_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1`;
-const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-async function callFn(name, accessToken, body) {
-  const res = await fetch(`${FN_URL}/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: ANON,
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = { raw: text };
-  }
-  return { status: res.status, ok: res.ok, body: parsed };
-}
 
 suite('Coach (signup, alunos, RLS)', ({ test }) => {
   test('signup-professor: promove role + cria coaches row', async (ctx) => {
@@ -35,7 +16,7 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
 
     const res = await callFn('signup-professor', user.accessToken, {
       bio: 'Professor de teste',
-      cref: '045821-G/SP',
+      cref: TEST_CREF,
     });
     expect(res.ok).toBe(true);
     expect(res.body.coach).toBeDefined();
@@ -59,7 +40,7 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
   test('coach-create-student: cria conta + ficha', async (ctx) => {
     const coach = await createTestUser({ prefix: 'coach-cs' });
     ctx.defer(() => cleanupUser(coach));
-    await callFn('signup-professor', coach.accessToken, {});
+    await promoteToCoach(coach);
 
     // Cria aluno via edge function.
     const studentEmail = `e2e-student-${Date.now()}@nutrion-test.local`;
@@ -93,7 +74,7 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
   test('coach lê profile dos seus alunos (RLS)', async (ctx) => {
     const coach = await createTestUser({ prefix: 'coach-read' });
     ctx.defer(() => cleanupUser(coach));
-    await callFn('signup-professor', coach.accessToken, {});
+    await promoteToCoach(coach);
 
     const studentEmail = `e2e-student-r-${Date.now()}@nutrion-test.local`;
     const create = await callFn('coach-create-student', coach.accessToken, {
@@ -119,10 +100,11 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
   test('comum não vira professor via signup-professor se já é aluno', async (ctx) => {
     const coach = await createTestUser({ prefix: 'coach-blk' });
     ctx.defer(() => cleanupUser(coach));
-    await callFn('signup-professor', coach.accessToken, {});
+    await promoteToCoach(coach);
 
+    const studentEmail = `e2e-student-blk-${Date.now()}@nutrion-test.local`;
     const create = await callFn('coach-create-student', coach.accessToken, {
-      email: `e2e-student-blk-${Date.now()}@nutrion-test.local`,
+      email: studentEmail,
       password: 'test-1234',
       full_name: 'Aluno Bloqueado',
     });
@@ -130,16 +112,8 @@ suite('Coach (signup, alunos, RLS)', ({ test }) => {
     ctx.defer(() => adminClient.auth.admin.deleteUser(studentId).catch(() => {}));
 
     // Aluno faz signin (precisa do JWT) e tenta promover via signup-professor.
-    const { data: signIn } = await adminClient.auth.signInWithPassword({
-      email: create.body.student.email ?? `e2e-student-blk-${Date.now()}@nutrion-test.local`,
-      password: 'test-1234',
-    });
-    if (!signIn?.session) {
-      // Não conseguiu logar — provavelmente email diferente. Pula esse caso.
-      return;
-    }
-    const studentToken = signIn.session.access_token;
-    const res = await callFn('signup-professor', studentToken, {});
+    const student = await signInAs(studentEmail, 'test-1234');
+    const res = await callFn('signup-professor', student.accessToken, { cref: TEST_CREF });
     expect(res.status).toBe(409);
   });
 });

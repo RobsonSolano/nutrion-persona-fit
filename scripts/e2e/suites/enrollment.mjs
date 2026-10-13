@@ -9,30 +9,13 @@
 // unauthorized.
 
 import { suite, expect } from '../lib/runner.mjs';
-import { adminClient, cleanupUser, createTestUser } from '../lib/clients.mjs';
-
-const FN_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1`;
-const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-async function callFn(name, accessToken, body) {
-  const res = await fetch(`${FN_URL}/${name}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: ANON,
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = { raw: text };
-  }
-  return { status: res.status, ok: res.ok, body: parsed };
-}
+import {
+  adminClient,
+  callFn,
+  cleanupUser,
+  createTestUser,
+  TEST_CREF,
+} from '../lib/clients.mjs';
 
 /** Professor premium, público e completo — o único estado que aparece na busca. */
 async function createDiscoverableCoach(ctx, overrides = {}) {
@@ -41,7 +24,7 @@ async function createDiscoverableCoach(ctx, overrides = {}) {
 
   const res = await callFn('signup-professor', coach.accessToken, {
     bio: 'Professor de teste e2e',
-    cref: overrides.cref ?? '045821-G/SP',
+    cref: overrides.cref ?? TEST_CREF,
   });
   expect(res.ok).toBe(true);
 
