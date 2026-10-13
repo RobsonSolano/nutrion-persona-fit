@@ -116,15 +116,41 @@ already has a parent`, via `ReactClippingViewManager`). O primeiro palpite
 (Modal vs `removeClippedSubviews` do ScrollView) foi testado e NÃO era. Sempre
 remover `<Stack.Screen>` ao mover uma tela para dentro de `Tabs`.
 
-**Limitação do ambiente local (pré-existente, não da feature):** o
-`supabase functions serve` não resolve bare specifiers (`@supabase/supabase-js`)
-dentro de `_shared/` — qualquer function que importe de lá não boota localmente.
-A suíte Coach antiga falha igual. Testar edge function exige `fn:deploy`.
-Tentativas com `--import-map` e `deno.json` não resolveram.
+**~~Limitação do ambiente local~~ — diagnóstico ERRADO, corrigido em 2026-10-13.**
+A anotação original dizia que o `functions serve` não resolvia bare specifiers
+dentro de `_shared/`. O erro apontava para a linha 20 da PRÓPRIA
+`coach-respond-enrollment/index.ts`: era a única das 27 functions **sem
+`deno.json`** (o import map `@supabase/supabase-js` + `std/` vive em cada pasta).
+Copiado o arquivo padrão, ela sobe local. Sem isso o deploy provavelmente
+também falharia. **Edge function roda local sim:**
+`npx supabase@latest start -x vector` + `npx supabase@latest functions serve
+--no-verify-jwt`, e a e2e aponta pro local sobrescrevendo
+`EXPO_PUBLIC_SUPABASE_URL`/`_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` na linha de
+comando (o `--env-file` do node não sobrescreve env já setada).
 
-**Estado da entrega:** nada publicado. Falta `db:push` (9 migrations),
-`fn:deploy` (`coach-respond-enrollment` + `signup-professor`), rodar os 6 e-2-e
-que dependem da function, e OTA. Nada aqui é nativo — sai sem `.aab`.
+**Retomada em 2026-10-13 — integração com a develop:**
+- **Painel em abas saiu antes, separado** (release 1.18, `cac8993`). O merge da
+  develop deu conflito add/add nos 4 arquivos de `(coach)/(painel)/`; em todos a
+  versão da feature era superset (develop + contratação + CREF validado). Ficou
+  a da feature.
+- **Migrations renomeadas `20260829*` → `20261013*`.** Produção já tinha
+  `20260915*` e `20261001*` aplicadas; com a data antiga o `db push` recusaria
+  por ordem (ou exigiria `--include-all`). Conferido que nenhuma das 9 estava em
+  produção e que nenhuma migration posterior mexe nos mesmos objetos.
+- **e2e: 9 testes antigos estavam quebrados, sem relação com a feature.**
+  (1) chamavam `signup-professor` com `{}`, e o CREF já era obrigatório na main;
+  (2) `adminClient.auth.signInWithPassword(...)` grava a sessão do aluno no
+  client compartilhado — toda consulta "admin" das suítes seguintes passava a
+  rodar sob RLS como aquele aluno (perfil volta `null`). Corrigido na raiz:
+  `signInAs()` em `scripts/e2e/lib/clients.mjs` loga num client descartável;
+  `callFn`, `TEST_CREF` e `promoteToCoach()` também foram para lá.
+  **Lição: nunca chamar `auth.signIn*` num client compartilhado.**
+- Verificado local: 371 unitários, 4 suítes SQL, **34/34 e2e** (incluindo as 6
+  que dependem da function e nunca tinham rodado).
+
+**Estado da entrega:** nada publicado ainda. Falta `db:push` (9 migrations),
+`fn:deploy` de `coach-respond-enrollment` + `signup-professor`, e2e contra
+produção, e OTA. Nada aqui é nativo — sai sem `.aab`.
 
 ### Professor edita metas do aluno (2026-08-27)
 

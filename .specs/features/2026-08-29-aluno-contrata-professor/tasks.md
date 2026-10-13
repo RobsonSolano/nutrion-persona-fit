@@ -61,9 +61,24 @@ Todas as tasks feitas. Além do planejado:
 | Fluxo do professor | Emulador: abas, Home com métricas, fila com WhatsApp |
 | Perfil público | Emulador: toggle, UF/cidade (645 municípios de SP), especialidades |
 
+### Retomada (2026-10-13)
+
+- **T10 — Merge da develop:** conflito nos 4 arquivos do painel em abas (saiu
+  separado na 1.18); versão da feature mantida por ser superset.
+- **T11 — Migrations renomeadas** `20260829*` → `20261013*` (produção já tinha
+  migrations posteriores aplicadas).
+- **T12 — `coach-respond-enrollment/deno.json`** que faltava. Era ele, e não o
+  `_shared/`, que impedia a function de subir local.
+- **T13 — e2e:** `signInAs`/`callFn`/`promoteToCoach`/`TEST_CREF` centralizados
+  em `scripts/e2e/lib/clients.mjs`; 9 testes antigos quebrados voltaram.
+
+| O quê | Como |
+|---|---|
+| 371 testes unitários | `npx vitest run` |
+| 4 suítes SQL | psql contra Supabase local — ALL PASS |
+| **34 de 34 e-2-e** (12 da contratação) | Supabase local + `functions serve` |
+
 ### NÃO verificado (precisa de deploy)
 
-- `coach-respond-enrollment` ponta a ponta (aceitar/recusar/andamento) — o runtime
-  local não sobe functions que importam de `_shared/`.
-- Push de `enrollment_accepted` / `enrollment_declined`.
+- Push de `enrollment_accepted` / `enrollment_declined` (exige device real).
 - `EnrollmentOutcomeGate` com desfecho real (depende do aceite).
