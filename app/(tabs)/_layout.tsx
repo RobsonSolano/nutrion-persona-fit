@@ -11,6 +11,7 @@ import { useActiveWorkoutHeartbeat } from '@/hooks/useActiveWorkoutHeartbeat';
 import { useStudentSuspension } from '@/hooks/useStudentSuspension';
 import { PendingWorkoutModal } from '@/components/workout/PendingWorkoutModal';
 import EnrollmentOutcomeGate from '@/components/coach/EnrollmentOutcomeGate';
+import { StudentAnnouncementGate } from '@/components/AnnouncementGate';
 import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
 
@@ -162,6 +163,7 @@ export default function TabsLayout() {
     </Tabs>
     <PendingWorkoutModal />
     <EnrollmentOutcomeGate />
+    <StudentAnnouncementGate />
     </>
   );
 }
