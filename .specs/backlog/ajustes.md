@@ -101,3 +101,21 @@ functions que importam o pushAi.
 **O que é:** remetente `NutriOn <gmail>`, assunto "Seu acesso ao NutriOn", assinatura "Equipe NutriOn".
 O aluno recebe e-mail de uma marca que não reconhece.
 **Esforço:** minutos + `fn:deploy coach-send-credentials`.
+
+## Webhook do RevenueCat pode sobrescrever plano manual ativo
+**Origem:** /simplify do "pago por fora" (2026-10-14).
+**Onde:** `supabase/functions/revenuecat-webhook/index.ts` (upsert em `subscriptions`)
+**O que é:** o upsert grava `source: 'store_play'` sem checar o que já existe. Um evento atrasado da
+Play (ex.: EXPIRATION de uma assinatura antiga) troca uma parceria ou um "pago por fora" vigente por
+uma loja expirada — a pessoa perde o plano. O painel já protege o outro sentido (não dá plano manual
+pra quem paga pela loja).
+**Esforço:** médio — uma função SQL de upsert com regra de precedência (estado inativo da loja não
+substitui plano manual ativo), chamada pelo webhook + `fn:deploy`.
+
+## App não sabe que o plano é manual (parceria / pago por fora)
+**Origem:** /simplify do "pago por fora" (2026-10-14).
+**Onde:** `src/components/SubscriptionCard.tsx` (`hasStoreSub`, `isTrial` derivados de `source`)
+**O que é:** professor com plano manual Pro ainda vê "Fazer upgrade" e textos da Play. O
+`resolve_entitlement` já devolve `via`, `store_active` e `manual`; o tipo `Entitlement` do app não
+declara esses campos. Bônus: assinatura da loja já vencida ainda mostra "Gerenciar assinatura".
+**Esforço:** baixo-médio — tipo + lógica do card; exige OTA.
