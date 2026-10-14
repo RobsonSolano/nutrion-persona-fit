@@ -188,6 +188,19 @@ export default function PerfilScreen() {
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
             Conta
           </Text>
+          {/* Ação principal do usuário comum: linha inteira. Em meia largura o
+              rótulo não cabia e quebrava em duas linhas. */}
+          {isComum && (
+            <View className="mb-2">
+              <Button
+                label="Encontre um professor"
+                onPress={() => router.push('/encontrar-professor' as Href)}
+                variant="primary"
+                size="md"
+                icon={<Search size={16} color={colors.textInverse} />}
+              />
+            </View>
+          )}
           <View className="flex-row flex-wrap gap-2">
             <View style={{ width: '48.5%' }}>
               <Button
@@ -198,17 +211,6 @@ export default function PerfilScreen() {
                 icon={<Pencil size={14} color={colors.text} />}
               />
             </View>
-            {isComum && (
-              <View style={{ width: '48.5%' }}>
-                <Button
-                  label="Encontre um professor"
-                  onPress={() => router.push('/encontrar-professor' as Href)}
-                  variant="secondary"
-                  size="md"
-                  icon={<Search size={14} color={colors.accent} />}
-                />
-              </View>
-            )}
             {isComum && solicitacoesAbertas > 0 && (
               <View style={{ width: '48.5%' }}>
                 <Button
