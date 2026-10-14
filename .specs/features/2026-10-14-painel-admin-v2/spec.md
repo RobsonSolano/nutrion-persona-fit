@@ -25,8 +25,9 @@ Uso: só o dev.
 - **Contas de teste fora por padrão:** `@nutrion.test`, `@example.com`,
   `@cloudtestlabaccounts.com` (robôs da Play), `+review@`.
 - **Dia = dia em São Paulo**, não UTC.
-- **Receita estimada** = assinantes ativos da Play × preço de tabela do catálogo do painel
-  (`painel/src/lib/plans.ts`). O banco não guarda o preço pago.
+- **Receita estimada do mês** = assinantes ativos da Play × preço de tabela do catálogo do painel
+  (`painel/src/lib/plans.ts`) + valor mensal de quem paga por fora. Avulsos ficam à parte. O banco
+  não guarda o preço pago na Play; aparece "parcial" enquanto faltar preço ou valor.
 
 ## Requisitos
 | ID | Requisito | Status |
@@ -38,7 +39,8 @@ Uso: só o dev.
 | [ADM]-05 | Série diária de cadastros, ativos e IA por recurso | Verified |
 | [ADM]-06 | Lista de usuários com filtros (papel, plano, origem, professor, busca) e ficha | Verified |
 | [ADM]-07 | Uso da IA só em contadores: por recurso (total/sucesso/erro/limite/tempo), códigos de erro, por dia, pushes (enviados/falharam/motivo de não envio) — e exclusões com motivo | Verified |
-| [ADM]-08 | Conceder/alterar/remover parceria pelo painel | Verified |
+| [ADM]-08 | Plano manual pelo painel: parceria (não paga) ou pago por fora (Pix etc.) — conceder, alterar, encerrar | Verified |
+| [ADM]-09 | Pago por fora: desde quando, mensal ou avulso, dia do pagamento e valor; mensal entra na receita do mês, avulso fica à parte; conta como pagante mesmo herdando plano maior do professor | Verified |
 
 Testes: `supabase/tests/painel_admin.test.sql` (banco) e `vitest` no painel (funções puras).
 Conferido na tela (Playwright, 1440 px e 390 px) contra o Supabase local com seed.
