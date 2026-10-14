@@ -28,3 +28,22 @@ não um lembrete só no fim. A ideia é acompanhar o consumo durante o dia, não
 
 **Dificuldade:** Média. Não é só agendar — mexe na função, no cooldown por tipo e na política global
 de rate limit, que vale pra todos os outros pushes.
+
+## Tirar o leitor de QR do dev client do build de produção
+**Origem:** revisão do `/simplify` na correção dos avisos do Play Console (2026-10-14).
+
+**O que é:** `expo-dev-launcher/android/build.gradle` declara `play-services-code-scanner` e
+`mlkit:barcode-scanning` como `implementation`, mas só o source set debug usa. Resultado: produção
+leva a `GmsBarcodeScanningDelegateActivity` sem uso e a meta-data
+`com.google.mlkit.vision.DEPENDENCIES=barcode_ui` — a Play Services baixa o módulo de UI do leitor
+no install, pra nada.
+
+**Hoje:** `plugins/withUnlockedScannerOrientation.js` só destrava a orientação (o que a Play
+acusou). Depende do nome interno da classe do ML Kit — um bump que renomeie faz o override virar
+no-op em silêncio.
+
+**Correção mais funda:** trocar o plugin por `withAppBuildGradle` excluindo as duas deps de
+`release*RuntimeClasspath`, + `tools:node="remove"` na meta-data só no release. Exige build release
+com R8 e reteste. Vale também abrir issue no expo pra virar `debugImplementation`.
+
+**Dificuldade:** Média (horas). **Exige build novo.**

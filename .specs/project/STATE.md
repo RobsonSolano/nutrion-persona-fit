@@ -88,6 +88,28 @@ de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (para
 faturamento) — isto é ajuste cirúrgico de prompt.
 
 
+### Avisos do Play Console na 1.5.0 (7) → R8 ligado + scanner destravado (2026-10-14)
+
+A Play acusou 3 coisas na 1.5.0 (7). Correção vai no **1.5.0 (8)** — mesma versão, pra não abrir
+runtime de OTA nova; o build 8 substitui o 7.
+
+- **R8 — agora COM prazo:** "DEX code optimization / Obfuscation 2%", obrigatório a partir de
+  **fev/2027**. A decisão de 2026-08-26 ("opcional, sem prazo, deixar desligado") caiu. Ligado via
+  `expo-build-properties` (`enableMinifyInReleaseBuilds` + `enableShrinkResourcesInReleaseBuilds`).
+  APK release local testado no emulador sem nenhuma proguard rule extra: login e-mail, seletor do
+  Google abre, abas de aluno e coach, treino com imagens, contratações; logcat sem
+  `ClassNotFound`/`NoSuchMethod`. RevenueCat responde (`BILLING_UNAVAILABLE` do emulador) — compra
+  real não testada.
+- **Orientação travada:** a activity `GmsBarcodeScanningDelegateActivity` (leitor de QR do
+  `expo-dev-launcher`, que declara `play-services-code-scanner` como `implementation`) entra no
+  release com `portrait`. `plugins/withUnlockedScannerOrientation.js` sobrescreve pra `unspecified`
+  com `tools:replace`. Correção mais funda (tirar a dep do release) foi pro backlog de melhorias.
+- **Edge-to-edge:** continua não acionável — vem de `com.facebook.react` e `material`. Sai com
+  upgrade de SDK.
+
+**Mapping:** o .aab de produção leva o `mapping.txt` e a Play desofusca sozinha. Sentry nativo fica
+ofuscado (plugin dele desligado); JS não é afetado (Hermes).
+
 ### Play In-App Updates + binário 1.5.0 (2026-10-14)
 
 Item #3. Spec em `.specs/features/2026-10-14-play-in-app-updates/`. `expo-in-app-updates`
