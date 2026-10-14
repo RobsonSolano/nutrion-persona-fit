@@ -50,7 +50,9 @@ insert into auth.users (id, email) values
   ('dddddddd-0000-0000-0000-000000000009', 'robo@nutrion.test'),
   ('dddddddd-0000-0000-0000-000000000011', 'pagante@painel-teste.local'),
   ('dddddddd-0000-0000-0000-000000000012', 'alunopagante@painel-teste.local'),
-  ('dddddddd-0000-0000-0000-000000000013', 'alunoearly@painel-teste.local');
+  ('dddddddd-0000-0000-0000-000000000013', 'alunoearly@painel-teste.local'),
+  ('dddddddd-0000-0000-0000-000000000014', 'porfora@painel-teste.local'),
+  ('dddddddd-0000-0000-0000-000000000015', 'alunoporfora@painel-teste.local');
 
 insert into public.admin_users (id, full_name) values
   ('dddddddd-0000-0000-0000-000000000000', 'Admin');
@@ -79,8 +81,15 @@ insert into public.profiles (id, role, coach_id, user_number, full_name) values
   -- paga Pro pela Play, mas o professor é Premium: herda, e continua pagante
   ('dddddddd-0000-0000-0000-000000000012', 'aluno', 'dddddddd-0000-0000-0000-000000000004', 9712, 'Aluno Pagante'),
   -- grandfather não vale pra aluno; professor free → free
-  ('dddddddd-0000-0000-0000-000000000013', 'aluno', 'dddddddd-0000-0000-0000-000000000001', 9713, 'Aluno Early');
+  ('dddddddd-0000-0000-0000-000000000013', 'aluno', 'dddddddd-0000-0000-0000-000000000001', 9713, 'Aluno Early'),
+  -- paga por fora da loja (Pix), valor combinado
+  ('dddddddd-0000-0000-0000-000000000014', 'professor', null, 9714, 'Prof Por Fora'),
+  -- paga Pro por fora, mas o professor é Premium: herda, e segue pagante por fora
+  ('dddddddd-0000-0000-0000-000000000015', 'aluno', 'dddddddd-0000-0000-0000-000000000004', 9715, 'Aluno Por Fora');
 
+insert into public.subscriptions (user_id, tier, source, status, period_end, monthly_amount) values
+  ('dddddddd-0000-0000-0000-000000000014','premium','external','active', null, 99.90),
+  ('dddddddd-0000-0000-0000-000000000015','pro',    'external','active', null, 30.00);
 insert into public.subscriptions (user_id, tier, source, status, trial_end, period_end, trial_consumed) values
   ('dddddddd-0000-0000-0000-000000000002','pro',    'server_trial','in_trial', now() + interval '3 days', null, true),
   -- status segue in_trial no banco, mas a data já passou: é free.
@@ -128,7 +137,7 @@ begin
   perform public._t_as('dddddddd-0000-0000-0000-000000000001');
   assert public._t_err('select public.admin_metrics(current_date - 30, current_date)') = 'forbidden',
     'não-admin deveria levar forbidden';
-  assert public._t_err($q$select public.admin_set_partner_plan('dddddddd-0000-0000-0000-000000000001', 'premium')$q$)
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'partner', 'premium')$q$)
     = 'forbidden', 'não-admin não pode se dar parceria';
   perform public._t_as(null);
   assert public._t_err('select public.admin_list_users()') = 'forbidden', 'anônimo deveria levar forbidden';
@@ -148,11 +157,16 @@ begin
       ('dddddddd-0000-0000-0000-000000000007', 'none'),
       ('dddddddd-0000-0000-0000-000000000008', 'partner'),
       ('dddddddd-0000-0000-0000-000000000012', 'inherited'),
-      ('dddddddd-0000-0000-0000-000000000013', 'none')
+      ('dddddddd-0000-0000-0000-000000000013', 'none'),
+      ('dddddddd-0000-0000-0000-000000000014', 'external'),
+      ('dddddddd-0000-0000-0000-000000000015', 'inherited')
     ) x(id, via)
   loop
     assert r ->> 'via' = v_via, format('via esperado %s, veio %s', v_via, r ->> 'via');
   end loop;
+  r := public._resolve_entitlement('dddddddd-0000-0000-0000-000000000015');
+  assert r ->> 'tier' = 'premium' and r ->> 'manual' = 'external',
+    'aluno que paga por fora com professor premium: herda premium e segue com plano manual';
   r := public._resolve_entitlement('dddddddd-0000-0000-0000-000000000012');
   assert r ->> 'tier' = 'premium' and (r ->> 'store_active')::boolean,
     'aluno pagante com professor premium: herda premium e segue pagante';
@@ -169,15 +183,20 @@ begin
 
   -- [ADM]-04: totais do dashboard (conta de teste fica fora por padrão).
   m := public.admin_metrics(v_today - 30, v_today);
-  assert public._t_delta(m, a, '{base,total}') = 11, format('total sem teste +11, veio %s', public._t_delta(m, a, '{base,total}'));
-  assert public._t_delta(m, a, '{base,by_role,professor}') = 1, 'um professor';
+  assert public._t_delta(m, a, '{base,total}') = 13, format('total sem teste +13, veio %s', public._t_delta(m, a, '{base,total}'));
+  assert public._t_delta(m, a, '{base,by_role,professor}') = 2, 'dois professores';
   assert public._t_delta(m, a, '{base,deletions}') = 1, 'uma exclusão';
   assert public._t_delta(m, a, '{plans,by_kind,free}') = 4, format('free +4, veio %s', public._t_delta(m, a, '{plans,by_kind,free}'));
   assert public._t_delta(m, a, '{plans,by_kind,store}') = 2, 'dois com plano vindo da loja';
   assert public._t_delta(m, a, '{plans,by_kind,partner}') = 2, 'duas parcerias';
   assert public._t_delta(m, a, '{plans,by_kind,trial}') = 1, 'um trial ativo';
-  assert public._t_delta(m, a, '{plans,by_kind,inherited}') = 2, 'dois herdados';
-  assert public._t_delta(m, a, '{plans,paying}') = 3, 'três pagam (inclui o aluno que herda premium)';
+  assert public._t_delta(m, a, '{plans,by_kind,inherited}') = 3, 'três herdados';
+  assert public._t_delta(m, a, '{plans,paying}') = 5, 'cinco pagam (inclui os alunos que herdam premium e pagam)';
+  assert public._t_delta(m, a, '{plans,paying_by,store}') = 3, 'três pela loja';
+  assert public._t_delta(m, a, '{plans,paying_by,external}') = 2, 'dois por fora (um deles herda plano maior)';
+  assert public._t_delta(m, a, '{plans,by_kind,external}') = 1, 'origem do plano por fora: só o professor';
+  assert (m #>> '{plans,external_revenue}')::numeric - coalesce((a #>> '{plans,external_revenue}')::numeric, 0) = 129.90,
+    'receita por fora = soma dos valores combinados';
   assert public._t_delta(m, a, '{plans,trial_started}') = 3, 'três fizeram trial';
   assert public._t_delta(m, a, '{plans,trial_converted}') = 1, 'um converteu';
   assert exists (select 1 from json_array_elements(m #> '{plans,store_by_plan}') e
@@ -188,10 +207,10 @@ begin
   assert public._t_delta(m, a, '{ai,total}') = 3, 'três usos de IA';
   assert public._t_delta(m, a, '{ai,by_feature,chat}') = 2, 'dois chats';
   m := public.admin_metrics(v_today - 30, v_today, null, true);
-  assert public._t_delta(m, (select m_test from _antes), '{base,total}') = 12, 'com teste +12';
+  assert public._t_delta(m, (select m_test from _antes), '{base,total}') = 14, 'com teste +14';
   m := public.admin_metrics(v_today - 30, v_today, 'premium');
-  assert public._t_delta(m, (select m_premium from _antes), '{base,total}') = 4,
-    'premium = prof + 2 alunos + parceiro';
+  assert public._t_delta(m, (select m_premium from _antes), '{base,total}') = 6,
+    'premium = prof + 3 alunos + parceiro + por fora';
   assert public._t_err('select public.admin_metrics(date ''0002-01-01'', current_date)') = 'period_too_long',
     'período absurdo é recusado';
   raise notice 'OK 4: admin_metrics';
@@ -207,16 +226,16 @@ begin
   r := public.admin_list_users(p_kind => 'partner', p_search => 'painel-teste');
   assert (r ->> 'total')::int = 2, 'duas parcerias na lista';
   r := public.admin_list_users(p_kind => 'not_free', p_search => 'painel-teste');
-  assert (r ->> 'total')::int = 7, format('não-free = 7, veio %s', r ->> 'total');
+  assert (r ->> 'total')::int = 9, format('não-free = 9, veio %s', r ->> 'total');
   r := public.admin_list_users(p_role => 'comum', p_search => 'pagante@');
   assert (r ->> 'total')::int = 1 and r #>> '{users,0,plan_kind}' = 'store', 'busca por e-mail';
-  r := public.admin_list_users(p_role => 'professor', p_search => 'painel-teste');
-  assert (r #>> '{users,0,students}')::int = 2, 'professor com 2 alunos';
+  r := public.admin_list_users(p_role => 'professor', p_search => 'prof@painel-teste');
+  assert (r #>> '{users,0,students}')::int = 3, 'professor com 3 alunos';
   r := public.admin_user_detail('dddddddd-0000-0000-0000-000000000005');
   assert r #>> '{coach,full_name}' = 'Prof Premium', 'ficha mostra o professor';
   assert r #>> '{user,plan_kind}' = 'inherited', 'ficha mostra a origem do plano';
   assert exists (select 1 from json_array_elements(public.admin_coach_options()) e
-                  where e ->> 'name' = 'Prof Premium' and (e ->> 'students')::int = 2),
+                  where e ->> 'name' = 'Prof Premium' and (e ->> 'students')::int = 3),
     'professor no filtro com a contagem de alunos';
   raise notice 'OK 6: admin_list_users / detail / coach_options';
 
@@ -241,15 +260,15 @@ begin
   raise notice 'OK 7: uso da IA, pushes e exclusões';
 
   -- [ADM]-08: parceria.
-  assert public._t_err($q$select public.admin_set_partner_plan('dddddddd-0000-0000-0000-000000000004', 'pro')$q$)
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000004', 'partner', 'pro')$q$)
     = 'has_store_subscription', 'não sobrescreve assinatura paga';
-  assert public._t_err($q$select public.admin_set_partner_plan('dddddddd-0000-0000-0000-000000000012', 'pro')$q$)
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000012', 'partner', 'pro')$q$)
     = 'has_store_subscription', 'nem a do aluno que herda um plano maior';
-  assert public._t_err($q$select public.admin_set_partner_plan('dddddddd-0000-0000-0000-000000000001', 'pro', now() - interval '1 day')$q$)
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'partner', 'pro', now() - interval '1 day')$q$)
     = 'invalid_until', 'data de fim no passado é recusada';
 
-  r := public.admin_set_partner_plan('dddddddd-0000-0000-0000-000000000001', 'premium',
-                                     now() + interval '30 days', 'parceria teste');
+  r := public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'partner', 'premium',
+                                    now() + interval '30 days', 'parceria teste');
   assert r ->> 'tier' = 'premium' and r ->> 'via' = 'partner', 'parceria concedida';
   assert (select note from public.subscriptions
            where user_id = 'dddddddd-0000-0000-0000-000000000001') = 'parceria teste', 'guarda a observação';
@@ -257,11 +276,22 @@ begin
   assert public.grant_server_trial('dddddddd-0000-0000-0000-000000000001') = 'skipped_source',
     'grant_server_trial respeita parceria';
 
-  r := public.admin_revoke_partner_plan('dddddddd-0000-0000-0000-000000000001');
-  assert r ->> 'tier' = 'free', 'parceria removida volta a free';
-  assert public._t_err($q$select public.admin_revoke_partner_plan('dddddddd-0000-0000-0000-000000000002')$q$)
-    = 'not_partner', 'só remove o que é parceria';
-  raise notice 'OK 8: parceria';
+  -- vira pago por fora: troca o tipo, guarda o valor
+  r := public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'external', 'pro',
+                                    null, 'Pix mensal', 49.90);
+  assert r ->> 'via' = 'external' and r ->> 'tier' = 'pro', 'pago por fora concedido';
+  assert (select monthly_amount from public.subscriptions
+           where user_id = 'dddddddd-0000-0000-0000-000000000001') = 49.90, 'guarda o valor combinado';
+  assert public.grant_server_trial('dddddddd-0000-0000-0000-000000000001') = 'skipped_source',
+    'grant_server_trial respeita pago por fora';
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'outro', 'pro')$q$)
+    = 'invalid_kind', 'tipo inválido é recusado';
+
+  r := public.admin_revoke_manual_plan('dddddddd-0000-0000-0000-000000000001');
+  assert r ->> 'tier' = 'free', 'plano manual encerrado volta a free';
+  assert public._t_err($q$select public.admin_revoke_manual_plan('dddddddd-0000-0000-0000-000000000002')$q$)
+    = 'not_manual', 'só encerra plano manual';
+  raise notice 'OK 8: plano manual (parceria e pago por fora)';
 
   raise notice 'PAINEL_ADMIN: ALL PASS';
 end;
