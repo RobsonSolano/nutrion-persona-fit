@@ -96,10 +96,11 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [],
-      melhorias: [
-        '🔔 Lembretes voltaram a funcionar: água, treino, proteína e aviso de sequência agora chegam no horário certo. Se você não recebe notificação, ative em Perfil → Ativar notificações.',
+      novidades: [
+        '🧑‍🏫 Professores com perfil público',
+        '🤝 Se torne aluno de um professor',
       ],
+      melhorias: [],
       ajustes: [],
     },
   },
