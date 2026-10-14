@@ -12,6 +12,7 @@ export type EntitlementSource =
   | 'server_trial'
   | 'grandfather'
   | 'partner' // parceria concedida pelo painel admin
+  | 'external' // paga por fora da loja (Pix etc.), marcado no painel admin
   | 'none';
 
 export type Entitlement = {

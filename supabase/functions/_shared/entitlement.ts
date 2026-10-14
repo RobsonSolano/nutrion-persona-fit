@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Entitlement = {
   tier: 'free' | 'pro' | 'premium';
-  source: 'store_play' | 'store_apple' | 'stripe' | 'server_trial' | 'grandfather' | 'partner' | 'none';
+  source: 'store_play' | 'store_apple' | 'stripe' | 'server_trial' | 'grandfather' | 'partner' | 'external' | 'none';
   ai_personal: boolean; // chat IA + sanity check
   ai_coach: boolean; // coach-generate-plan + coach-import-workout-ai (só professor)
   student_limit: number | null; // null = ilimitado (só professor)
