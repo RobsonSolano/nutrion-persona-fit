@@ -30,12 +30,11 @@ import {
   useRequestCoach,
 } from '@/hooks/useEnrollment';
 import { isValidPhone, maskPhoneBR, parsePhoneInput } from '@/lib/phone';
+import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { recordLegalAcceptanceSafe } from '@/services/legal';
 
-const PLAY_SUBSCRIPTIONS =
-  'https://play.google.com/store/account/subscriptions?package=br.com.nutrion';
 
 export default function PerfilPublicoProfessorScreen() {
   const router = useRouter();
@@ -286,7 +285,7 @@ export default function PerfilPublicoProfessorScreen() {
                       Store.
                     </Text>
                     <Pressable
-                      onPress={() => void Linking.openURL(PLAY_SUBSCRIPTIONS)}
+                      onPress={() => void Linking.openURL(PLAY_SUBSCRIPTIONS_URL)}
                       className="flex-row items-center gap-1.5 mt-2.5 active:opacity-70"
                     >
                       <ExternalLink size={13} color={colors.accent} />
