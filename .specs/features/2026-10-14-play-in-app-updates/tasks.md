@@ -7,8 +7,8 @@ Branch: `feature/play-in-app-updates`.
   `requireOptionalNativeModule` antes do import. `[INA]-01..04`
 - [x] **T3 — `version` 1.5.0.** `[AAB]-01`
 - [x] **T4 — Conferência no dev client sem o módulo:** sem crash, módulo devolvido como ausente. `[INA]-04`
-- [ ] **T5 — Build `production` no EAS** (versionCode 7). `[AAB]-02`
-- [ ] **T6 — Upload na Play** (dev) e `recommended_version = 1.5.0` (dev). `[AAB]-03`
+- [x] **T5 — Build `production` no EAS** (versionCode 7) e envio por `eas submit` como rascunho na faixa de produção (2026-10-14). `[AAB]-02`
+- [ ] **T6 — Lançar o rascunho no Play Console** (dev) e `recommended_version = 1.5.0` (dev). `[AAB]-03`
 
 | O quê | Como |
 |---|---|
