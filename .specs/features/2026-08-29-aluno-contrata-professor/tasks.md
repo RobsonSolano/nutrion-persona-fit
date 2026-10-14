@@ -78,7 +78,24 @@ Todas as tasks feitas. Além do planejado:
 | 4 suítes SQL | psql contra Supabase local — ALL PASS |
 | **34 de 34 e-2-e** (12 da contratação) | Supabase local + `functions serve` |
 
-### NÃO verificado (precisa de deploy)
+### Achados do teste no emulador (2026-10-13, tarde)
 
-- Push de `enrollment_accepted` / `enrollment_declined` (exige device real).
-- `EnrollmentOutcomeGate` com desfecho real (depende do aceite).
+- **T14** — Máscara de telefone (`maskPhoneBR`) + `whatsappUrl` com 55.
+- **T15** — "Aluno desde" (`coach_linked_at` + trigger). `[TRAN]-12`
+- **T16** — Aviso velho de aceite e aviso de desvínculo. `[TRAN]-08` `[TRAN]-09`
+- **T17** — Limite de 5 solicitações abertas. `[SOLI]-12`
+- **T18** — Aluno encerra o acompanhamento, professor avisado com o motivo. `[TRAN]-10` `[TRAN]-11`
+- **T19** — Revisões de plano com `coach_id` nullable + desvínculo atômico (bug de privacidade antigo).
+- **T20** — `ConfirmModal` sobe com o teclado.
+- **T21** — Avaliação com comentário + tela Avaliações do professor. `[AVAL]-02,05,06,07,08`
+
+| O quê | Como |
+|---|---|
+| 394 testes unitários | `npx vitest run` |
+| 8 suítes SQL | psql contra Supabase local — ALL PASS |
+| **45 de 45 e-2-e** | Supabase local + `functions serve` |
+| Telas | Emulador contra produção: solicitar, aceitar, sair com motivo, aviso do professor, desvincular, "Vínculo encerrado", avaliar com comentário, Avaliações do professor |
+
+### NÃO verificado
+
+- Push de `enrollment_accepted` / `enrollment_declined` / `student_left_coach` (exige device real).

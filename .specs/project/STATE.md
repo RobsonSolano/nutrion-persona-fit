@@ -148,9 +148,47 @@ comando (o `--env-file` do node não sobrescreve env já setada).
 - Verificado local: 371 unitários, 4 suítes SQL, **34/34 e2e** (incluindo as 6
   que dependem da function e nunca tinham rodado).
 
-**Estado da entrega:** nada publicado ainda. Falta `db:push` (9 migrations),
-`fn:deploy` de `coach-respond-enrollment` + `signup-professor`, e2e contra
-produção, e OTA. Nada aqui é nativo — sai sem `.aab`.
+**Retomada em 2026-10-13 (tarde) — achados do teste no emulador, todos com teste:**
+- **Aviso velho de aceite:** aceito e desvinculado antes de abrir o app, o
+  aluno via "você agora tem professor". `outcomesToAnnounce` só anuncia aceite
+  de quem ainda é o professor dele, e o desvínculo marca o aceite como visto.
+- **Desvínculo sem aviso no app** (só push): `coach_unlink_notices` registra
+  os dois lados (`initiated_by` coach|student, `reason`, snapshots de nome).
+- **Aluno refém:** `student-leave-coach` — o aluno sai sozinho, motivo
+  obrigatório (10–500), o professor lê no aviso de abertura.
+- **Limite de 5 solicitações abertas** em `request_coach`.
+- **Avaliação com comentário** opcional (só o professor lê, via
+  `list_my_coach_ratings`); aluno atual cadastrado pelo professor também avalia
+  (`can_rate_coach`, interna — revogada de authenticated).
+- **"Aluno desde"** (`profiles.coach_linked_at`, trigger).
+- **Máscara de telefone** + `whatsappUrl` põe o 55 (sem ele, `wa.me/11…` era +1).
+
+**BUG DE PRIVACIDADE ANTIGO (desde 2026-07):** o desvínculo fazia
+`student_plan_revisions.coach_id = null`, mas a coluna era NOT NULL. Como o
+passo era best-effort (só logava), falhou em silêncio em todo desvínculo e o
+ex-professor seguiu lendo o histórico de planos do ex-aluno (3 casos em
+produção, reparados). **Lição: passo de privacidade não pode ser "best-effort
+que só loga".** Os passos viraram uma transação (`unlink_coach_student`,
+só service_role); trial e reconciliação de vagas seguem best-effort.
+
+**Gotchas do emulador (dev client):**
+- `adb shell input text` com dois "r" próximos dispara o **reload do dev
+  client** (atalho R-R). Usar texto sem "rr".
+- O preenchimento automático do Google enche login com a conta pessoal salva.
+  Desligar durante o teste: `settings put secure autofill_service null`
+  (e devolver depois).
+- O toast do LogBox (RevenueCat sem billing no emulador) cobre a barra de abas
+  até y≈2208; tocar na aba pelo texto ou limpar o LogBox antes.
+- IP de LAN muda: `adb reverse tcp:8081 tcp:8081` + deep link com `localhost`.
+- Capturar erro de privilégio trocando de role dentro de `do $$` deu
+  **segfault no Postgres local**; testar privilégio com `has_function_privilege`.
+
+**Estado da entrega (2026-10-13):** backend inteiro em produção — 15
+migrations `20261013*` e as functions `coach-respond-enrollment`,
+`signup-professor`, `coach-unlink-student`, `student-leave-coach`. App via OTA.
+Professores públicos: LUCAS MIGUEL (cidade preenchida como São Paulo/SP como
+placeholder — ele ajusta no Perfil; passou a premium pra aparecer). Coach Teste
+fora da busca.
 
 ### Professor edita metas do aluno (2026-08-27)
 

@@ -133,14 +133,25 @@ públicos pra aquele usuário, e solicitações abertas daquele par são cancela
 **[AVAL]-01** — Tabela `coach_ratings` (`student_id`, `coach_id`, `stars` 1-5, timestamps), PK
 composta.
 
-**[AVAL]-02** — Só quem teve solicitação `efetuado` com aquele professor pode avaliar (vale pra
-ex-aluno também). Regra no servidor.
+**[AVAL]-02** — Pode avaliar quem teve solicitação `efetuado` com aquele professor (vale pra
+ex-aluno também) **ou é aluno atual dele** — inclui quem o professor cadastrou direto, que nunca
+passou pela contratação (revisto em 2026-10-13). Regra no servidor.
 
 **[AVAL]-03** — Uma avaliação por par, editável — reavaliar sobrescreve.
 
 **[AVAL]-04** — A busca e o perfil público exibem média (1 casa) e total.
 
-**[AVAL]-05** — Sem comentário em texto (D6).
+**[AVAL]-05** — ~~Sem comentário em texto (D6).~~ Revisto em 2026-10-13: comentário
+**opcional**, até 500 caracteres, junto da nota.
+
+**[AVAL]-06** — O comentário **só o professor avaliado lê** (e o próprio autor, pra editar). Nunca
+aparece na busca nem no perfil público — ali só média e total ([AVAL]-04).
+
+**[AVAL]-07** — O aluno atual avalia pelo card "Seu professor" no Perfil; o ex-aluno, pelo perfil
+público do professor. Mesmo modal: estrelas + comentário opcional.
+
+**[AVAL]-08** — O professor vê em **Perfil → Avaliações** a média, o total e cada avaliação:
+estrelas, comentário (se houver), nome do aluno e data.
 
 ## 6. Área do professor em abas
 
@@ -177,12 +188,43 @@ retroativamente no login, mas não aparecem na busca ([DESC]-03) até corrigir.
 
 ---
 
+## 8. Retomada (2026-10-13) — achados do teste no emulador
+
+**[SOLI]-12** — Um usuário tem no máximo **5 solicitações abertas** (`pendente` ou
+`andamento`) ao mesmo tempo, somando todos os professores. Canceladas e efetuadas não contam.
+QUANDO tenta abrir a 6ª, ENTÃO `request_coach` devolve `too_many_open` e nada é gravado. Trava
+contra envio em massa, não regra de negócio fina.
+
+**[SOLI]-13** — QUANDO quem já é aluno tenta solicitar outro professor, ENTÃO `request_coach`
+devolve `already_student`. Pra trocar de professor, primeiro encerra o vínculo atual ([TRAN]-10).
+
+**[SOLI]-14** — QUANDO uma solicitação é aceita, ENTÃO as outras abertas do mesmo usuário viram
+`cancelado` **já marcadas como vistas** — ele escolheu este professor, não é notícia.
+
+**[TRAN]-08** — O aviso de abertura "você agora tem professor" só aparece se o usuário ainda é
+aluno daquele professor. Aceito e desvinculado antes de abrir o app, o aceite não é anunciado.
+
+**[TRAN]-09** — QUANDO o professor desvincula o aluno, ENTÃO o ex-aluno vê "Vínculo encerrado"
+na próxima abertura do app (registro em `coach_unlink_notices`, não só push).
+
+**[TRAN]-10** — O aluno pode **encerrar o acompanhamento sozinho**, a qualquer momento, sem
+depender do professor. Motivo **obrigatório** (10 a 500 caracteres). O efeito é o mesmo do
+desvínculo pelo professor: volta a `comum`, mantém registros e treinos (e volta a editá-los),
+as notas privadas do professor sobre ele são apagadas, as revisões de plano perdem o
+`coach_id`, recebe o trial de servidor se elegível, e a vaga do professor é reconciliada.
+
+**[TRAN]-11** — QUANDO o aluno encerra o acompanhamento, ENTÃO o professor vê, na próxima
+abertura do app, o aviso com o nome do aluno e o **motivo** (e recebe push, que só antecipa).
+Antes de confirmar, o aluno é avisado na tela de que o professor vai ler o motivo.
+
+**[TRAN]-12** — O detalhe do aluno mostra "Aluno desde dd/mm/aaaa" (`profiles.coach_linked_at`,
+mantido por trigger sempre que o `coach_id` muda; troca de professor recomeça, desvínculo limpa).
+
 ## Fora de escopo
 
 - Fila de revisão manual de CREF por admin ("aguarde enquanto validamos") — registrado em
   `STATE.md` como próximo passo.
 - Pagamento do aluno ao professor pelo app (D7).
-- Comentário em texto nas avaliações (D6).
 - Denúncia/moderação de professor.
 - Chat aluno↔professor dentro do app — decisão do dev: não se paga agora. O contato é o
   telefone da solicitação ([SOLI]-11).
