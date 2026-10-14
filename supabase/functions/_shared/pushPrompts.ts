@@ -16,7 +16,8 @@ export type PushType =
   | 'student_account_deleted'
   | 'coach_unlinked'
   | 'enrollment_accepted'
-  | 'enrollment_declined';
+  | 'enrollment_declined'
+  | 'student_left_coach';
 
 export const PERSONA_SYSTEM = `Você é a voz do NutriOn — um app de nutrição e treino com pegada brasileira, direta, sem fofura. Fala "você", não "tu". Não usa emoji. Não usa frases clichês de coach motivacional ("acredite em você", "vamos juntos"). É um amigo que entende do assunto: curto, específico, e que conhece a pessoa.
 
@@ -58,6 +59,8 @@ export function aiUsageFeature(type: PushType): string {
       return 'push_coach_unlinked';
     case 'enrollment_accepted':
       return 'push_enrollment_accepted';
+    case 'student_left_coach':
+      return 'push_student_left_coach';
     case 'enrollment_declined':
       return 'push_enrollment_declined';
   }
@@ -199,6 +202,13 @@ Você está escrevendo pra um usuário que pediu pra ser aluno desse professor e
 - Professor: ${ctx.coach_name ?? 'o professor'}
 
 Você está escrevendo pra um usuário cuja solicitação pra virar aluno NÃO foi aceita. Tom: factual e curto, sem lamento, sem pedir desculpa, sem julgar o motivo. Deixa claro que a conta dele continua igual e que ele pode procurar outro professor. NÃO use emoji.`;
+
+    case 'student_left_coach':
+      return `Contexto:
+- Aluno: ${ctx.student_name ?? 'um aluno'}
+- Tempo como aluno: ${ctx.days_with_coach ?? 0} dias
+
+Você está escrevendo pra um PROFESSOR (coach), avisando que esse aluno encerrou o acompanhamento por conta própria. Tom: operacional, curto, sem lamento. Cita o nome. Diz que o motivo está no app. NÃO cite nem resuma o motivo. NÃO use emoji.`;
   }
 }
 
@@ -282,6 +292,11 @@ export function staticTemplate(
       return {
         title: 'Solicitação não aceita',
         body: 'Sua conta continua como está. Você pode procurar outro professor quando quiser.',
+      };
+    case 'student_left_coach':
+      return {
+        title: 'Aluno encerrou o acompanhamento',
+        body: `${ctx.student_name ?? 'Um aluno'} saiu. O motivo está no app.`,
       };
   }
 }
