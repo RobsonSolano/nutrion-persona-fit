@@ -8,7 +8,7 @@ Branch: `feature/play-in-app-updates`.
 - [x] **T3 — `version` 1.5.0.** `[AAB]-01`
 - [x] **T4 — Conferência no dev client sem o módulo:** sem crash, módulo devolvido como ausente. `[INA]-04`
 - [x] **T5 — Build `production` no EAS** (versionCode 7) e envio por `eas submit` como rascunho na faixa de produção (2026-10-14). `[AAB]-02`
-- [ ] **T6 — Lançar o rascunho no Play Console** (dev) e `recommended_version = 1.5.0` (dev). `[AAB]-03`
+- [x] **T6 — Lançar o rascunho no Play Console** (dev) e `recommended_version = 1.5.0` (dev). `[AAB]-03` — 1.5.0 (8) em produção 100% e `recommended_version = 1.5.0` em 2026-10-14. Validado pelo dev num aparelho real na 1.4.0: aviso "Nova versão disponível" → Atualizar → Play Store → atualizou → abriu normal.
 
 | O quê | Como |
 |---|---|

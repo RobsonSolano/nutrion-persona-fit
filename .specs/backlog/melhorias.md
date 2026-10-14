@@ -47,3 +47,31 @@ no-op em silêncio.
 com R8 e reteste. Vale também abrir issue no expo pra virar `debugImplementation`.
 
 **Dificuldade:** Média (horas). **Exige build novo.**
+
+## R8 — ligar otimização, resource shrinking otimizado e repackage
+**Origem:** Play Console, app bundle 8 (1.5.0), 2026-10-14 — depois de ligar o R8.
+
+**Estado no bundle 8:** DEX optimization "High", ofuscação **86%** (era 2% no 7), Full Mode ✅,
+Resource Shrinking ✅. Faltam três coisas que a Play recomenda (sem prazo — o prazo de fev/2027
+era só da ofuscação, já resolvido):
+
+| Item | Causa | Como |
+|---|---|---|
+| Optimization isn't enabled | `android/app/build.gradle` (template Expo) usa `proguard-android.txt`, que tem `-dontoptimize` | config plugin trocando por `proguard-android-optimize.txt` |
+| Resource Shrinking Optimized | flag ausente | `android.r8.optimizedResourceShrinking=true` em `gradle.properties` (AGP 8.11 aceita) |
+| Repackage Classes | regra ausente | `-repackageclasses` em `extraProguardRules` do `expo-build-properties` |
+| AGP 9.0 | AGP 8.11.0 vem do RN do SDK 54 | só com upgrade de SDK |
+
+**Risco:** a otimização é a parte agressiva do R8 — a que quebra lib com reflexão (RevenueCat,
+Google Sign-In, Sentry, módulos Expo). Fazer em **build isolado**, só isso, e retestar o APK release
+como em 2026-10-14 (login e-mail + Google, abas aluno/coach, treino, contratações, compra em
+aparelho real).
+
+**Dificuldade:** Média. **Exige build novo.**
+
+**Junto, no mesmo painel — "bitmap image optimization": NÃO acionável.** O Console aponta
+`Q9.c$b$a` (`BitmapFactory.decodeStream` + `URLConnection`). Desofuscado com o `proguard.map` do
+bundle 8: `expo.modules.notifications...builders.DownloadImageKt$downloadImage` — o `expo-notifications`
+baixando a imagem anexada a um push. Nossos pushes não mandam imagem (`send-push-notification`,
+`_shared/push*`), então esse caminho nem roda. É análise estática de código de biblioteca: só sai
+com upgrade do `expo-notifications` / SDK.

@@ -110,6 +110,10 @@ runtime de OTA nova; o build 8 substitui o 7.
 **Mapping:** o .aab de produção leva o `mapping.txt` e a Play desofusca sozinha. Sentry nativo fica
 ofuscado (plugin dele desligado); JS não é afetado (Hermes).
 
+**Enviado (2026-10-14):** build EAS `93f3b403` (versionCode 8) conferido — manifesto sem `portrait`
+em nenhuma activity, `proguard.map` dentro do .aab — e enviado por `eas submit` como rascunho na
+produção. Falta (dev): lançar no Console e, depois de a Play liberar, `recommended_version = 1.5.0`.
+
 ### Play In-App Updates + binário 1.5.0 (2026-10-14)
 
 Item #3. Spec em `.specs/features/2026-10-14-play-in-app-updates/`. `expo-in-app-updates`
@@ -133,7 +137,11 @@ versão mostrava "Uncaught Error"; a corrigida devolve null e o app segue.
 3. Dias depois, se quiser forçar: `min_version = 1.5.0`.
 4. A partir da 1.5.0, o "Atualizar" das próximas versões usa o fluxo nativo.
 
-**Não verificado:** o fluxo nativo de verdade — exige app instalado pela Play + versão mais nova
+**Verificado (2026-10-14, aparelho real do dev na 1.4.0):** aviso "Nova versão disponível" (OTA 1.21.0
+na runtime 1.4.0) → Atualizar → Play Store → atualizou pra 1.5.0 → abriu normal. Pegadinha: o OTA só
+vale na abertura seguinte, então o aviso pode levar duas aberturas pra aparecer.
+
+**Ainda não verificado:** o fluxo nativo de verdade — exige app instalado pela Play + versão mais nova
 publicada (a próxima release, ou Internal App Sharing).
 
 **Teste local com o app no Supabase local:** `EXPO_PUBLIC_SUPABASE_URL` no ambiente do
