@@ -110,6 +110,10 @@ runtime de OTA nova; o build 8 substitui o 7.
 **Mapping:** o .aab de produção leva o `mapping.txt` e a Play desofusca sozinha. Sentry nativo fica
 ofuscado (plugin dele desligado); JS não é afetado (Hermes).
 
+**Enviado (2026-10-14):** build EAS `93f3b403` (versionCode 8) conferido — manifesto sem `portrait`
+em nenhuma activity, `proguard.map` dentro do .aab — e enviado por `eas submit` como rascunho na
+produção. Falta (dev): lançar no Console e, depois de a Play liberar, `recommended_version = 1.5.0`.
+
 ### Play In-App Updates + binário 1.5.0 (2026-10-14)
 
 Item #3. Spec em `.specs/features/2026-10-14-play-in-app-updates/`. `expo-in-app-updates`
