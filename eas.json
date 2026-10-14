@@ -37,7 +37,9 @@
   "submit": {
     "production": {
       "android": {
-        "track": "production"
+        "track": "production",
+        "serviceAccountKeyPath": "../nutrion-493900-d7d52e979b42.json",
+        "releaseStatus": "draft"
       }
     }
   }
