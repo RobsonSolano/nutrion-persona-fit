@@ -66,3 +66,7 @@ supabase/functions/**/deno.lock
 
 # Estado local do supabase CLI (branch do 'supabase start')
 supabase/.branches/
+
+# rascunhos de sessão (retain-context, fora-do-escopo) — nunca commitar
+context-tmp.md
+achados-tmp.md
