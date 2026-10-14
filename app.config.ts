@@ -41,7 +41,7 @@ const config: ExpoConfig = {
   name: 'Persona Fit',
   slug: 'nutrion',
   scheme: 'nutrion',
-  version: '1.4.0',
+  version: '1.5.0',
   // Destravado por recomendação do Play Console (telas grandes): app travado
   // em portrait é tratado como não-adaptativo em tablet e foldable. Nada no
   // app declara `resizeableActivity=false` — a trava de orientação era a

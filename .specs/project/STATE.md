@@ -88,6 +88,36 @@ de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (para
 faturamento) — isto é ajuste cirúrgico de prompt.
 
 
+### Play In-App Updates + binário 1.5.0 (2026-10-14)
+
+Item #3. Spec em `.specs/features/2026-10-14-play-in-app-updates/`. `expo-in-app-updates`
+0.12.0 (Play `app-update` 2.1.0). O "Atualizar" do aviso de versão abre a atualização
+**imediata** da Play quando ela já conhece a versão nova; senão, o link da loja.
+
+**Por que não o modo flexível:** a lib chama `completeUpdate()` sozinha ao terminar o
+download → reinicia o app de repente, no meio do uso.
+
+**LIÇÃO — `try { require(pkg) } catch` NÃO protege módulo nativo ausente.** O require em
+tempo de execução roda a inicialização do módulo dentro do guard do Metro, que reporta o erro
+como **fatal** (no release, derruba o app) em vez de lançar pra quem chamou. O certo:
+`requireOptionalNativeModule('Nome')` (do `expo`) devolve null sem lançar — perguntar antes,
+importar depois. Achado testando no dev client 1.3.0 do emulador (sem o módulo): a primeira
+versão mostrava "Uncaught Error"; a corrigida devolve null e o app segue.
+
+**Roteiro de lançamento da 1.5.0:**
+1. `.aab` 1.5.0 (versionCode 7) do EAS → Play Console → Produção → nova versão.
+2. Só depois que a Play mostrar a 1.5.0 disponível: `app_config.recommended_version = 1.5.0`
+   (aviso com "Depois" pra quem está na 1.4.0 — leva à loja, porque a 1.4.0 não tem o módulo).
+3. Dias depois, se quiser forçar: `min_version = 1.5.0`.
+4. A partir da 1.5.0, o "Atualizar" das próximas versões usa o fluxo nativo.
+
+**Não verificado:** o fluxo nativo de verdade — exige app instalado pela Play + versão mais nova
+publicada (a próxima release, ou Internal App Sharing).
+
+**Teste local com o app no Supabase local:** `EXPO_PUBLIC_SUPABASE_URL` no ambiente do
+`expo start` NÃO trocou o banco do bundle (seguiu indo pra produção) — não resolvido; o
+[INA]-04 foi provado com log temporário em vez disso.
+
 ### Avisos remotos + atualização pela loja (2026-10-13, noite)
 
 Item #2 da ordem. Spec em `.specs/features/2026-10-13-avisos-remotos/`.
