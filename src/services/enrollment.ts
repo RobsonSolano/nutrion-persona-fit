@@ -12,6 +12,41 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
 
+/**
+ * POST numa edge function com o token da sessão. Não lança em erro HTTP:
+ * devolve status, corpo cru (pro parse de 402) e o `detail` (ou `error`)
+ * do JSON quando houver — cada chamador escolhe a mensagem.
+ */
+async function postFn(
+  name: string,
+  body: unknown,
+): Promise<{ ok: boolean; status: number; text: string; detail?: string }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sessão expirada. Entre de novo.');
+
+  const res = await fetch(FN(name), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let detail: string | undefined;
+  if (!res.ok) {
+    try {
+      const json = JSON.parse(text) as { detail?: string; error?: string };
+      detail = json.detail ?? json.error;
+    } catch {
+      // body não-JSON (gateway fora do ar, HTML de erro) — mensagem genérica
+    }
+  }
+  return { ok: res.ok, status: res.status, text, detail };
+}
+
 export type EnrollmentStatus = 'pendente' | 'andamento' | 'efetuado' | 'cancelado';
 
 export const ENROLLMENT_STATUS_LABELS: Record<EnrollmentStatus, string> = {
@@ -37,6 +72,8 @@ export type CoachSearchResult = {
 export type CoachPublicProfile = CoachSearchResult & {
   cref: string | null;
   my_rating: number | null;
+  /** Só pro próprio autor (pra editar); nunca vem de terceiros ([AVAL]-06). */
+  my_comment: string | null;
   can_rate: boolean;
   open_request_status: EnrollmentStatus | null;
 };
@@ -79,10 +116,12 @@ export async function getCoachPublicProfile(
 /** Erros da RPC viram Error com a mensagem já pronta pra UI. */
 const REQUEST_ERROS: Record<string, string> = {
   already_student:
-    'Você já é aluno de um professor. Peça o desvínculo antes de contratar outro.',
+    'Você já é aluno de um professor. Encerre o acompanhamento atual (no seu Perfil) antes de contratar outro.',
   invalid_role: 'Esta conta não pode virar aluno.',
   coach_unavailable: 'Este professor não está disponível no momento.',
   already_requested: 'Você já tem uma solicitação aberta com este professor.',
+  too_many_open:
+    'Você já tem 5 solicitações em aberto. Cancele alguma ou espere uma resposta antes de enviar outra.',
   invalid_phone: 'Informe um telefone válido com DDD (10 a 13 dígitos).',
   unauthorized: 'Sessão expirada. Entre de novo.',
 };
@@ -149,20 +188,99 @@ export async function markRequestSeen(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function rateCoach(coachId: string, stars: number): Promise<void> {
+/** Desvínculo registrado em coach_unlink_notices (pelo professor ou pelo aluno). */
+export type UnlinkNotice = {
+  id: string;
+  coach_name: string | null;
+  student_name: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
+export type UnlinkNoticeSide = 'student' | 'coach';
+
+/**
+ * Desvínculos que o usuário ainda não viu, do lado dele:
+ *   'student' → "seu professor encerrou o vínculo" (o professor iniciou)
+ *   'coach'   → "aluno encerrou o acompanhamento" (o aluno iniciou, [TRAN]-11)
+ */
+export async function listUnseenUnlinkNotices(
+  userId: string,
+  side: UnlinkNoticeSide,
+): Promise<UnlinkNotice[]> {
+  const col = side === 'student'
+    ? { owner: 'student_id', initiatedBy: 'coach', seen: 'seen_by_student_at' }
+    : { owner: 'coach_id', initiatedBy: 'student', seen: 'seen_by_coach_at' };
+  const { data, error } = await supabase
+    .from('coach_unlink_notices')
+    .select('id, coach_name, student_name, reason, created_at')
+    .eq(col.owner, userId)
+    .eq('initiated_by', col.initiatedBy)
+    .is(col.seen, null)
+    .order('created_at');
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** O aluno encerra o acompanhamento sozinho, com motivo ([TRAN]-10). */
+export async function leaveCoach(reason: string): Promise<void> {
+  const res = await postFn('student-leave-coach', { reason });
+  if (!res.ok) throw new Error(res.detail ?? 'Não consegui encerrar o acompanhamento.');
+}
+
+export async function markUnlinkNoticeSeen(id: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_unlink_notice_seen', { p_id: id });
+  if (error) throw error;
+}
+
+const RATE_ERROS: Record<string, string> = {
+  not_eligible: 'Só quem é ou foi aluno do professor pode avaliar.',
+  invalid_comment: 'O comentário pode ter até 500 caracteres.',
+};
+
+/** Nota de 1 a 5 + comentário opcional ([AVAL]-05). Reavaliar sobrescreve. */
+export async function rateCoach(
+  coachId: string,
+  stars: number,
+  comment?: string | null,
+): Promise<void> {
   const { data, error } = await supabase.rpc('rate_coach', {
     p_coach_id: coachId,
     p_stars: stars,
+    p_comment: comment ?? null,
   });
   if (error) throw error;
   const res = data as { ok: boolean; error?: string };
   if (!res.ok) {
-    throw new Error(
-      res.error === 'not_eligible'
-        ? 'Só quem foi aluno do professor pode avaliar.'
-        : 'Não consegui salvar a avaliação.',
-    );
+    throw new Error(RATE_ERROS[res.error ?? ''] ?? 'Não consegui salvar a avaliação.');
   }
+}
+
+export type MyRating = { stars: number; comment: string | null };
+
+/** A avaliação que o usuário já deu a este professor (RLS: só a própria). */
+export async function getMyRatingFor(coachId: string): Promise<MyRating | null> {
+  const { data, error } = await supabase
+    .from('coach_ratings')
+    .select('stars, comment')
+    .eq('coach_id', coachId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export type CoachRatingRow = {
+  stars: number;
+  comment: string | null;
+  student_name: string | null;
+  rated_at: string;
+};
+
+/** Professor: as avaliações que recebeu, com comentário ([AVAL]-08). */
+export async function listMyCoachRatings(): Promise<CoachRatingRow[]> {
+  const { data, error } = await supabase.rpc('list_my_coach_ratings');
+  if (error) throw error;
+  return (data ?? []) as CoachRatingRow[];
 }
 
 // ---------------------------------------------------------------------
@@ -200,37 +318,16 @@ export async function respondToEnrollment(
   action: RespondAction,
   cancelReason?: string | null,
 ): Promise<void> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-  if (!token) throw new Error('Sessão expirada. Entre de novo.');
-
-  const res = await fetch(FN('coach-respond-enrollment'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      apikey: ANON_KEY,
-    },
-    body: JSON.stringify({
-      request_id: requestId,
-      action,
-      cancel_reason: cancelReason ?? null,
-    }),
+  const res = await postFn('coach-respond-enrollment', {
+    request_id: requestId,
+    action,
+    cancel_reason: cancelReason ?? null,
   });
-
-  const text = await res.text();
   if (!res.ok) {
     // 402 vira o upsell padrão do app (mesma trilha do coach-create-student).
-    const upgrade = parseNeedsUpgrade(res.status, text);
+    const upgrade = parseNeedsUpgrade(res.status, res.text);
     if (upgrade) throw upgrade;
-    let detail: string | undefined;
-    try {
-      const json = JSON.parse(text) as { detail?: string; error?: string };
-      detail = json.detail ?? json.error;
-    } catch {
-      // body não-JSON (gateway fora do ar, HTML de erro) — mensagem genérica
-    }
-    throw new Error(detail ?? 'Não consegui responder a solicitação.');
+    throw new Error(res.detail ?? 'Não consegui responder a solicitação.');
   }
 }
 

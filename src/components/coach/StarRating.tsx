@@ -15,9 +15,10 @@ type Props = {
 };
 
 /**
- * Estrelas 1-5. Em modo leitura mostra a média e o total; sem nenhuma
- * avaliação mostra "sem avaliações" em vez de 5 estrelas apagadas, que
- * seriam lidas como nota zero.
+ * Estrelas 1-5. Em modo leitura mostra a média e o total; com total
+ * informado e igual a zero, mostra "sem avaliações" em vez de 5 estrelas
+ * apagadas, que seriam lidas como nota zero. Sem `count`, é a nota de uma
+ * avaliação só (a do aluno, uma linha da lista) — mostra as estrelas.
  */
 export default function StarRating({
   value,
@@ -27,7 +28,7 @@ export default function StarRating({
   disabled = false,
 }: Props) {
   const interactive = !!onChange && !disabled;
-  const semAvaliacao = !interactive && (count ?? 0) === 0;
+  const semAvaliacao = !interactive && count === 0;
 
   if (semAvaliacao) {
     return (

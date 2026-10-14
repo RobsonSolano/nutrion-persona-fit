@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/lib/theme';
 import { usePendingEnrollmentCount } from '@/hooks/useEnrollment';
+import StudentLeftGate from '@/components/coach/StudentLeftGate';
 
 /**
  * Abas do painel do professor. Antes tudo pendurava na home num scroll só —
@@ -21,6 +22,7 @@ export default function CoachPainelLayout() {
   const tabBarHeight = baseHeight + insets.bottom;
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -93,6 +95,8 @@ export default function CoachPainelLayout() {
         }}
       />
     </Tabs>
+    <StudentLeftGate />
+    </>
   );
 }
 

@@ -21,15 +21,15 @@ import {
 import { Avatar, Button, Card, Input, Screen } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import StarRating from '@/components/coach/StarRating';
+import RateCoachModal from '@/components/coach/RateCoachModal';
 import { colors } from '@/lib/theme';
 import { especialidadeLabel, SERVICE_MODE_LABELS, type ServiceMode } from '@/lib/especialidades';
 import {
   useCoachPublicProfile,
   useMyLastContactPhone,
-  useRateCoach,
   useRequestCoach,
 } from '@/hooks/useEnrollment';
-import { formatPhoneBR, isValidPhone, parsePhoneInput } from '@/lib/phone';
+import { isValidPhone, maskPhoneBR, parsePhoneInput } from '@/lib/phone';
 import { useProfile } from '@/hooks/useProfile';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { recordLegalAcceptanceSafe } from '@/services/legal';
@@ -45,7 +45,7 @@ export default function PerfilPublicoProfessorScreen() {
   const profileQ = useProfile();
   const entQ = useEntitlement();
   const requestM = useRequestCoach();
-  const rateM = useRateCoach();
+  const [notaTocada, setNotaTocada] = useState<number | null>(null);
 
   const [confirmando, setConfirmando] = useState(false);
 
@@ -54,7 +54,7 @@ export default function PerfilPublicoProfessorScreen() {
   const lastPhoneQ = useMyLastContactPhone();
   const [phoneRaw, setPhoneRaw] = useState('');
   useEffect(() => {
-    if (lastPhoneQ.data && !phoneRaw) setPhoneRaw(lastPhoneQ.data);
+    if (lastPhoneQ.data && !phoneRaw) setPhoneRaw(maskPhoneBR(lastPhoneQ.data));
     // Preenche uma vez só: com phoneRaw nas deps, apagar o campo o reencheria.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastPhoneQ.data]);
@@ -89,15 +89,6 @@ export default function PerfilPublicoProfessorScreen() {
       });
     } catch (err) {
       setConfirmando(false);
-      alert.showError(err);
-    }
-  }
-
-  async function avaliar(stars: number) {
-    if (!coach) return;
-    try {
-      await rateM.mutateAsync({ coachId: coach.coach_id, stars });
-    } catch (err) {
       alert.showError(err);
     }
   }
@@ -208,13 +199,20 @@ export default function PerfilPublicoProfessorScreen() {
                 <StarRating
                   value={coach.my_rating ?? 0}
                   size={30}
-                  onChange={avaliar}
-                  disabled={rateM.isPending}
+                  onChange={setNotaTocada}
+                />
+                <RateCoachModal
+                  visible={notaTocada != null}
+                  coachId={coach.coach_id}
+                  coachName={coach.full_name}
+                  initialStars={notaTocada}
+                  initialComment={coach.my_comment}
+                  onClose={() => setNotaTocada(null)}
                 />
                 <Text className="text-text-muted text-[11px] mt-3">
                   {coach.my_rating
-                    ? 'Toque nas estrelas pra mudar sua nota.'
-                    : 'Só quem foi aluno pode avaliar. Sua nota entra na média pública.'}
+                    ? 'Toque nas estrelas pra mudar sua nota ou o comentário.'
+                    : 'Toque nas estrelas pra avaliar. A nota entra na média pública; o comentário só o professor lê.'}
                 </Text>
               </Card>
             )}
@@ -244,8 +242,8 @@ export default function PerfilPublicoProfessorScreen() {
             ) : jaEhAluno ? (
               <Card padding="md">
                 <Text className="text-text-dim text-xs leading-relaxed">
-                  Você já é aluno de um professor. Para trocar, peça o desvínculo ao
-                  seu professor atual.
+                  Você já é aluno de um professor. Para trocar, encerre o acompanhamento
+                  atual no seu Perfil (card “Seu professor”) e depois solicite este.
                 </Text>
               </Card>
             ) : confirmando ? (
@@ -303,16 +301,16 @@ export default function PerfilPublicoProfessorScreen() {
                   <Input
                     label="Seu telefone para contato"
                     value={phoneRaw}
-                    onChangeText={setPhoneRaw}
-                    placeholder="11999999999"
+                    onChangeText={(t) => setPhoneRaw(maskPhoneBR(t))}
+                    placeholder="(11) 99999-9999"
                     keyboardType="number-pad"
-                    maxLength={13}
+                    maxLength={15}
                     leftIcon={<Phone size={16} color={colors.textMuted} />}
                     error={phoneError ?? undefined}
                   />
                   <Text className="text-text-muted text-[11px] mt-2 leading-relaxed">
                     {phoneOk
-                      ? `${formatPhoneBR(phoneDigits)} — o professor usa este número pra falar com você.`
+                      ? 'O professor usa este número pra falar com você.'
                       : 'O professor combina tudo com você por fora do app (WhatsApp ou ligação). Só ele vê este número, e só enquanto a solicitação estiver de pé.'}
                   </Text>
                 </View>

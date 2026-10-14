@@ -6,9 +6,14 @@ import {
   listBlockedUsers,
   listCoachRequests,
   getMyCoachRating,
+  getMyRatingFor,
+  listMyCoachRatings,
   getMyLastContactPhone,
   listMyRequests,
+  leaveCoach,
+  listUnseenUnlinkNotices,
   markRequestSeen,
+  markUnlinkNoticeSeen,
   rateCoach,
   requestCoach,
   respondToEnrollment,
@@ -16,15 +21,19 @@ import {
   unblockUser,
   type RespondAction,
   type SearchFilters,
+  type UnlinkNoticeSide,
 } from '@/services/enrollment';
 import { useAuth } from './useAuth';
+import { useProfile } from './useProfile';
 import { queryKeys } from '@/lib/queryKeys';
+import { outcomesToAnnounce } from '@/lib/enrollmentOutcomes';
 
 export const coachSearchKey = (f: SearchFilters) =>
   ['coach_search', f.uf ?? '', f.city ?? '', (f.specialties ?? []).join(','),
    f.serviceMode ?? '', f.query ?? ''] as const;
 export const coachPublicKey = (id: string) => ['coach_public', id] as const;
 export const myRequestsKey = (uid: string) => ['my_enrollment_requests', uid] as const;
+const unlinkNoticesKey = (uid: string) => ['unlink_notices', uid] as const;
 export const coachRequestsKey = (uid: string) => ['coach_enrollment_requests', uid] as const;
 export const blockedKey = (uid: string) => ['coach_blocks', uid] as const;
 
@@ -60,14 +69,14 @@ export function useMyEnrollmentRequests() {
  * Desfechos que o usuário ainda não viu. Alimenta o aviso na abertura do
  * app — que NÃO depende de push: a permissão de notificação pode estar
  * negada, e o usuário precisa saber que virou aluno (ou que não virou).
+ * Aceite de quem já não é o professor dele não entra (ver outcomesToAnnounce).
  */
 export function useUnseenEnrollmentOutcomes() {
   const q = useMyEnrollmentRequests();
-  const unseen = (q.data ?? []).filter(
-    (r) =>
-      (r.status === 'efetuado' || r.status === 'cancelado') &&
-      !r.seen_by_student_at,
-  );
+  const profileQ = useProfile();
+  const unseen = profileQ.data
+    ? outcomesToAnnounce(q.data ?? [], profileQ.data.coach_id)
+    : [];
   return { ...q, unseen };
 }
 
@@ -113,6 +122,45 @@ export function useCancelMyRequest() {
   });
 }
 
+/**
+ * Desvínculos não vistos do lado do usuário — mesmo motivo do aviso de
+ * desfecho: o push pode não chegar, e o vínculo muda o que dá pra fazer.
+ */
+export function useUnseenUnlinkNotices(side: UnlinkNoticeSide) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: [...unlinkNoticesKey(user?.id ?? 'anon'), side],
+    queryFn: () => listUnseenUnlinkNotices(user!.id, side),
+    enabled: !!user?.id,
+    staleTime: 15_000,
+  });
+}
+
+export function useMarkUnlinkNoticeSeen() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: markUnlinkNoticeSeen,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: unlinkNoticesKey(user?.id ?? 'anon') });
+    },
+  });
+}
+
+/**
+ * Aluno encerra o acompanhamento ([TRAN]-10). Muda role, plano, permissões
+ * de edição e o que aparece em quase toda tela — invalida tudo.
+ */
+export function useLeaveCoach() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: leaveCoach,
+    onSuccess: async () => {
+      await qc.invalidateQueries();
+    },
+  });
+}
+
 export function useMarkRequestSeen() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -124,15 +172,46 @@ export function useMarkRequestSeen() {
   });
 }
 
+const myRatingKey = (coachId: string) => ['my_rating_for', coachId] as const;
+
 export function useRateCoach() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ coachId, stars }: { coachId: string; stars: number }) =>
-      rateCoach(coachId, stars),
+    mutationFn: ({
+      coachId,
+      stars,
+      comment,
+    }: {
+      coachId: string;
+      stars: number;
+      comment?: string | null;
+    }) => rateCoach(coachId, stars, comment),
     onSuccess: async (_r, vars) => {
-      await qc.invalidateQueries({ queryKey: coachPublicKey(vars.coachId) });
-      await qc.invalidateQueries({ queryKey: ['coach_search'] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: coachPublicKey(vars.coachId) }),
+        qc.invalidateQueries({ queryKey: myRatingKey(vars.coachId) }),
+        qc.invalidateQueries({ queryKey: ['coach_search'] }),
+      ]);
     },
+  });
+}
+
+/** A avaliação que o usuário já deu a este professor (pra pré-preencher). */
+export function useMyRatingFor(coachId: string | null) {
+  return useQuery({
+    queryKey: myRatingKey(coachId ?? 'none'),
+    queryFn: () => getMyRatingFor(coachId!),
+    enabled: !!coachId,
+  });
+}
+
+/** Professor: avaliações recebidas, com comentário ([AVAL]-08). */
+export function useMyCoachRatings() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['my_coach_ratings', user?.id ?? 'anon'],
+    queryFn: listMyCoachRatings,
+    enabled: !!user?.id,
   });
 }
 

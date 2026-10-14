@@ -18,6 +18,7 @@ import {
   Lock,
   LogOut,
   Save,
+  Star,
   TrendingUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -304,6 +305,26 @@ export default function CoachPerfilScreen() {
                 </View>
               )}
             </Card>
+
+            <Pressable
+              onPress={() => router.push('/(coach)/avaliacoes' as Href)}
+              className="active:opacity-80"
+            >
+              <Card padding="md">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center">
+                    <Star size={17} color={colors.warn} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text text-sm font-semibold">Avaliações</Text>
+                    <Text className="text-text-muted text-[11px] mt-0.5">
+                      Notas e comentários dos seus alunos
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.textDim} />
+                </View>
+              </Card>
+            </Pressable>
 
             <Pressable
               onPress={() => router.push('/(coach)/bloqueados' as Href)}

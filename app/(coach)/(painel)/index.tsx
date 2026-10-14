@@ -125,21 +125,26 @@ export default function CoachHome() {
           />
         </View>
 
-        <Card padding="md">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Star size={14} color={colors.warn} />
-              <Text className="text-text-dim text-[11px] uppercase tracking-widest">
-                Sua avaliação
-              </Text>
+        <Pressable
+          onPress={() => router.push('/(coach)/avaliacoes' as Href)}
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <Star size={14} color={colors.warn} />
+                <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+                  Sua avaliação
+                </Text>
+              </View>
+              <StarRating
+                value={ratingQ.data?.avg ?? 0}
+                count={ratingQ.data?.count ?? 0}
+                size={14}
+              />
             </View>
-            <StarRating
-              value={ratingQ.data?.avg ?? 0}
-              count={ratingQ.data?.count ?? 0}
-              size={14}
-            />
-          </View>
-        </Card>
+          </Card>
+        </Pressable>
 
         {suspended > 0 && (
           <Pressable
