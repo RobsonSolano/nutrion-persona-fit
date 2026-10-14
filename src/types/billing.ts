@@ -11,6 +11,7 @@ export type EntitlementSource =
   | 'stripe'
   | 'server_trial'
   | 'grandfather'
+  | 'partner' // parceria concedida pelo painel admin
   | 'none';
 
 export type Entitlement = {
