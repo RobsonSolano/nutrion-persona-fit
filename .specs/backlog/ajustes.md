@@ -85,3 +85,19 @@ checar o vínculo atual (`exists (select 1 from profiles p where p.id = student_
 **O que é:** o app só acessa por RPC; a policy é inofensiva mas sobra. Já está em produção — não valeu
 uma migration só pra isso. Junta com a próxima migration que tocar essas tabelas.
 **Esforço:** minutos.
+
+## pushAi grava colunas que não existem em ai_usage_log
+**Origem:** painel admin v2 (2026-10-14), montando os contadores de uso da IA.
+**Onde:** `supabase/functions/_shared/pushAi.ts` (insert após `callGroq`)
+**O que é:** grava `model`, `input_tokens`, `output_tokens` — colunas que a tabela não tem. O insert
+falha calado (não checa o erro), então push escrito pela IA nunca entra em `ai_usage_log`, e falha da
+IA no push também não é registrada. O painel conta pushes por `push_history` (que está certo).
+**Esforço:** minutos no código (`tokens`, `status: 'success'|'error'`, `error_code`) + `fn:deploy` das 11
+functions que importam o pushAi.
+
+## E-mail de credenciais do aluno ainda sai como "NutriOn"
+**Origem:** revisão do backlog (2026-10-14), conferindo o SMTP.
+**Onde:** `supabase/functions/coach-send-credentials/index.ts` (remetente, assunto, corpo, assinatura)
+**O que é:** remetente `NutriOn <gmail>`, assunto "Seu acesso ao NutriOn", assinatura "Equipe NutriOn".
+O aluno recebe e-mail de uma marca que não reconhece.
+**Esforço:** minutos + `fn:deploy coach-send-credentials`.
