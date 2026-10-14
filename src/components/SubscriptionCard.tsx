@@ -12,9 +12,8 @@ import { syncMyCoachAccess } from '@/services/suspension';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
 
-const PLAY_SUBSCRIPTIONS_URL =
-  'https://play.google.com/store/account/subscriptions?package=br.com.nutrion';
 
 const TIER_LABEL: Record<string, string> = {
   free: 'Free',

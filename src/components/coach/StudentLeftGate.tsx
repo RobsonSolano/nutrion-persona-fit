@@ -5,6 +5,7 @@ import ReasonBox from '@/components/coach/ReasonBox';
 import { colors } from '@/lib/theme';
 import { useMarkUnlinkNoticeSeen, useUnseenUnlinkNotices } from '@/hooks/useEnrollment';
 import { useSeenGate } from '@/hooks/useSeenGate';
+import { useAppUpdate } from '@/hooks/useAppUpdate';
 
 /**
  * Avisa o professor, na abertura do painel, que um aluno encerrou o
@@ -16,8 +17,10 @@ export default function StudentLeftGate() {
   const markSeen = useMarkUnlinkNoticeSeen();
   const atual = data?.[0] ?? null;
   const gate = useSeenGate(atual?.id ?? null);
+  const { blocked } = useAppUpdate();
 
-  if (!atual || !gate.visible) return null;
+  // Bloqueio de versão vem primeiro ([MOD]-01).
+  if (blocked || !atual || !gate.visible) return null;
 
   const fechar = () => void gate.dismiss(() => markSeen.mutateAsync(atual.id));
   const nome = atual.student_name ?? 'Um aluno';

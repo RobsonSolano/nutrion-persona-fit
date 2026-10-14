@@ -11,6 +11,7 @@ import {
   useUnseenUnlinkNotices,
 } from '@/hooks/useEnrollment';
 import { useSeenGate } from '@/hooks/useSeenGate';
+import { useAppUpdate } from '@/hooks/useAppUpdate';
 
 /**
  * Avisa, na abertura do app, o que mudou no vínculo com o professor:
@@ -33,8 +34,10 @@ export default function EnrollmentOutcomeGate() {
   const desvinculo = unlinkQ.data?.[0] ?? null;
   const desfecho = unseen.length > 0 ? unseen[unseen.length - 1] : null;
   const gate = useSeenGate(desvinculo?.id ?? desfecho?.id ?? null);
+  const { blocked } = useAppUpdate();
 
-  if (!gate.visible) return null;
+  // Bloqueio de versão vem primeiro ([MOD]-01).
+  if (blocked || !gate.visible) return null;
 
   if (desvinculo) {
     const nome = desvinculo.coach_name ?? 'Seu professor';

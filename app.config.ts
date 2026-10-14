@@ -96,10 +96,7 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [
-        '🧑‍🏫 Professores com perfil público',
-        '🤝 Se torne aluno de um professor',
-      ],
+      novidades: [],
       melhorias: [],
       ajustes: ['🔧 Manutenção e pequenas melhorias.'],
     },

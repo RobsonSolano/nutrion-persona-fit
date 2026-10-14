@@ -16,6 +16,7 @@ await import('./suites/requests.mjs');
 await import('./suites/enrollment.mjs');
 await import('./suites/notes.mjs');
 await import('./suites/data-export.mjs');
+await import('./suites/announcements.mjs');
 
 const filterIdx = process.argv.indexOf('--filter');
 const filter = filterIdx > 0 ? process.argv[filterIdx + 1] : undefined;
