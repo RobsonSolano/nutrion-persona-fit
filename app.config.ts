@@ -17,6 +17,21 @@ const plugins: ExpoConfig['plugins'] = [
         'O Persona Fit precisa da câmera para registrar pratos em tempo real.',
     },
   ],
+  // R8 no release: o Play Console exige otimização de DEX (ofuscação ≥ 25%)
+  // a partir de fev/2027. O .aab de produção leva o mapeamento, então a Play
+  // desofusca os crashes sozinha; APKs de preview não — guardar o mapping.txt
+  // se precisar ler stack nativo deles. Crash nativo no Sentry fica ofuscado
+  // enquanto o plugin dele (abaixo) seguir desligado — JS não é afetado (Hermes).
+  [
+    'expo-build-properties',
+    {
+      android: {
+        enableMinifyInReleaseBuilds: true,
+        enableShrinkResourcesInReleaseBuilds: true,
+      },
+    },
+  ],
+  './plugins/withUnlockedScannerOrientation',
   // Sentry plugin desabilitado temporariamente — upload de source maps
   // estava falhando no build EAS (sentry-cli exit 1). SDK do Sentry no JS
   // (src/lib/sentry.ts) continua funcionando e capturando exceptions; só
