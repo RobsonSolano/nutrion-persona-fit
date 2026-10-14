@@ -101,7 +101,7 @@ const config: ExpoConfig = {
         '🤝 Se torne aluno de um professor',
       ],
       melhorias: [],
-      ajustes: ['🔎 Botão "Encontre um professor" em destaque no Perfil.'],
+      ajustes: ['🔧 Manutenção e pequenas melhorias.'],
     },
   },
 };
