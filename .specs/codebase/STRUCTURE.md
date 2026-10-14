@@ -17,8 +17,16 @@ app/                          # Rotas Expo Router (file-based)
   rotina/                     # CRUD de rotinas (visão do dono — comum/professor)
     nova.tsx, [id].tsx
   (coach)/                    # Área do professor (role=professor)
-    index.tsx, _layout.tsx, aluno-novo.tsx, perfil.tsx,
-    solicitacoes.tsx, import-workout.tsx
+    _layout.tsx               # Stack; as telas de detalhe empilham sobre as abas
+    (painel)/                 # Abas do professor
+      _layout.tsx             # Tabs: Home | Alunos | Perfil
+      index.tsx               # Home (métricas, contratações, biblioteca)
+      alunos.tsx              # Lista de alunos
+      perfil.tsx              # Perfil + perfil público (busca) + bloqueados
+    aluno-novo.tsx, import-workout.tsx
+    solicitacoes.tsx          # Pedidos dos alunos JÁ vinculados (student_requests)
+    contratacoes.tsx          # Fila de quem pediu pra VIRAR aluno (coach_enrollment_requests)
+    bloqueados.tsx
     aluno/[id]/               # Detalhe do aluno
       index.tsx               # visão (com drag-and-drop de rotinas)
       editar.tsx, notas.tsx, anamnese.tsx, contrato.tsx
@@ -30,7 +38,10 @@ app/                          # Rotas Expo Router (file-based)
     templates/                # Biblioteca de treinos do coach
       index.tsx, novo.tsx, [id].tsx
   evolucao/                   # Evolução do dono (peso, progress entries)
-  solicitacoes/               # Fila aluno → professor
+  solicitacoes/               # Fila aluno → professor (suporte, aluno já vinculado)
+  encontrar-professor/        # Busca de professor + perfil público
+    index.tsx, [id].tsx
+  minhas-solicitacoes.tsx     # Solicitações de contratação do próprio usuário
   anamnese.tsx                # Anamnese do aluno (autopreenchimento)
   log.tsx                     # Log rápido (refeição/água/treino)
   treino-ativo.tsx            # Cronômetro de treino em tempo real (start/pausa/parar/salvar)

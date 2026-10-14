@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   Switch,
   Text,
@@ -8,12 +9,16 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  Ban,
   Bell,
   BellOff,
+  ChevronRight,
   Download,
+  Eye,
   Lock,
   LogOut,
   Save,
+  Star,
   TrendingUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +36,13 @@ import {
   useUpdateCoachSettings,
 } from '@/hooks/useCoachContact';
 import { formatPhoneBR, isValidPhone, parsePhoneInput } from '@/lib/phone';
+import { validateCredential, CREF_EXAMPLE } from '@/lib/cref';
 import { colors } from '@/lib/theme';
+import { useQuery } from '@tanstack/react-query';
+import LocalidadePicker from '@/components/coach/LocalidadePicker';
+import EspecialidadePicker from '@/components/coach/EspecialidadePicker';
+import { faltaParaPerfilPublico, getMyCoach } from '@/services/coach';
+import { SERVICE_MODES, SERVICE_MODE_LABELS } from '@/lib/especialidades';
 import { usePushToggle } from '@/hooks/usePushToggle';
 
 export default function CoachPerfilScreen() {
@@ -49,6 +60,20 @@ export default function CoachPerfilScreen() {
   const [showContact, setShowContact] = useState(false);
   const [phoneRaw, setPhoneRaw] = useState('');
 
+  // Perfil público (descoberta). Vem de getMyCoach porque useCoachContact
+  // devolve só o subconjunto que o ALUNO pode ver do coach.
+  const myCoachQ = useQuery({
+    queryKey: ['my-coach', user?.id ?? 'anon'],
+    queryFn: getMyCoach,
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+  const [isPublic, setIsPublic] = useState(false);
+  const [uf, setUf] = useState<string | null>(null);
+  const [city, setCity] = useState<string | null>(null);
+  const [ibge, setIbge] = useState<number | null>(null);
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [serviceMode, setServiceMode] = useState<string | null>(null);
   const push = usePushToggle();
   const { logout } = useAuth();
 
@@ -61,15 +86,46 @@ export default function CoachPerfilScreen() {
     }
   }, [coachQ.data]);
 
+  useEffect(() => {
+    const c = myCoachQ.data;
+    if (c) {
+      setIsPublic(c.is_public);
+      setUf(c.state_uf);
+      setCity(c.city);
+      setIbge(c.city_ibge_code ? Number(c.city_ibge_code) : null);
+      setSpecialties(c.specialties ?? []);
+      setServiceMode(c.service_mode);
+    }
+  }, [myCoachQ.data]);
+
+  // O CREF é editável aqui — sem a mesma validação do cadastro, qualquer
+  // professor trocaria o registro válido por lixo depois de entrar.
+  const credencial = validateCredential(cref);
+  const crefError = !credencial.ok ? credencial.reason : null;
+
   const phoneDigits = parsePhoneInput(phoneRaw);
   const phoneError =
     showContact && phoneDigits.length > 0 && !isValidPhone(phoneDigits)
       ? 'Telefone inválido. Use 10 a 13 dígitos (DDI+DDD+número).'
       : null;
 
+  // O que falta pra descoberta, calculado sobre o que está NA TELA (não no
+  // que está salvo) — senão o professor liga o toggle, salva, e só depois
+  // descobre que continua invisível.
+  const faltaPublico = faltaParaPerfilPublico({
+    ...(myCoachQ.data ?? ({} as never)),
+    state_uf: uf,
+    city,
+    specialties,
+    service_mode: serviceMode as 'online' | 'presencial' | 'hibrido' | null,
+  });
+  const publicoIncompleto = isPublic && faltaPublico.length > 0;
+
   const canSave =
     !update.isPending &&
+    !crefError &&
     !phoneError &&
+    !publicoIncompleto &&
     !(showContact && phoneDigits.length === 0);
 
   async function handleSave() {
@@ -77,10 +133,17 @@ export default function CoachPerfilScreen() {
     try {
       await update.mutateAsync({
         bio: bio.trim() || null,
-        cref: cref.trim() || null,
+        cref: credencial.ok ? credencial.value : null,
         show_contact_to_students: showContact,
         contact_phone: showContact ? phoneDigits : null,
+        is_public: isPublic,
+        state_uf: uf,
+        city,
+        city_ibge_code: ibge != null ? String(ibge) : null,
+        specialties,
+        service_mode: serviceMode as 'online' | 'presencial' | 'hibrido' | null,
       });
+      await myCoachQ.refetch();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert.showAlert({
         title: 'Salvo',
@@ -148,11 +211,142 @@ export default function CoachPerfilScreen() {
                   label="CREF ou CRN"
                   value={cref}
                   onChangeText={setCref}
-                  placeholder="Ex: 012345-G/SP"
+                  placeholder={`Ex: ${CREF_EXAMPLE}`}
                   autoCapitalize="characters"
                 />
+                {crefError ? (
+                  <Text className="text-danger text-[11px] px-1 mt-1">
+                    {crefError}
+                  </Text>
+                ) : null}
               </View>
             </Card>
+
+            <Card padding="md">
+              <View className="flex-row items-center justify-between mb-1">
+                <View className="flex-row items-center gap-2 flex-1 pr-3">
+                  <Eye size={14} color={colors.accent} />
+                  <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+                    Aparecer na busca
+                  </Text>
+                </View>
+                <Switch
+                  value={isPublic}
+                  onValueChange={setIsPublic}
+                  trackColor={{ false: colors.surfaceMuted, true: colors.accent }}
+                />
+              </View>
+              <Text className="text-text-muted text-[11px] leading-relaxed">
+                Com isso ligado, usuários do app te encontram por região e
+                especialidade e podem pedir pra ser seus alunos. Só professores
+                com plano Premium aparecem na busca.
+              </Text>
+
+              {isPublic && (
+                <View className="gap-4 mt-4">
+                  <LocalidadePicker
+                    label="Onde você atende"
+                    uf={uf}
+                    city={city}
+                    onChange={(v) => {
+                      setUf(v.uf);
+                      setCity(v.city);
+                      setIbge(v.ibge);
+                    }}
+                  />
+
+                  <View>
+                    <Text className="text-text-dim text-xs uppercase tracking-widest mb-2">
+                      Tipo de atendimento
+                    </Text>
+                    <View className="flex-row gap-2">
+                      {SERVICE_MODES.map((m) => {
+                        const on = serviceMode === m;
+                        return (
+                          <Pressable
+                            key={m}
+                            onPress={() => setServiceMode(m)}
+                            className={`flex-1 items-center rounded-2xl border py-2.5 ${
+                              on
+                                ? 'bg-accent/15 border-accent/40'
+                                : 'bg-surface border-border active:bg-surface-raised'
+                            }`}
+                          >
+                            <Text
+                              className={`text-xs font-semibold ${
+                                on ? 'text-accent-soft' : 'text-text-dim'
+                              }`}
+                            >
+                              {SERVICE_MODE_LABELS[m]}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  <EspecialidadePicker
+                    label="Especialidades"
+                    selected={specialties}
+                    onChange={setSpecialties}
+                  />
+
+                  {publicoIncompleto && (
+                    <View className="rounded-2xl border border-warn/40 bg-warn/10 px-4 py-3">
+                      <Text className="text-warn text-xs font-semibold">
+                        Falta preencher: {faltaPublico.join(', ')}
+                      </Text>
+                      <Text className="text-text-dim text-[11px] mt-1 leading-relaxed">
+                        Sem isso você não aparece na busca, mesmo com a chave
+                        ligada.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Card>
+
+            <Pressable
+              onPress={() => router.push('/(coach)/avaliacoes' as Href)}
+              className="active:opacity-80"
+            >
+              <Card padding="md">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center">
+                    <Star size={17} color={colors.warn} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text text-sm font-semibold">Avaliações</Text>
+                    <Text className="text-text-muted text-[11px] mt-0.5">
+                      Notas e comentários dos seus alunos
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.textDim} />
+                </View>
+              </Card>
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push('/(coach)/bloqueados' as Href)}
+              className="active:opacity-80"
+            >
+              <Card padding="md">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center">
+                    <Ban size={17} color={colors.textDim} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text text-sm font-semibold">
+                      Usuários bloqueados
+                    </Text>
+                    <Text className="text-text-muted text-[11px] mt-0.5">
+                      Quem não pode mais te encontrar nem solicitar
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.textDim} />
+                </View>
+              </Card>
+            </Pressable>
 
             <Card padding="md">
               <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">

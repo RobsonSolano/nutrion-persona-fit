@@ -88,6 +88,108 @@ de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (para
 faturamento) — isto é ajuste cirúrgico de prompt.
 
 
+### Aluno contrata professor (2026-08-29)
+
+Épico #8 do BACKLOG implementado numa branch (`feature/aluno-contrata-professor`),
+8 commits. Spec em `.specs/features/2026-08-29-aluno-contrata-professor/`.
+
+**Decisões que valem além desta feature:**
+
+- **CREF não tem API pública.** Verificado em 2026-08-29: CONFEF só expõe busca
+  web; cada regional tem portal próprio (vários em `implanta.net.br`,
+  `spiderware`), nenhum com API documentada. A validação implementada é
+  ESTRUTURAL (formato `NNNNNN-G/UF`, UF real, anti-degenerado) — barra lixo
+  óbvio, não fraude. **Próximo passo registrado:** fila de revisão manual por
+  admin ("aguarde enquanto validamos"), único caminho que prova o registro.
+  Existe `admin_users` desde 2026-05-14 pra construir em cima.
+- **Aluno agora recebe `max(tier próprio, tier do coach)`** no
+  `_resolve_entitlement`. Antes só herdava `ai_personal`. Sem isso, quem já
+  pagava Pro viraria aluno e continuaria sendo cobrado sem contrapartida — o
+  app não cancela assinatura da loja.
+- **`expo-clipboard` é nativo.** Foi cortado do botão "copiar telefone" porque
+  forçaria `.aab`. `Linking` (WhatsApp, tel:) sai por OTA.
+
+**Armadilha que custou tempo — mover tela de Stack pra Tab:** ao converter
+`(coach)/perfil.tsx` em aba, o `<Stack.Screen options>` ficou no JSX e derrubou
+o app na montagem (`addViewAt: failed to insert view` / `The specified child
+already has a parent`, via `ReactClippingViewManager`). O primeiro palpite
+(Modal vs `removeClippedSubviews` do ScrollView) foi testado e NÃO era. Sempre
+remover `<Stack.Screen>` ao mover uma tela para dentro de `Tabs`.
+
+**~~Limitação do ambiente local~~ — diagnóstico ERRADO, corrigido em 2026-10-13.**
+A anotação original dizia que o `functions serve` não resolvia bare specifiers
+dentro de `_shared/`. O erro apontava para a linha 20 da PRÓPRIA
+`coach-respond-enrollment/index.ts`: era a única das 27 functions **sem
+`deno.json`** (o import map `@supabase/supabase-js` + `std/` vive em cada pasta).
+Copiado o arquivo padrão, ela sobe local. Sem isso o deploy provavelmente
+também falharia. **Edge function roda local sim:**
+`npx supabase@latest start -x vector` + `npx supabase@latest functions serve
+--no-verify-jwt`, e a e2e aponta pro local sobrescrevendo
+`EXPO_PUBLIC_SUPABASE_URL`/`_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` na linha de
+comando (o `--env-file` do node não sobrescreve env já setada).
+
+**Retomada em 2026-10-13 — integração com a develop:**
+- **Painel em abas saiu antes, separado** (release 1.18, `cac8993`). O merge da
+  develop deu conflito add/add nos 4 arquivos de `(coach)/(painel)/`; em todos a
+  versão da feature era superset (develop + contratação + CREF validado). Ficou
+  a da feature.
+- **Migrations renomeadas `20260829*` → `20261013*`.** Produção já tinha
+  `20260915*` e `20261001*` aplicadas; com a data antiga o `db push` recusaria
+  por ordem (ou exigiria `--include-all`). Conferido que nenhuma das 9 estava em
+  produção e que nenhuma migration posterior mexe nos mesmos objetos.
+- **e2e: 9 testes antigos estavam quebrados, sem relação com a feature.**
+  (1) chamavam `signup-professor` com `{}`, e o CREF já era obrigatório na main;
+  (2) `adminClient.auth.signInWithPassword(...)` grava a sessão do aluno no
+  client compartilhado — toda consulta "admin" das suítes seguintes passava a
+  rodar sob RLS como aquele aluno (perfil volta `null`). Corrigido na raiz:
+  `signInAs()` em `scripts/e2e/lib/clients.mjs` loga num client descartável;
+  `callFn`, `TEST_CREF` e `promoteToCoach()` também foram para lá.
+  **Lição: nunca chamar `auth.signIn*` num client compartilhado.**
+- Verificado local: 371 unitários, 4 suítes SQL, **34/34 e2e** (incluindo as 6
+  que dependem da function e nunca tinham rodado).
+
+**Retomada em 2026-10-13 (tarde) — achados do teste no emulador, todos com teste:**
+- **Aviso velho de aceite:** aceito e desvinculado antes de abrir o app, o
+  aluno via "você agora tem professor". `outcomesToAnnounce` só anuncia aceite
+  de quem ainda é o professor dele, e o desvínculo marca o aceite como visto.
+- **Desvínculo sem aviso no app** (só push): `coach_unlink_notices` registra
+  os dois lados (`initiated_by` coach|student, `reason`, snapshots de nome).
+- **Aluno refém:** `student-leave-coach` — o aluno sai sozinho, motivo
+  obrigatório (10–500), o professor lê no aviso de abertura.
+- **Limite de 5 solicitações abertas** em `request_coach`.
+- **Avaliação com comentário** opcional (só o professor lê, via
+  `list_my_coach_ratings`); aluno atual cadastrado pelo professor também avalia
+  (`can_rate_coach`, interna — revogada de authenticated).
+- **"Aluno desde"** (`profiles.coach_linked_at`, trigger).
+- **Máscara de telefone** + `whatsappUrl` põe o 55 (sem ele, `wa.me/11…` era +1).
+
+**BUG DE PRIVACIDADE ANTIGO (desde 2026-07):** o desvínculo fazia
+`student_plan_revisions.coach_id = null`, mas a coluna era NOT NULL. Como o
+passo era best-effort (só logava), falhou em silêncio em todo desvínculo e o
+ex-professor seguiu lendo o histórico de planos do ex-aluno (3 casos em
+produção, reparados). **Lição: passo de privacidade não pode ser "best-effort
+que só loga".** Os passos viraram uma transação (`unlink_coach_student`,
+só service_role); trial e reconciliação de vagas seguem best-effort.
+
+**Gotchas do emulador (dev client):**
+- `adb shell input text` com dois "r" próximos dispara o **reload do dev
+  client** (atalho R-R). Usar texto sem "rr".
+- O preenchimento automático do Google enche login com a conta pessoal salva.
+  Desligar durante o teste: `settings put secure autofill_service null`
+  (e devolver depois).
+- O toast do LogBox (RevenueCat sem billing no emulador) cobre a barra de abas
+  até y≈2208; tocar na aba pelo texto ou limpar o LogBox antes.
+- IP de LAN muda: `adb reverse tcp:8081 tcp:8081` + deep link com `localhost`.
+- Capturar erro de privilégio trocando de role dentro de `do $$` deu
+  **segfault no Postgres local**; testar privilégio com `has_function_privilege`.
+
+**Estado da entrega (2026-10-13):** backend inteiro em produção — 15
+migrations `20261013*` e as functions `coach-respond-enrollment`,
+`signup-professor`, `coach-unlink-student`, `student-leave-coach`. App via OTA.
+Professores públicos: LUCAS MIGUEL (cidade preenchida como São Paulo/SP como
+placeholder — ele ajusta no Perfil; passou a premium pra aparecer). Coach Teste
+fora da busca.
+
 ### Professor edita metas do aluno (2026-08-27)
 
 Lápis na card "Metas atuais" (aba Plano do coach) → popup com calorias,

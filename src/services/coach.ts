@@ -104,7 +104,27 @@ export type CoachSettingsPatch = {
   contact_phone?: string | null;
   bio?: string | null;
   cref?: string | null;
+  // Perfil público (descoberta). is_public só vale se o resto estiver
+  // preenchido — a checagem final é do servidor (is_coach_discoverable),
+  // a UI só evita o opt-in que não teria efeito nenhum.
+  is_public?: boolean;
+  state_uf?: string | null;
+  city?: string | null;
+  city_ibge_code?: string | null;
+  specialties?: string[];
+  service_mode?: 'online' | 'presencial' | 'hibrido' | null;
 };
+
+/** O que falta pra poder aparecer na busca. Vazio = pronto. */
+export function faltaParaPerfilPublico(coach: Coach | null | undefined): string[] {
+  if (!coach) return ['carregando'];
+  const falta: string[] = [];
+  if (!coach.state_uf) falta.push('estado');
+  if (!coach.city) falta.push('cidade');
+  if (!coach.specialties || coach.specialties.length === 0) falta.push('especialidades');
+  if (!coach.service_mode) falta.push('tipo de atendimento');
+  return falta;
+}
 
 export async function updateCoachSettings(patch: CoachSettingsPatch): Promise<void> {
   const {

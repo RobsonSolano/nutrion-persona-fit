@@ -57,7 +57,10 @@ export default function RotinaDetalheScreen() {
   const isStudent = profileQ.data?.role === 'aluno';
   const isCoach = profileQ.data?.role === 'professor';
   const fromCoach = !!detailQ.data?.created_by_coach;
-  const readOnly = isStudent && fromCoach;
+  // Aluno não edita rotina NENHUMA — nem a que ele criou como usuário comum
+  // antes de contratar um professor. A RLS já bloqueia (routine_ownership_lock);
+  // sem isto a UI ofereceria o botão e o banco recusaria calado.
+  const readOnly = isStudent;
   const createTemplate = useCreateTemplate();
   const alert = useAlert();
   const { requestStart, active: activeWorkout } = useStartWorkoutFlow();
@@ -206,7 +209,7 @@ export default function RotinaDetalheScreen() {
                     </Text>
                   </View>
                 </View>
-                {fromCoach && (
+                {fromCoach ? (
                   <View className="flex-row items-center gap-2 mt-3 rounded-2xl border border-violet/40 bg-violet/10 px-3 py-2">
                     <GraduationCap size={14} color={colors.violetSoft} />
                     <Text className="text-violet-soft text-[11px] font-semibold flex-1">
@@ -218,7 +221,17 @@ export default function RotinaDetalheScreen() {
                       </Text>
                     )}
                   </View>
-                )}
+                ) : readOnly ? (
+                  // Treino que o usuário criou ANTES de virar aluno. Sem este
+                  // aviso ele só veria os botões de edição sumirem.
+                  <View className="flex-row items-center gap-2 mt-3 rounded-2xl border border-border-strong bg-surface-raised px-3 py-2">
+                    <GraduationCap size={14} color={colors.textDim} />
+                    <Text className="text-text-dim text-[11px] flex-1 leading-relaxed">
+                      Treino seu, mantido depois que você virou aluno. Quem edita
+                      agora é o professor.
+                    </Text>
+                  </View>
+                ) : null}
                 {detailQ.data.description && (
                   <Text className="text-text-dim text-sm mt-4 leading-relaxed">
                     {detailQ.data.description}

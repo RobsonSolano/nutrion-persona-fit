@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Home, Users, UserCog } from 'lucide-react-native';
-import { Platform, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/lib/theme';
+import { usePendingEnrollmentCount } from '@/hooks/useEnrollment';
+import StudentLeftGate from '@/components/coach/StudentLeftGate';
 
 /**
  * Abas do painel do professor. Antes tudo pendurava na home num scroll só —
@@ -14,11 +16,13 @@ import { colors } from '@/lib/theme';
  */
 export default function CoachPainelLayout() {
   const insets = useSafeAreaInsets();
+  const pendentes = usePendingEnrollmentCount();
 
   const baseHeight = 78;
   const tabBarHeight = baseHeight + insets.bottom;
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -59,8 +63,10 @@ export default function CoachPainelLayout() {
         name="index"
         options={{
           title: 'Home',
+          // O badge fica na Home porque é dela que se chega na fila de
+          // contratações — o número some junto com o card quando zera.
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon focused={focused}>
+            <TabIcon focused={focused} badge={pendentes}>
               <Home color={color} size={22} strokeWidth={focused ? 2.5 : 2} />
             </TabIcon>
           ),
@@ -89,15 +95,19 @@ export default function CoachPainelLayout() {
         }}
       />
     </Tabs>
+    <StudentLeftGate />
+    </>
   );
 }
 
 function TabIcon({
   focused,
   children,
+  badge,
 }: {
   focused: boolean;
   children: React.ReactNode;
+  badge?: number;
 }) {
   return (
     <View
@@ -111,6 +121,28 @@ function TabIcon({
       }}
     >
       {children}
+      {badge != null && badge > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: -2,
+            right: 4,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: colors.accent,
+            paddingHorizontal: 3,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text
+            style={{ color: colors.textInverse, fontSize: 9, fontWeight: '700' }}
+          >
+            {badge}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

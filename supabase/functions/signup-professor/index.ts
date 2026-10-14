@@ -10,6 +10,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { validateCredential, CREF_EXAMPLE } from '../_shared/credencial.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -71,15 +72,25 @@ serve(async (req: Request) => {
     // CREF/CRN é OBRIGATÓRIO — credencial profissional valida que o user
     // é mesmo um profissional, e fica visível no painel pra distinguir
     // de um user que só marcou "sou professor" por engano.
-    if (!cref || cref.length < 4) {
+    //
+    // A validação é ESTRUTURAL (formato + UF/região + anti-degenerado). Não
+    // existe API pública que prove o registro, então isto barra o lixo óbvio
+    // ("999999-G/SP"), não a fraude deliberada. Ver src/lib/cref.ts.
+    if (!cref) {
       return json(
         {
           error: 'cref_required',
-          detail: 'Informe seu CREF (Educação Física) ou CRN (Nutrição). Mínimo 4 caracteres.',
+          detail: `Informe seu CREF (Educação Física) ou CRN (Nutrição). Ex: ${CREF_EXAMPLE}.`,
         },
         400,
       );
     }
+    const credencial = validateCredential(cref);
+    if (!credencial.ok) {
+      return json({ error: 'cref_invalid', detail: credencial.reason }, 400);
+    }
+    // Grava sempre a forma canônica — o painel e a busca comparam texto.
+    const crefNormalizado = credencial.value;
 
     // Cliente service_role: dribla RLS e a trigger guard_role_changes.
     const supabaseService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -132,7 +143,7 @@ serve(async (req: Request) => {
       .upsert({
         id: user.id,
         bio,
-        cref,
+        cref: crefNormalizado,
       })
       .select('*')
       .single();

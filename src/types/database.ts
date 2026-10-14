@@ -54,6 +54,8 @@ export type Profile = {
   is_early_adopter: boolean | null;
   role: ProfileRole;
   coach_id: string | null;
+  /** "Aluno desde" — mantido por trigger; null sem professor. */
+  coach_linked_at: string | null;
   expo_push_token: string | null;
   created_at: string;
   updated_at: string;
@@ -67,6 +69,14 @@ export type Coach = {
   show_contact_to_students: boolean;
   contact_phone: string | null;
   created_at: string;
+  /** Opt-in de aparecer na busca. Sozinho não basta: exige premium + CREF válido. */
+  is_public: boolean;
+  state_uf: string | null;
+  city: string | null;
+  city_ibge_code: string | null;
+  /** Vocabulário de src/lib/especialidades.ts — não confundir com Modality. */
+  specialties: string[];
+  service_mode: 'online' | 'presencial' | 'hibrido' | null;
 };
 
 export type CoachContact = {

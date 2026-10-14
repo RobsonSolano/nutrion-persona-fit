@@ -69,21 +69,66 @@ export async function createTestUser(opts = {}) {
     throw new Error(`createUser falhou: ${createErr?.message ?? 'sem user'}`);
   }
 
-  // Login pra obter JWT.
-  const { data: signIn, error: signInErr } =
-    await anonClient.auth.signInWithPassword({ email, password });
-  if (signInErr || !signIn.session) {
+  try {
+    return { id: created.user.id, email, password, ...(await signInAs(email, password)) };
+  } catch (err) {
     await adminClient.auth.admin.deleteUser(created.user.id).catch(() => {});
-    throw new Error(`signIn falhou: ${signInErr?.message ?? 'sem session'}`);
+    throw err;
   }
+}
 
-  return {
-    id: created.user.id,
-    email,
-    password,
-    accessToken: signIn.session.access_token,
-    client: userClient(signIn.session.access_token),
-  };
+/**
+ * Loga um user e devolve { accessToken, client }. O login acontece num
+ * client descartável: `signInWithPassword` grava a sessão no client que o
+ * chama, e fazer isso no `adminClient` compartilhado trocava o service role
+ * pelo JWT do user — toda consulta "admin" seguinte rodava sob RLS.
+ */
+export async function signInAs(email, password) {
+  const throwaway = createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await throwaway.auth.signInWithPassword({ email, password });
+  if (error || !data.session) {
+    throw new Error(`signIn falhou: ${error?.message ?? 'sem session'}`);
+  }
+  const accessToken = data.session.access_token;
+  return { accessToken, client: userClient(accessToken) };
+}
+
+/** Chama uma edge function como o user dono do token. */
+export async function callFn(name, accessToken, body) {
+  const res = await fetch(`${URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      apikey: ANON,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = { raw: text };
+  }
+  return { status: res.status, ok: res.ok, body: parsed };
+}
+
+/** CREF de formato válido — o signup-professor recusa cadastro sem um. */
+export const TEST_CREF = '045821-G/SP';
+
+/**
+ * Promove o user a professor via signup-professor. Falha aqui, e não lá na
+ * frente, se o cadastro for recusado.
+ */
+export async function promoteToCoach(user, extra = {}) {
+  const res = await callFn('signup-professor', user.accessToken, { cref: TEST_CREF, ...extra });
+  if (!res.ok) {
+    throw new Error(`signup-professor falhou: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  return res;
 }
 
 export async function cleanupUser(user) {
