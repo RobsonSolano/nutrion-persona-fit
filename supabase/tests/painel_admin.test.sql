@@ -87,9 +87,12 @@ insert into public.profiles (id, role, coach_id, user_number, full_name) values
   -- paga Pro por fora, mas o professor é Premium: herda, e segue pagante por fora
   ('dddddddd-0000-0000-0000-000000000015', 'aluno', 'dddddddd-0000-0000-0000-000000000004', 9715, 'Aluno Por Fora');
 
-insert into public.subscriptions (user_id, tier, source, status, period_end, monthly_amount) values
-  ('dddddddd-0000-0000-0000-000000000014','premium','external','active', null, 99.90),
-  ('dddddddd-0000-0000-0000-000000000015','pro',    'external','active', null, 30.00);
+insert into public.subscriptions (user_id, tier, source, status, period_end, monthly_amount,
+                                  external_since, external_recurring, external_billing_day) values
+  -- recorrente: R$ 99,90 todo dia 10
+  ('dddddddd-0000-0000-0000-000000000014','premium','external','active', null, 99.90, current_date - 60, true, 10),
+  -- avulso: pagou R$ 30 uma vez
+  ('dddddddd-0000-0000-0000-000000000015','pro',    'external','active', null, 30.00, current_date - 5, false, null);
 insert into public.subscriptions (user_id, tier, source, status, trial_end, period_end, trial_consumed) values
   ('dddddddd-0000-0000-0000-000000000002','pro',    'server_trial','in_trial', now() + interval '3 days', null, true),
   -- status segue in_trial no banco, mas a data já passou: é free.
@@ -195,8 +198,10 @@ begin
   assert public._t_delta(m, a, '{plans,paying_by,store}') = 3, 'três pela loja';
   assert public._t_delta(m, a, '{plans,paying_by,external}') = 2, 'dois por fora (um deles herda plano maior)';
   assert public._t_delta(m, a, '{plans,by_kind,external}') = 1, 'origem do plano por fora: só o professor';
-  assert (m #>> '{plans,external_revenue}')::numeric - coalesce((a #>> '{plans,external_revenue}')::numeric, 0) = 129.90,
-    'receita por fora = soma dos valores combinados';
+  assert (m #>> '{plans,external_revenue}')::numeric - coalesce((a #>> '{plans,external_revenue}')::numeric, 0) = 99.90,
+    'receita do mês por fora = só os recorrentes';
+  assert (m #>> '{plans,external_one_off}')::numeric - coalesce((a #>> '{plans,external_one_off}')::numeric, 0) = 30,
+    'avulso fica à parte';
   assert public._t_delta(m, a, '{plans,trial_started}') = 3, 'três fizeram trial';
   assert public._t_delta(m, a, '{plans,trial_converted}') = 1, 'um converteu';
   assert exists (select 1 from json_array_elements(m #> '{plans,store_by_plan}') e
@@ -278,10 +283,21 @@ begin
 
   -- vira pago por fora: troca o tipo, guarda o valor
   r := public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'external', 'pro',
-                                    null, 'Pix mensal', 49.90);
+                                    null, 'Pix mensal', 49.90, date '2026-09-01', true, 10::smallint);
   assert r ->> 'via' = 'external' and r ->> 'tier' = 'pro', 'pago por fora concedido';
-  assert (select monthly_amount from public.subscriptions
-           where user_id = 'dddddddd-0000-0000-0000-000000000001') = 49.90, 'guarda o valor combinado';
+  assert (select (monthly_amount, external_since, external_recurring, external_billing_day)
+            = (49.90::numeric, date '2026-09-01', true, 10::smallint)
+            from public.subscriptions where user_id = 'dddddddd-0000-0000-0000-000000000001'),
+    'guarda valor, início, recorrência e dia';
+  r := public.admin_list_users(p_search => 'free@painel-teste');
+  assert r #>> '{users,0,external_billing_day}' = '10', 'lista traz o dia do pagamento';
+  -- avulso não guarda dia de pagamento
+  perform public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'external', 'pro',
+                                       null, null, 120, date '2026-10-01', false, 10::smallint);
+  assert (select external_billing_day is null and not external_recurring from public.subscriptions
+           where user_id = 'dddddddd-0000-0000-0000-000000000001'), 'avulso sem dia de pagamento';
+  assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'external', 'pro', null, null, 10, null, true, 32::smallint)$q$)
+    = 'invalid_billing_day', 'dia do mês inválido é recusado';
   assert public.grant_server_trial('dddddddd-0000-0000-0000-000000000001') = 'skipped_source',
     'grant_server_trial respeita pago por fora';
   assert public._t_err($q$select public.admin_set_manual_plan('dddddddd-0000-0000-0000-000000000001', 'outro', 'pro')$q$)
