@@ -6,6 +6,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import UpdateGate from '@/components/UpdateGate';
+import { useAppUpdate } from '@/hooks/useAppUpdate';
 
 // O DraggableFlatList em RoutinesReorderList vive dentro de um
 // ScrollView vertical (PlanoTab) com altura fixa propositalmente — não
@@ -41,6 +43,8 @@ function Providers({ children }: { children: React.ReactNode }) {
   useNotificationRouter();
   const userId = useSessionStore((s) => s.user?.id ?? null);
   const ota = useOtaUpdate();
+  // Binário abaixo da mínima: o OTA não resolve — só a loja ([MOD]-01).
+  const bloqueado = useAppUpdate().blocked;
 
   useEffect(() => {
     setSentryUser(userId);
@@ -54,8 +58,9 @@ function Providers({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
+      <UpdateGate />
       <ConfirmModal
-        visible={ota.isReady}
+        visible={ota.isReady && !bloqueado}
         onClose={ota.dismiss}
         title="Atualização disponível"
         message={getOtaModalMessage(ota.releaseNotes)}

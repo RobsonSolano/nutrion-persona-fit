@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/lib/theme';
 import { usePendingEnrollmentCount } from '@/hooks/useEnrollment';
 import StudentLeftGate from '@/components/coach/StudentLeftGate';
+import { CoachAnnouncementGate } from '@/components/AnnouncementGate';
 
 /**
  * Abas do painel do professor. Antes tudo pendurava na home num scroll só —
@@ -96,6 +97,7 @@ export default function CoachPainelLayout() {
       />
     </Tabs>
     <StudentLeftGate />
+    <CoachAnnouncementGate />
     </>
   );
 }

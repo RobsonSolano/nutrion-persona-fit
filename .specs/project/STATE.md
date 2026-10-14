@@ -88,6 +88,32 @@ de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (para
 faturamento) — isto é ajuste cirúrgico de prompt.
 
 
+### Avisos remotos + atualização pela loja (2026-10-13, noite)
+
+Item #2 da ordem. Spec em `.specs/features/2026-10-13-avisos-remotos/`.
+
+**Como usar (tudo no Table Editor do Supabase, sem build nem OTA):**
+- **Aviso:** inserir linha em `announcements` — `title`, `body`, `audience`
+  (`todos|comum|aluno|professor`), opcional `cta_label` + `cta_url` (rota do app
+  tipo `/encontrar-professor` ou URL), `starts_at` (padrão agora), `ends_at`
+  (opcional), `active`. Aparece uma vez por usuário, depois do login.
+- **Atualização:** `app_config` (linha única). `recommended_version` → aviso com
+  "Depois"; `min_version` → bloqueia até atualizar, inclusive no login. Vazio =
+  nada. `update_title`/`update_message`/`android_store_url` opcionais.
+- **Roteiro do próximo `.aab` (1.5.0):** subir na Play → `recommended_version =
+  1.5.0` → depois de uns dias, se quiser forçar, `min_version = 1.5.0`.
+
+**Versão instalada = `Updates.runtimeVersion`** (sem módulo nativo novo — sai por
+OTA). Só funciona porque a política de runtime é `appVersion`; se virar
+fingerprint, a runtime vira hash e o app trata como desconhecida (nunca bloqueia,
+com teste). **O popup só alcança quem recebe OTA: tem que estar publicado ANTES do
+`.aab` que sobe a versão.**
+
+**Um modal por vez:** bloqueio de versão > avisos de vínculo > aviso remoto. Cada
+gate checa `useAppUpdate().blocked`; o aviso remoto espera os de vínculo
+(`useHasPending{Student,Coach}LinkNotice`). Coordenador central foi avaliado e
+descartado por ora (2 regras não pagam o custo).
+
 ### Aluno contrata professor (2026-08-29)
 
 Épico #8 do BACKLOG implementado numa branch (`feature/aluno-contrata-professor`),

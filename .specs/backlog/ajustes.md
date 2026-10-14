@@ -77,3 +77,11 @@ checar o vínculo atual (`exists (select 1 from profiles p where p.id = student_
 **Onde:** `supabase/functions/delete-my-account/index.ts` (2 cálculos de dias à mão)
 **O que é:** `_shared/desvinculo.ts` exporta `daysSince`; o delete-my-account não foi tocado nesta leva.
 **Esforço:** minutos + `fn:deploy`.
+
+## `announcement_views` tem policy de leitura que o app não usa
+**Origem:** /simplify de 2026-10-13 (avisos remotos).
+**Onde:** migration `20261013160000_avisos_remotos.sql` (`announcement_views_select_own`) e as RPCs
+`my_pending_announcements`/`mark_announcement_seen` (usam `auth.uid()` em vez de `(select auth.uid())`).
+**O que é:** o app só acessa por RPC; a policy é inofensiva mas sobra. Já está em produção — não valeu
+uma migration só pra isso. Junta com a próxima migration que tocar essas tabelas.
+**Esforço:** minutos.

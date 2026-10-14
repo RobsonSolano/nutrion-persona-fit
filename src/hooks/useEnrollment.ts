@@ -136,6 +136,22 @@ export function useUnseenUnlinkNotices(side: UnlinkNoticeSide) {
   });
 }
 
+/**
+ * Há aviso de vínculo pendente? É o que os avisos remotos esperam ([MOD]-02)
+ * — mesma regra e mesmas queries (em cache) dos gates de vínculo. Um hook por
+ * lado: o professor não consulta desfecho de contratação.
+ */
+export function useHasPendingStudentLinkNotice(): boolean {
+  const unlink = useUnseenUnlinkNotices('student');
+  const { unseen } = useUnseenEnrollmentOutcomes();
+  return (unlink.data?.length ?? 0) > 0 || unseen.length > 0;
+}
+
+export function useHasPendingCoachLinkNotice(): boolean {
+  const left = useUnseenUnlinkNotices('coach');
+  return (left.data?.length ?? 0) > 0;
+}
+
 export function useMarkUnlinkNoticeSeen() {
   const qc = useQueryClient();
   const { user } = useAuth();

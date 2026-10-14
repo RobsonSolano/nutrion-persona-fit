@@ -4,6 +4,7 @@ import { Save, SlidersHorizontal, Trash2 } from 'lucide-react-native';
 import { Button, Card, Input } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { usePendingWorkout } from '@/hooks/usePendingWorkout';
+import { useAppUpdate } from '@/hooks/useAppUpdate';
 import { formatHMS, msToMinutes } from '@/lib/workoutTimer';
 
 /**
@@ -19,8 +20,10 @@ export function PendingWorkoutModal() {
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
   const [day, setDay] = useState('');
+  const { blocked } = useAppUpdate();
 
-  if (!pending) return null;
+  // Bloqueio de versão vem primeiro ([MOD]-01).
+  if (!pending || blocked) return null;
 
   const totalMin = msToMinutes(elapsedMsValue);
 
