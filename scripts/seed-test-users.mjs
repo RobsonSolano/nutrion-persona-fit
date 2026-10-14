@@ -43,7 +43,7 @@ const USERS = [
     email: 'coach@nutrion.test',
     fullName: 'Coach Teste',
     role: 'professor',
-    coach: { bio: 'Coach de teste pra LGPD', cref: 'TEST-001/SP' },
+    coach: { bio: 'Coach de teste pra LGPD', cref: '045821-G/SP' },
   },
   {
     key: 'aluno1',

@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 export type PlanRevision = {
   id: string;
   student_id: string;
-  coach_id: string;
+  // null depois do desvínculo: a revisão fica com o aluno e sai do alcance do ex-professor.
+  coach_id: string | null;
   rationale: string | null;
   calorie_goal: number | null;
   protein_goal_g: number | null;

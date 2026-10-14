@@ -1,5 +1,13 @@
 import { ReactNode } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import Button from './Button';
 
 type ActionVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -25,7 +33,7 @@ type Props = {
   icon?: ReactNode;
   /** Ações em ordem visual (top-down). Convenção: cancelar por último. */
   actions: ConfirmAction[];
-  /** Se true, fechar pelo backdrop é bloqueado (forçar uso dos botões). */
+  /** Se false, fechar pelo backdrop é bloqueado (forçar uso dos botões). */
   dismissable?: boolean;
 };
 
@@ -47,15 +55,28 @@ export default function ConfirmModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
+      {/* Modal não herda o adjustResize da janela: sem isto, um campo de
+          texto no `content` (motivo, confirmação) sobe o teclado por cima
+          dos botões. O ScrollView centraliza quando cabe e rola quando o
+          teclado toma o espaço. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }}
+      >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
       <Pressable
         onPress={() => {
           if (dismissable) onClose();
         }}
         style={{
           flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.65)',
           justifyContent: 'center',
           paddingHorizontal: 24,
+          paddingVertical: 24,
         }}
       >
         <Pressable
@@ -93,6 +114,8 @@ export default function ConfirmModal({
           </View>
         </Pressable>
       </Pressable>
+      </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

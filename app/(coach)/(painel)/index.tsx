@@ -7,6 +7,9 @@ import {
   MessagesSquare,
   BookOpen,
   UserPlus,
+  Star,
+  Eye,
+  EyeOff,
   Plus,
 } from 'lucide-react-native';
 import { Card, Screen } from '@/components/ui';
@@ -19,8 +22,13 @@ import CoachPlanBadge from '@/components/CoachPlanBadge';
 import { useDowngradeStatus } from '@/hooks/useDowngradeStatus';
 import { useCoachRequests } from '@/hooks/useRequests';
 import { useCoachAccessSync } from '@/hooks/useCoachAccessSync';
-import { getMyCoach } from '@/services/coach';
+import {
+  useCoachEnrollmentRequests,
+  useCoachRating,
+} from '@/hooks/useEnrollment';
+import { faltaParaPerfilPublico, getMyCoach } from '@/services/coach';
 import { suspendedCount } from '@/lib/suspension';
+import StarRating from '@/components/coach/StarRating';
 
 export default function CoachHome() {
   const router = useRouter();
@@ -30,6 +38,8 @@ export default function CoachHome() {
   useCoachAccessSync();
   const studentsQ = useStudents();
   const openRequestsQ = useCoachRequests('open');
+  const enrollmentQ = useCoachEnrollmentRequests();
+  const ratingQ = useCoachRating(user?.id ?? null);
   const coachQ = useQuery({
     queryKey: ['my-coach', user?.id ?? 'anon'],
     queryFn: getMyCoach,
@@ -45,6 +55,16 @@ export default function CoachHome() {
   const alunos = studentsQ.data ?? [];
   const suspended = suspendedCount(alunos);
   const ativos = alunos.length - suspended;
+
+  const pendentes = (enrollmentQ.data ?? []).filter(
+    (r) => r.status === 'pendente',
+  ).length;
+  const emAndamento = (enrollmentQ.data ?? []).filter(
+    (r) => r.status === 'andamento',
+  ).length;
+
+  const falta = faltaParaPerfilPublico(coachQ.data);
+  const perfilPublicoOk = coachQ.data?.is_public && falta.length === 0;
 
   return (
     <Screen variant="hero" edges={['top']}>
@@ -96,14 +116,35 @@ export default function CoachHome() {
             onPress={() => router.push('/(coach)/alunos' as Href)}
           />
           <StatTile
-            label="Pedidos"
-            value={String(openRequestsCount)}
-            hint={openRequestsCount > 0 ? 'aguardando você' : 'nenhum aberto'}
+            label="Solicitações"
+            value={String(pendentes)}
+            hint={emAndamento > 0 ? `${emAndamento} em andamento` : 'pendentes'}
             icon={<UserPlus size={16} color={colors.accent} />}
-            highlight={openRequestsCount > 0}
-            onPress={() => router.push('/(coach)/solicitacoes' as Href)}
+            highlight={pendentes > 0}
+            onPress={() => router.push('/(coach)/contratacoes' as Href)}
           />
         </View>
+
+        <Pressable
+          onPress={() => router.push('/(coach)/avaliacoes' as Href)}
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <Star size={14} color={colors.warn} />
+                <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+                  Sua avaliação
+                </Text>
+              </View>
+              <StarRating
+                value={ratingQ.data?.avg ?? 0}
+                count={ratingQ.data?.count ?? 0}
+                size={14}
+              />
+            </View>
+          </Card>
+        </Pressable>
 
         {suspended > 0 && (
           <Pressable
@@ -119,6 +160,56 @@ export default function CoachHome() {
             </Text>
           </Pressable>
         )}
+
+        {/* Estado da descoberta: sem isso o professor não entende por que
+            ninguém o encontra. */}
+        <Pressable
+          onPress={() => router.push('/(coach)/perfil' as Href)}
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View
+                className={`h-11 w-11 rounded-2xl border items-center justify-center ${
+                  perfilPublicoOk
+                    ? 'bg-accent/10 border-accent/30'
+                    : 'bg-surface-raised border-border'
+                }`}
+              >
+                {perfilPublicoOk ? (
+                  <Eye size={20} color={colors.accent} />
+                ) : (
+                  <EyeOff size={20} color={colors.textDim} />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  {perfilPublicoOk ? 'Você aparece na busca' : 'Você não aparece na busca'}
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5 leading-relaxed">
+                  {perfilPublicoOk
+                    ? 'Alunos podem te encontrar por região e especialidade.'
+                    : falta.length > 0
+                      ? `Falta preencher: ${falta.join(', ')}.`
+                      : 'Ative "aparecer na busca" no seu perfil.'}
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
+
+        <NavCard
+          icon={<UserPlus size={20} color={colors.accent} />}
+          title="Contratações"
+          subtitle={
+            pendentes > 0
+              ? `${pendentes} nova${pendentes > 1 ? 's' : ''} aguardando você`
+              : 'Quem pediu pra ser seu aluno'
+          }
+          badge={pendentes}
+          onPress={() => router.push('/(coach)/contratacoes' as Href)}
+        />
 
         <NavCard
           icon={<MessagesSquare size={20} color={colors.violetSoft} />}

@@ -29,6 +29,7 @@ import {
   FileText,
   TrendingUp,
   Mail,
+  CalendarDays,
 } from 'lucide-react-native';
 import {
   Avatar,
@@ -423,6 +424,15 @@ function VisaoTab({
                   className="text-text-dim text-[11px] flex-1"
                 >
                   {profile.email}
+                </Text>
+              </View>
+            )}
+            {profile.coach_linked_at && (
+              <View className="flex-row items-center gap-1 mt-1.5">
+                <CalendarDays size={11} color={colors.textDim} />
+                <Text className="text-text-dim text-[11px]">
+                  Aluno desde{' '}
+                  {new Date(profile.coach_linked_at).toLocaleDateString('pt-BR')}
                 </Text>
               </View>
             )}

@@ -27,6 +27,10 @@ const CRITICAL_TYPES: PushType[] = [
   'goal_achieved',
   'student_account_deleted',
   'coach_unlinked',
+  // O desfecho da contratação muda o estado da conta — não segura até as 7h.
+  'enrollment_accepted',
+  'enrollment_declined',
+  'student_left_coach',
 ];
 
 // Cooldown por tipo (em horas) — entre 2 envios do MESMO tipo pro MESMO user
@@ -44,6 +48,9 @@ const COOLDOWN_HOURS_BY_TYPE: Record<PushType, number> = {
   streak_warning: 20,
   student_account_deleted: 0, // evento único, sempre enviar
   coach_unlinked: 0, // evento único, sempre enviar
+  enrollment_accepted: 0, // evento único, sempre enviar
+  enrollment_declined: 0, // evento único, sempre enviar
+  student_left_coach: 0, // evento único, sempre enviar
 };
 
 const GLOBAL_DAILY_MAX = 3; // máx 3 pushes/dia

@@ -15,6 +15,8 @@ import {
   RefreshCw,
   AlertTriangle,
   MessagesSquare,
+  Search,
+  UserPlus,
   Lock,
   Download,
   Bell,
@@ -37,6 +39,7 @@ import SubscriptionCard from '@/components/SubscriptionCard';
 import StudentAssessmentCard from '@/components/StudentAssessmentCard';
 import { Avatar } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
+import { useMyEnrollmentRequests } from '@/hooks/useEnrollment';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 
@@ -63,6 +66,13 @@ export default function PerfilScreen() {
     hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
   const isStudent = profile?.role === 'aluno';
+  const isComum = profile?.role === 'comum';
+  // Só o usuário comum contrata: aluno já tem professor, professor não usa
+  // estas tabs.
+  const myRequestsQ = useMyEnrollmentRequests();
+  const solicitacoesAbertas = (myRequestsQ.data ?? []).filter(
+    (r) => r.status === 'pendente' || r.status === 'andamento',
+  ).length;
 
   async function executeReset(mode: ResetOnboardingMode) {
     setRedoStep('closed');
@@ -188,6 +198,28 @@ export default function PerfilScreen() {
                 icon={<Pencil size={14} color={colors.text} />}
               />
             </View>
+            {isComum && (
+              <View style={{ width: '48.5%' }}>
+                <Button
+                  label="Encontre um professor"
+                  onPress={() => router.push('/encontrar-professor' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<Search size={14} color={colors.accent} />}
+                />
+              </View>
+            )}
+            {isComum && solicitacoesAbertas > 0 && (
+              <View style={{ width: '48.5%' }}>
+                <Button
+                  label={`Solicitações (${solicitacoesAbertas})`}
+                  onPress={() => router.push('/minhas-solicitacoes' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<UserPlus size={14} color={colors.violetSoft} />}
+                />
+              </View>
+            )}
             {isStudent && (
               <View style={{ width: '48.5%', position: 'relative' }}>
                 <Button

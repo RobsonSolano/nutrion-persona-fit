@@ -63,3 +63,6 @@ taco_*.pdf
 
 # artefatos do deno check nas edge functions
 supabase/functions/**/deno.lock
+
+# Estado local do supabase CLI (branch do 'supabase start')
+supabase/.branches/

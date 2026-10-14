@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { Plus, Search, Users, X } from 'lucide-react-native';
+import { Plus, Search, UserPlus, Users, X } from 'lucide-react-native';
 import { Button, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
@@ -134,6 +134,7 @@ export default function CoachAlunosScreen() {
             ) : (
               <EmptyAlunos
                 onCadastrar={() => router.push('/(coach)/aluno-novo' as Href)}
+                onContratacoes={() => router.push('/(coach)/contratacoes' as Href)}
               />
             )
           }
@@ -143,7 +144,13 @@ export default function CoachAlunosScreen() {
   );
 }
 
-function EmptyAlunos({ onCadastrar }: { onCadastrar: () => void }) {
+function EmptyAlunos({
+  onCadastrar,
+  onContratacoes,
+}: {
+  onCadastrar: () => void;
+  onContratacoes: () => void;
+}) {
   return (
     <View className="items-center px-6 pt-16">
       <View className="h-16 w-16 rounded-3xl bg-surface-raised border border-border items-center justify-center mb-4">
@@ -153,10 +160,18 @@ function EmptyAlunos({ onCadastrar }: { onCadastrar: () => void }) {
         Nenhum aluno ainda
       </Text>
       <Text className="text-text-muted text-xs text-center mt-2 leading-relaxed">
-        Cadastre a conta do aluno com a ficha já preenchida.
+        Você pode cadastrar a conta do aluno você mesmo, ou deixar que te
+        encontrem pela busca e mandem solicitação.
       </Text>
       <View className="mt-5 self-stretch gap-2">
         <Button label="Cadastrar aluno" onPress={onCadastrar} fullWidth />
+        <Button
+          label="Ver contratações"
+          variant="secondary"
+          onPress={onContratacoes}
+          icon={<UserPlus size={15} color={colors.text} />}
+          fullWidth
+        />
       </View>
     </View>
   );
