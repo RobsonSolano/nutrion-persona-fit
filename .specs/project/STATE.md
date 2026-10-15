@@ -88,6 +88,41 @@ de confiar na aritmética do LLM. Não confundir com o épico "IA robusta" (para
 faturamento) — isto é ajuste cirúrgico de prompt.
 
 
+### Painel admin v2 + plano manual + suporte e sugestões (2026-10-14/15)
+
+Specs: `.specs/features/2026-10-14-painel-admin-v2/` e `.specs/features/2026-10-15-suporte-sugestoes/`.
+Painel = repo `RobsonSolano/nutrion-painel`, no ar em https://admin-personafit.vercel.app (Vercel
+time SolanooDev, **sem integração Git** — publicar com `vercel deploy --prod` dentro de `painel/`).
+
+- **Dados do painel só por funções `admin_*`** (SECURITY DEFINER, todas começam com `_admin_assert()`):
+  estão no mesmo banco do app e qualquer usuário logado alcança com a anon key.
+- **Plano manual** (`subscriptions.source` = `partner` | `external`): parceria não paga; "pago por
+  fora" tem `monthly_amount`, `external_since`, `external_recurring`, `external_billing_day`. Vale até
+  `period_end` (null = sem fim). `_resolve_entitlement` devolve `via`, `store_active` e `manual`
+  (uma fonte só das regras de plano — o painel lê dali). Pagante = loja ativa ou pago por fora,
+  mesmo que o aluno herde plano maior do professor.
+- **Receita do mês** = pagantes da Play × preço de tabela (`painel/src/lib/plans.ts`: 15,90 /
+  15,90 / 29,90, do manual de billing) + mensais por fora. Avulsos ficam à parte.
+- **Uso da IA só em contadores** (`ai_usage_log` status/error_code + `push_history`), nunca o texto
+  das conversas — decisão do dev.
+- **Suporte e sugestões:** app escreve só por `send_support_message` (papel gravado do perfil,
+  10/dia); resposta pelo painel via edge `admin-support-update`, que manda push quando
+  `admin_support_update` devolve `reply_changed`.
+
+**LIÇÕES:**
+- `coach-import-workout-ai` gravava `feature = 'coach_import_workout'` fora do check de
+  `ai_usage_log` → insert falhava calado, importações nunca foram contadas (corrigido no check).
+  `pushAi.ts` grava colunas inexistentes (backlog). Insert de log sem checar erro esconde isso.
+- Painel antigo travava em "Carregando…" no reload: chamada ao supabase **dentro** do
+  `onAuthStateChange` trava no lock de auth. Adiar com `setTimeout`.
+- `trial_end` no passado com `status = in_trial` gravado é free — o banco nunca atualiza o status;
+  sempre decidir pela data.
+
+**Pendências com o dev:** e-mail do Claudio gravado como `...@gmail.comt`; trocar a senha antiga do
+admin (está no histórico do git do painel); responder/encerrar a mensagem de teste "Teste do fluxo
+de suporte" (conta `comum@nutrion.test`). Backlog: webhook x plano manual, SubscriptionCard sem
+saber de plano manual, pushAi, e-mail "NutriOn".
+
 ### Avisos do Play Console na 1.5.0 (7) → R8 ligado + scanner destravado (2026-10-14)
 
 A Play acusou 3 coisas na 1.5.0 (7). Correção vai no **1.5.0 (8)** — mesma versão, pra não abrir
