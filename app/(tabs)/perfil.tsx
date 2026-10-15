@@ -23,17 +23,19 @@ import {
   BellOff,
   TrendingUp,
   HeartPulse,
+  LifeBuoy,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { usePushToggle } from '@/hooks/usePushToggle';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
+import { useUnreadSupportReplies } from '@/hooks/useSupport';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
-import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
+import { Button, Card, ConfirmModal, CountBadge, Screen } from '@/components/ui';
 import CoachCard from '@/components/CoachCard';
 import SubscriptionCard from '@/components/SubscriptionCard';
 import StudentAssessmentCard from '@/components/StudentAssessmentCard';
@@ -59,6 +61,7 @@ export default function PerfilScreen() {
 
   const push = usePushToggle();
   const unreadQ = useUnreadStudentRequests();
+  const unreadSupport = useUnreadSupportReplies();
   const alert = useAlert();
 
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
@@ -231,34 +234,7 @@ export default function PerfilScreen() {
                   size="md"
                   icon={<MessagesSquare size={14} color={colors.violetSoft} />}
                 />
-                {(unreadQ.data ?? 0) > 0 && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -4,
-                      minWidth: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: colors.accent,
-                      paddingHorizontal: 4,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 2,
-                      borderColor: colors.surface,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: colors.textInverse,
-                        fontSize: 10,
-                        fontWeight: '700',
-                      }}
-                    >
-                      {unreadQ.data}
-                    </Text>
-                  </View>
-                )}
+                <CountBadge count={unreadQ.data ?? 0} />
               </View>
             )}
             <View style={{ width: '48.5%' }}>
@@ -321,6 +297,16 @@ export default function PerfilScreen() {
                 size="md"
                 icon={<HeartPulse size={14} color={colors.violetSoft} />}
               />
+            </View>
+            <View style={{ width: '100%', position: 'relative' }}>
+              <Button
+                label="Suporte e sugestões"
+                onPress={() => router.push('/suporte' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<LifeBuoy size={14} color={colors.textDim} />}
+              />
+              <CountBadge count={unreadSupport} />
             </View>
           </View>
         </Card>
