@@ -10,3 +10,4 @@ export { default as MarkdownText } from './MarkdownText';
 export { default as SegmentedControl } from './SegmentedControl';
 export { default as Sparkline } from './Sparkline';
 export { default as StatRing } from './StatRing';
+export { default as CountBadge } from './CountBadge';

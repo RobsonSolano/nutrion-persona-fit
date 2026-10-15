@@ -8,6 +8,7 @@ import { checkMySuspension } from '@/services/suspension';
 type PushPayload = {
   event?: string;
   request_id?: string;
+  message_id?: string;
   type?: string;
 };
 
@@ -56,6 +57,11 @@ export function useNotificationRouter() {
       } else if (payload.event === 'plan_updated') {
         // Aluno foi notificado que o plano dele foi atualizado.
         target = '/(tabs)/treino' as Href;
+      } else if (payload.event === 'support_reply') {
+        // Equipe respondeu uma mensagem de suporte/sugestão.
+        target = (
+          payload.message_id ? `/suporte/${payload.message_id}` : '/suporte'
+        ) as Href;
       } else if (payload.event === 'inactivity_reminder') {
         // Lembrete de log — leva pro log rápido.
         target = '/log' as Href;
