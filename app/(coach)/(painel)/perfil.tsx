@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  LifeBuoy,
   Lock,
   LogOut,
   Save,
@@ -22,7 +23,7 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { Button, Card, Input, Screen } from '@/components/ui';
+import { Button, Card, CountBadge, Input, Screen } from '@/components/ui';
 import AvatarPicker from '@/components/AvatarPicker';
 import SubscriptionCard from '@/components/SubscriptionCard';
 import DangerZone from '@/components/DangerZone';
@@ -44,6 +45,7 @@ import EspecialidadePicker from '@/components/coach/EspecialidadePicker';
 import { faltaParaPerfilPublico, getMyCoach } from '@/services/coach';
 import { SERVICE_MODES, SERVICE_MODE_LABELS } from '@/lib/especialidades';
 import { usePushToggle } from '@/hooks/usePushToggle';
+import { useUnreadSupportReplies } from '@/hooks/useSupport';
 
 export default function CoachPerfilScreen() {
   const router = useRouter();
@@ -75,6 +77,7 @@ export default function CoachPerfilScreen() {
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [serviceMode, setServiceMode] = useState<string | null>(null);
   const push = usePushToggle();
+  const unreadSupport = useUnreadSupportReplies();
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -441,6 +444,17 @@ export default function CoachPerfilScreen() {
                   icon={<Lock size={16} color={colors.textDim} />}
                 />
               </View>
+            </View>
+
+            <View style={{ position: 'relative' }}>
+              <Button
+                label="Suporte e sugestões"
+                onPress={() => router.push('/suporte' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<LifeBuoy size={16} color={colors.textDim} />}
+              />
+              <CountBadge count={unreadSupport} />
             </View>
 
             <View className="flex-row gap-2">

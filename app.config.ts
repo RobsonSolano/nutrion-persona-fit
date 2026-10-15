@@ -111,9 +111,9 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: [],
+      novidades: ['💬 Suporte e sugestões no Perfil: mande dúvidas ou ideias e receba a resposta aqui no app.'],
       melhorias: [],
-      ajustes: ['🔧 Manutenção e pequenas melhorias.'],
+      ajustes: [],
     },
   },
 };
