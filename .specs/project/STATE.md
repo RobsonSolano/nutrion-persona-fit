@@ -2,6 +2,16 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Plano Elite e Pessoal Premium (2026-11-04)
+
+Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).
+Professor nunca fica sem limite de alunos: free 2 · pro 5 · premium 20 · elite 50.
+
+**Ideias para depois (fora desta entrega):**
+- Franquia de alunos extras: ~R$ 2,00 por aluno acima de 50 (ou pacotes).
+- Oferta para academias (B2B), separada do Elite; por isso não usar "Studio/Business" como nome agora.
+- Limite de alunos calculado num lugar só (`_resolve_entitlement`): a franquia entra somando assentos extras.
+
 ### Exercícios em conjunto / bi-set (2026-09-15)
 
 Aluno com 30-40 min não termina o treino fazendo um exercício depois do outro. O
