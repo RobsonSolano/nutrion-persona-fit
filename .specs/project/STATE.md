@@ -14,7 +14,7 @@ Sem regra de "Premium legado": consulta de 2026-11-04 mostrou nenhum professor c
 **Ordem de deploy (obrigatória):** 1) produtos `nutrion_prof_elite` e `nutrion_comum_premium` na Play
 + entitlement `elite` e produtos no RevenueCat → 2) migration (`supabase db push`) → 3) edge functions
 (webhook e chat-ai; o webhook com `elite` falha no check constraint sem a migration) → 4) app (só JS/TS mudou, sem dependência
-nativa: OTA `npm run update:production` serve; versão antiga do app segue funcionando sem o Elite) → 5) painel (`vercel --prod`) e hotsite.
+nativa: OTA `npm run update:production` serve; publicar logo após a migration: no app antigo, comum sem Premium vê erro genérico na busca de professores em vez do paywall) → 5) painel (`vercel --prod`) e hotsite.
 
 **Custo (maestro):** planejamento 0,53 M tokens · onda 1 0,58 M · onda 2 0,58 M · onda 3 0,36 M.
 
