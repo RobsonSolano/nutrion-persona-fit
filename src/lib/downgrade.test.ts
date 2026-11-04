@@ -25,7 +25,13 @@ describe('needsStudentChoice', () => {
     expect(needsStudentChoice({ ...base, role: 'comum' })).toBe(false);
   });
 
-  it('limite null (premium ilimitado) → false', () => {
+  it('limite null (sem limite) → false', () => {
     expect(needsStudentChoice({ ...base, studentLimit: null })).toBe(false);
+  });
+
+  it('ELITE-03 premium com 25 alunos e limite 20 → precisa escolher', () => {
+    expect(
+      needsStudentChoice({ ...base, studentCount: 25, studentLimit: 20 }),
+    ).toBe(true);
   });
 });
