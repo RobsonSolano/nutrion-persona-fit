@@ -6,6 +6,17 @@
 
 Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).
 Professor nunca fica sem limite de alunos: free 2 · pro 5 · premium 20 · elite 50.
+Pessoal Premium (`nutrion_comum_premium`, R$ 29,90): busca de professores (gate no servidor, erro
+PT402 `needs_upgrade:coach_discovery`) + cotas de IA 20 chat / 15 análises por dia. Cota maior só
+para assinatura **própria** premium+ (`own_tier`); aluno que herda do professor fica em 10/8.
+Sem regra de "Premium legado": consulta de 2026-11-04 mostrou nenhum professor com mais de 20 alunos.
+
+**Ordem de deploy (obrigatória):** 1) produtos `nutrion_prof_elite` e `nutrion_comum_premium` na Play
++ entitlement `elite` e produtos no RevenueCat → 2) migration (`supabase db push`) → 3) edge functions
+(webhook e chat-ai; o webhook com `elite` falha no check constraint sem a migration) → 4) app (build
+nativo, não OTA: muda paywall/compra) → 5) painel (`vercel --prod`) e hotsite.
+
+**Custo (maestro):** planejamento 0,53 M tokens · onda 1 0,58 M · onda 2 0,58 M · onda 3 0,36 M.
 
 **Ideias para depois (fora desta entrega):**
 - Franquia de alunos extras: ~R$ 2,00 por aluno acima de 50 (ou pacotes).
