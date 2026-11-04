@@ -27,6 +27,11 @@ import { useAuth } from './useAuth';
 import { useProfile } from './useProfile';
 import { queryKeys } from '@/lib/queryKeys';
 import { outcomesToAnnounce } from '@/lib/enrollmentOutcomes';
+import { NeedsUpgradeError } from '@/lib/needsUpgrade';
+
+// Erro de gate é determinístico: repetir a RPC só atrasa o redirect ao paywall.
+const retryUnlessUpgrade = (n: number, err: unknown) =>
+  !(err instanceof NeedsUpgradeError) && n < 1;
 
 export const coachSearchKey = (f: SearchFilters) =>
   ['coach_search', f.uf ?? '', f.city ?? '', (f.specialties ?? []).join(','),
@@ -43,15 +48,17 @@ export function useCoachSearch(filters: SearchFilters, enabled = true) {
     queryFn: () => searchCoaches(filters),
     enabled,
     staleTime: 60_000,
+    retry: retryUnlessUpgrade,
   });
 }
 
-export function useCoachPublicProfile(coachId: string | null) {
+export function useCoachPublicProfile(coachId: string | null, enabled = true) {
   return useQuery({
     queryKey: coachPublicKey(coachId ?? 'none'),
     queryFn: () => getCoachPublicProfile(coachId!),
-    enabled: !!coachId,
+    enabled: !!coachId && enabled,
     staleTime: 30_000,
+    retry: retryUnlessUpgrade,
   });
 }
 
