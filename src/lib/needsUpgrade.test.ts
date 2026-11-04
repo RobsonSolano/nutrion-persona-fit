@@ -3,6 +3,7 @@ import {
   NeedsUpgradeError,
   parseNeedsUpgrade,
   needsUpgradeFromInvokeError,
+  needsUpgradeFromRpcError,
 } from './needsUpgrade';
 
 describe('parseNeedsUpgrade', () => {
@@ -55,5 +56,37 @@ describe('needsUpgradeFromInvokeError', () => {
   it('retorna null quando o context não é 402', async () => {
     const e = { context: new Response('{}', { status: 500 }) };
     expect(await needsUpgradeFromInvokeError(e)).toBeNull();
+  });
+});
+
+describe('needsUpgradeFromRpcError', () => {
+  it('PREM-02 converte code PT402 em NeedsUpgradeError com a feature da mensagem', () => {
+    const err = needsUpgradeFromRpcError({
+      code: 'PT402',
+      message: 'needs_upgrade:coach_discovery',
+    }, 'x');
+    expect(err).toBeInstanceOf(NeedsUpgradeError);
+    expect(err?.feature).toBe('coach_discovery');
+  });
+
+  it('PREM-02 converte só pela mensagem needs_upgrade:', () => {
+    const err = needsUpgradeFromRpcError({ message: 'needs_upgrade:coach_discovery' }, 'x');
+    expect(err?.feature).toBe('coach_discovery');
+  });
+
+  it('PREM-02 PT402 sem feature na mensagem usa a feature padrão', () => {
+    expect(needsUpgradeFromRpcError({ code: 'PT402', message: '' }, 'coach_discovery')?.feature).toBe(
+      'coach_discovery',
+    );
+  });
+
+  it('PREM-02 erro comum vira null', () => {
+    expect(needsUpgradeFromRpcError({ code: '42501', message: 'permission denied' }, 'x')).toBeNull();
+    expect(needsUpgradeFromRpcError(new Error('boom'), 'x')).toBeNull();
+  });
+
+  it('PREM-02 null e undefined viram null', () => {
+    expect(needsUpgradeFromRpcError(null, 'x')).toBeNull();
+    expect(needsUpgradeFromRpcError(undefined, 'x')).toBeNull();
   });
 });

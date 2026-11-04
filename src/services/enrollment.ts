@@ -6,7 +6,7 @@
 // já pode ler pela RLS (as solicitações dele).
 
 import { supabase } from './supabase';
-import { parseNeedsUpgrade } from '@/lib/needsUpgrade';
+import { needsUpgradeFromRpcError, parseNeedsUpgrade } from '@/lib/needsUpgrade';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -99,7 +99,7 @@ export async function searchCoaches(
     p_service_mode: filters.serviceMode ?? null,
     p_query: filters.query?.trim() || null,
   });
-  if (error) throw error;
+  if (error) throw needsUpgradeFromRpcError(error, 'coach_discovery') ?? error;
   return (data ?? []) as CoachSearchResult[];
 }
 
@@ -109,7 +109,7 @@ export async function getCoachPublicProfile(
   const { data, error } = await supabase.rpc('get_coach_public_profile', {
     p_coach_id: coachId,
   });
-  if (error) throw error;
+  if (error) throw needsUpgradeFromRpcError(error, 'coach_discovery') ?? error;
   return (data ?? null) as CoachPublicProfile | null;
 }
 
@@ -136,7 +136,7 @@ export async function requestCoach(
     p_message: message ?? null,
     p_contact_phone: contactPhone,
   });
-  if (error) throw error;
+  if (error) throw needsUpgradeFromRpcError(error, 'coach_discovery') ?? error;
   const res = data as { ok: boolean; id?: string; error?: string };
   if (!res.ok) {
     throw new Error(REQUEST_ERROS[res.error ?? ''] ?? 'Não consegui enviar a solicitação.');

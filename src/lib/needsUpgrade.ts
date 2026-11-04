@@ -46,3 +46,22 @@ export async function needsUpgradeFromInvokeError(
     return null;
   }
 }
+
+/**
+ * Para callers via supabase.rpc: o gate SQL faz `raise exception 'needs_upgrade:<feature>'
+ * using errcode = 'PT402'`, e o PostgREST devolve { code: 'PT402', message }.
+ * Qualquer outro erro retorna null e segue o tratamento normal do caller.
+ */
+export function needsUpgradeFromRpcError(
+  error: unknown,
+  fallbackFeature: string,
+): NeedsUpgradeError | null {
+  if (!error || typeof error !== 'object') return null;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  const msg = typeof message === 'string' ? message : '';
+  const prefix = 'needs_upgrade:';
+  const hasPrefix = msg.startsWith(prefix);
+  if (code !== 'PT402' && !hasPrefix) return null;
+  const feature = hasPrefix ? msg.slice(prefix.length).trim() : '';
+  return new NeedsUpgradeError(feature || fallbackFeature);
+}
