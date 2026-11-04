@@ -68,7 +68,7 @@ begin
     ('aaaaaaaa-0000-0000-0000-000000000007'::uuid,'ai_coach','true'),
     ('aaaaaaaa-0000-0000-0000-000000000007'::uuid,'student_limit','5'),
     ('aaaaaaaa-0000-0000-0000-000000000008'::uuid,'ai_coach','true'),
-    ('aaaaaaaa-0000-0000-0000-000000000008'::uuid,'student_limit','<null>'),
+    ('aaaaaaaa-0000-0000-0000-000000000008'::uuid,'student_limit','20'),
     ('aaaaaaaa-0000-0000-0000-000000000009'::uuid,'ai_personal','true'),
     ('aaaaaaaa-0000-0000-0000-000000000009'::uuid,'ai_coach','false'),
     ('aaaaaaaa-0000-0000-0000-000000000010'::uuid,'ai_personal','false'),
