@@ -315,7 +315,7 @@ no `index.ts` à mão. Se o Deno estiver instalado: `deno check supabase/functio
 ---
 
 ### T04 — Paywall e compra: Elite para professor, Pessoal Premium para comum, sem "ilimitado"
-**Onda:** 2 · **Visual:** não · **Depende de:** T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** não · **Depende de:** T02 · **Status:** finalizado
 
 **O quê:** O paywall passa a oferecer a escada completa. Professor free vê Pro, Premium e Elite; pro vê
 Premium e Elite; premium vê só Elite; elite não vê planos e, se estourou o limite, vê que o Elite é o maior
@@ -411,7 +411,7 @@ Validação de tela fica para o aparelho (RevenueCat não roda na web).
 ---
 
 ### T05 — Telas de plano: badge e "Minha assinatura" com Elite, X/50 e upgrade só se houver plano acima
-**Onda:** 2 · **Visual:** não · **Depende de:** T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** não · **Depende de:** T02 · **Status:** finalizado
 
 **O quê:** `CoachPlanBadge` (home do professor) e `SubscriptionCard` (perfil do comum e do professor)
 passam a mostrar Elite e Premium do comum, o contador `X/limite` sempre que houver limite (Elite `X/50`), sem
@@ -466,7 +466,7 @@ premium vê "Plano Premium" com coroa e sem upgrade.
 ---
 
 ### T06 — Busca de professores exige Pessoal Premium (tela + erro do servidor)
-**Onda:** 2 · **Visual:** não · **Depende de:** T01, T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** não · **Depende de:** T01, T02 · **Status:** finalizado
 
 **O quê:** Usuário `comum` sem tier premium ou acima que abre "Encontrar professor" (lista ou perfil público)
 vê o paywall do Pessoal Premium (`coach_discovery`) em vez do conteúdo, e as consultas nem disparam. Se o
