@@ -53,7 +53,7 @@
 ---
 
 ### T01 — Banco: tier `elite`, limites 20/50, gates premium-ou-acima e busca só para Pessoal Premium
-**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** pendente
+**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** finalizado
 
 **O quê:** Uma migration nova que (1) aceita `'elite'` em `subscriptions.tier`; (2) cria `_tier_rank` como
 lugar único da ordem dos tiers; (3) redefine `_resolve_entitlement` com elite reconhecido como tier pago,
@@ -186,7 +186,7 @@ Rodar a migration duas vezes seguidas sem erro (idempotente). Nunca contra produ
 ---
 
 ### T02 — Base de tiers no app: tipo `elite`, helper `tierAtLeast` e limites sem "ilimitado"
-**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** pendente
+**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** finalizado
 
 **O quê:** Atualiza os tipos de billing do cliente (`Tier` com `elite`, `own_tier`, `store_active`, feature
 `coach_discovery`), cria `src/lib/tier.ts` como lugar único da ordem dos tiers no app (`tierAtLeast`,
@@ -248,7 +248,7 @@ rótulos e "há plano acima"), troca o gate de exercícios próprios para premiu
 ---
 
 ### T03 — Edge functions: webhook entende `elite` e cotas de IA 20/15 para assinatura própria premium+
-**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** pendente
+**Onda:** 1 · **Visual:** não · **Depende de:** — · **Status:** finalizado
 
 **O quê:** O webhook do RevenueCat grava `tier = 'elite'` quando a entitlement `elite` vem no evento
 (prioridade elite > premium > pro). As cotas diárias do `chat-ai` saem das constantes fixas e passam a vir de
