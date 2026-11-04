@@ -10,6 +10,7 @@ import {
   formatReferencesForPrompt,
 } from '../_shared/references.ts';
 import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
+import { dailyAiQuota } from '../_shared/aiQuota.ts';
 import { TACO_ALIMENTOS, formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
   DEFAULT_TEXT_MODEL,
@@ -58,8 +59,6 @@ type ChatRequest = {
   stream?: boolean;
 };
 
-const DAILY_USER_MESSAGE_LIMIT = 10;
-const DAILY_SANITY_CHECK_LIMIT = 8;
 const MAX_MESSAGE_CHARS = 255;
 const HISTORY_MESSAGES = 10;
 
@@ -192,6 +191,7 @@ serve(async (req: Request) => {
     if (!ent.ai_personal) {
       return needsUpgrade(isChatMode ? 'chat' : 'sanity_check', CORS);
     }
+    const quota = dailyAiQuota(ent);
 
     const userMessage = body.message?.trim() ?? '';
     const featureLabel: 'chat' | 'sanity_check' = isChatMode
@@ -248,13 +248,13 @@ serve(async (req: Request) => {
       if (countErr) {
         console.error('[chat-ai] count error:', countErr);
       }
-      if ((dailyCount ?? 0) >= DAILY_USER_MESSAGE_LIMIT) {
+      if ((dailyCount ?? 0) >= quota.chat) {
         await logEvent({ status: 'quota_exceeded' });
         return json(
           {
             error: 'daily_limit',
-            detail: `Você atingiu o limite de ${DAILY_USER_MESSAGE_LIMIT} mensagens hoje. Volta amanhã!`,
-            limit: DAILY_USER_MESSAGE_LIMIT,
+            detail: `Você atingiu o limite de ${quota.chat} mensagens hoje. Volta amanhã!`,
+            limit: quota.chat,
           },
           429,
         );
@@ -274,13 +274,13 @@ serve(async (req: Request) => {
       if (sanityErr) {
         console.error('[chat-ai] sanity count error:', sanityErr);
       }
-      if ((sanityCount ?? 0) >= DAILY_SANITY_CHECK_LIMIT) {
+      if ((sanityCount ?? 0) >= quota.sanity) {
         await logEvent({ status: 'quota_exceeded' });
         return json(
           {
             error: 'daily_limit',
-            detail: `Você atingiu o limite de ${DAILY_SANITY_CHECK_LIMIT} análises de prato hoje. Volta amanhã!`,
-            limit: DAILY_SANITY_CHECK_LIMIT,
+            detail: `Você atingiu o limite de ${quota.sanity} análises de prato hoje. Volta amanhã!`,
+            limit: quota.sanity,
           },
           429,
         );
