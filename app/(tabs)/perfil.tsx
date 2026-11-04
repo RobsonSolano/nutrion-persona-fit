@@ -27,6 +27,12 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useEntitlement, useAiFreeNotice } from '@/hooks/useEntitlement';
+import { dailyAiQuota } from '@/lib/aiQuota';
+import { MAX_MESSAGE_CHARS } from '@/services/chatMessages';
+import {
+  aiFreeNoticeText,
+} from '@/lib/aiFreeNotice';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { usePushToggle } from '@/hooks/usePushToggle';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
@@ -69,6 +75,13 @@ export default function PerfilScreen() {
     hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
   const isStudent = profile?.role === 'aluno';
+  const entQ = useEntitlement();
+  const showFreeNotice = useAiFreeNotice();
+  const freeNotice = aiFreeNoticeText({
+    quota: dailyAiQuota(entQ.data?.own_tier),
+    maxChars: MAX_MESSAGE_CHARS,
+    earlyAdopter: isEarlyAdopter,
+  });
   const isComum = profile?.role === 'comum';
   // Só o usuário comum contrata: aluno já tem professor, professor não usa
   // estas tabs.
@@ -165,25 +178,25 @@ export default function PerfilScreen() {
           )}
         </View>
 
-        <Card glow accent="violet" padding="md">
-          <View className="flex-row items-start gap-3">
-            <View className="h-10 w-10 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
-              <Gift size={18} color={colors.violetSoft} />
+        {showFreeNotice && (
+          <Card glow accent="violet" padding="md">
+            <View className="flex-row items-start gap-3">
+              <View className="h-10 w-10 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
+                <Gift size={18} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text font-semibold">
+                  Recursos de IA gratuitos
+                </Text>
+                <Text className="text-text-dim text-xs mt-1 leading-relaxed">
+                  {freeNotice.before}
+                  <Text className="text-violet-soft font-semibold">{freeNotice.highlight}</Text>
+                  {freeNotice.after}
+                </Text>
+              </View>
             </View>
-            <View className="flex-1">
-              <Text className="text-text font-semibold">
-                Recursos de IA gratuitos
-              </Text>
-              <Text className="text-text-dim text-xs mt-1 leading-relaxed">
-                Chat (10/dia · 255 chars), Sanity Check (5/dia) e onboarding
-                inteligente são <Text className="text-violet-soft font-semibold">temporariamente gratuitos</Text>.
-                {isEarlyAdopter
-                  ? ' Como early adopter, você continua com acesso quando virarem premium.'
-                  : ' Aproveita enquanto está aberto.'}
-              </Text>
-            </View>
-          </View>
-        </Card>
+          </Card>
+        )}
 
         <SubscriptionCard />
 

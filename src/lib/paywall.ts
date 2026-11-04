@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { NeedsUpgradeError } from './needsUpgrade';
+import type { PaywallOrigin } from './paywallContent';
 
 /** Abre o paywall modal contextual pra uma feature key do billing-core. */
-export function openPaywall(feature: string) {
-  router.push({ pathname: '/paywall', params: { feature } });
+export function openPaywall(feature: string, origin?: PaywallOrigin) {
+  router.push({ pathname: '/paywall', params: origin ? { feature, origin } : { feature } });
 }
 
 /**

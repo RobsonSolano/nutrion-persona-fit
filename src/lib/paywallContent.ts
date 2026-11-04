@@ -2,6 +2,7 @@
 // Lógica pura → testável sem RN. A tela app/paywall.tsx só renderiza o resultado.
 
 import type { Role } from '@/lib/purchaseSelection';
+import { tierAtLeast } from './tier';
 
 export type PaywallContent = {
   title: string;
@@ -55,6 +56,12 @@ const STUDENT_LIMIT: PaywallContent = {
   priceHint: PRICE_HINT,
 };
 
+/** Upgrade voluntário (origin 'upgrade'): mesmo paywall, sem a mensagem de limite atingido. */
+const STUDENT_LIMIT_UPGRADE: PaywallContent = {
+  ...STUDENT_LIMIT,
+  subtitle: 'Acompanhe mais alunos com um plano maior.',
+};
+
 const COACH_DISCOVERY: PaywallContent = {
   title: 'Encontre um professor',
   subtitle: 'Busque professores no app e peça para ser acompanhado.',
@@ -67,7 +74,18 @@ const COACH_DISCOVERY: PaywallContent = {
   priceHint: PRICE_HINT,
 };
 
-export function paywallContent(feature: string | undefined): PaywallContent {
+/** 'upgrade' = o usuário abriu o paywall por conta própria (não bateu no limite). */
+export type PaywallOrigin = 'upgrade';
+
+/** Feature key do atalho de upgrade do professor: pro+ esbarra em alunos, os demais em IA. */
+export function coachUpgradeFeature(tier: string): 'student_limit' | 'coach_generate_plan' {
+  return tierAtLeast(tier, 'pro') ? 'student_limit' : 'coach_generate_plan';
+}
+
+export function paywallContent(
+  feature: string | undefined,
+  origin?: PaywallOrigin,
+): PaywallContent {
   switch (feature) {
     case 'chat':
     case 'sanity_check':
@@ -76,7 +94,7 @@ export function paywallContent(feature: string | undefined): PaywallContent {
     case 'coach_import_workout':
       return COACH;
     case 'student_limit':
-      return STUDENT_LIMIT;
+      return origin === 'upgrade' ? STUDENT_LIMIT_UPGRADE : STUDENT_LIMIT;
     case 'coach_discovery':
       return COACH_DISCOVERY;
     default:

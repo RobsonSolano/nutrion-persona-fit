@@ -13,6 +13,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
+import { coachUpgradeFeature } from '@/lib/paywallContent';
 import { TIER_LABEL, tierAtLeast } from '@/lib/tier';
 
 /**
@@ -44,7 +45,7 @@ export default function SubscriptionCard() {
   if (isStudent) return null;
 
   function upgradeFeature(): string {
-    if (isProfessor) return tierAtLeast(tier, 'pro') ? 'student_limit' : 'coach_generate_plan';
+    if (isProfessor) return coachUpgradeFeature(tier);
     return tierAtLeast(tier, 'pro') ? 'coach_discovery' : 'chat';
   }
 
@@ -115,7 +116,7 @@ export default function SubscriptionCard() {
         {canUpgrade && (
           <Button
             label="Fazer upgrade"
-            onPress={() => openPaywall(upgradeFeature())}
+            onPress={() => openPaywall(upgradeFeature(), 'upgrade')}
             variant="primary"
             size="md"
             icon={<Crown size={14} color={colors.bg} />}

@@ -3,6 +3,7 @@ import { Crown, Sparkles, ArrowUpRight } from 'lucide-react-native';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { useStudents } from '@/hooks/useStudents';
 import { openPaywall } from '@/lib/paywall';
+import { coachUpgradeFeature } from '@/lib/paywallContent';
 import { colors } from '@/lib/theme';
 import { TIER_LABEL, tierAtLeast } from '@/lib/tier';
 
@@ -22,7 +23,7 @@ export default function CoachPlanBadge() {
   const canUpgrade = !tierAtLeast(tier, 'elite');
   const atLimit = limit != null && count >= limit;
 
-  const upgradeFeature = tierAtLeast(tier, 'pro') ? 'student_limit' : 'coach_generate_plan';
+  const upgradeFeature = coachUpgradeFeature(tier);
 
   const accent = isPremium ? colors.accent : colors.violetSoft;
 
@@ -57,7 +58,7 @@ export default function CoachPlanBadge() {
 
       {canUpgrade && (
         <Pressable
-          onPress={() => openPaywall(upgradeFeature)}
+          onPress={() => openPaywall(upgradeFeature, 'upgrade')}
           hitSlop={6}
           className="flex-row items-center gap-1 rounded-full border px-3 py-1.5 active:opacity-70"
           style={{ borderColor: `${colors.accent}66`, backgroundColor: `${colors.accent}18` }}

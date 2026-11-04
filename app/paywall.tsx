@@ -43,7 +43,7 @@ import { queryKeys } from '@/lib/queryKeys';
 export default function PaywallScreen() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { feature } = useLocalSearchParams<{ feature?: string }>();
+  const { feature, origin } = useLocalSearchParams<{ feature?: string; origin?: string }>();
   const { data: profile } = useProfile();
   const { user } = useAuth();
   const { data: entitlement } = useEntitlement();
@@ -54,7 +54,7 @@ export default function PaywallScreen() {
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const busy = busyPlan !== null;
 
-  const header = paywallContent(feature);
+  const header = paywallContent(feature, origin === 'upgrade' ? 'upgrade' : undefined);
   const role = profile?.role as Role | undefined;
   const currentTier = entitlement?.tier ?? 'free';
   const isAluno = role === 'aluno';

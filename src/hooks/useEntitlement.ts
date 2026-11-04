@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchEntitlement } from '@/services/entitlement';
 import { useAuth } from './useAuth';
 import { queryKeys } from '@/lib/queryKeys';
+import { showTemporaryFreeNotice } from '@/lib/aiFreeNotice';
 
 /**
  * Entitlement do usuário logado (billing-core). Keyed por userId + enabled: !!userId
@@ -33,4 +34,10 @@ export function useAiPersonalLocked(): boolean {
 export function useAiCoachLocked(): boolean {
   const { data } = useEntitlement();
   return data ? !data.ai_coach : false;
+}
+
+/** true quando o aviso "IA temporariamente gratuita" deve aparecer (entitlement não resolvido → false). */
+export function useAiFreeNotice(): boolean {
+  const { data } = useEntitlement();
+  return showTemporaryFreeNotice(data?.tier);
 }

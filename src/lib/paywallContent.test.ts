@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paywallContent, planContent } from './paywallContent';
+import { paywallContent, planContent, coachUpgradeFeature } from './paywallContent';
 
 describe('paywallContent', () => {
   it('chat e sanity_check apontam pro plano pessoal', () => {
@@ -91,5 +91,33 @@ describe('planContent', () => {
       }
     }
     expect(texts.join(' ').toLowerCase()).not.toContain('ilimitad');
+  });
+});
+
+describe('student_limit: limite atingido x upgrade voluntário', () => {
+  it('ELITE-06 limite atingido de fato mantém o texto de limite', () => {
+    expect(paywallContent('student_limit').subtitle).toBe(
+      'Você atingiu o limite de alunos do seu plano atual.',
+    );
+  });
+
+  it('ELITE-06 upgrade voluntário não diz que o limite foi atingido', () => {
+    const c = paywallContent('student_limit', 'upgrade');
+    expect(c.subtitle).toBe('Acompanhe mais alunos com um plano maior.');
+    expect(c.subtitle.toLowerCase()).not.toContain('atingiu');
+    expect(c.bullets).toEqual(paywallContent('student_limit').bullets);
+  });
+
+  it('origem voluntária não altera outras features', () => {
+    expect(paywallContent('chat', 'upgrade')).toEqual(paywallContent('chat'));
+  });
+});
+
+describe('coachUpgradeFeature', () => {
+  it('pro ou acima esbarra em limite de alunos; abaixo, na IA de professor', () => {
+    expect(coachUpgradeFeature('free')).toBe('coach_generate_plan');
+    expect(coachUpgradeFeature('pro')).toBe('student_limit');
+    expect(coachUpgradeFeature('premium')).toBe('student_limit');
+    expect(coachUpgradeFeature('elite')).toBe('student_limit');
   });
 });
