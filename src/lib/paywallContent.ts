@@ -22,7 +22,7 @@ const PERSONAL: PaywallContent = {
   title: 'Desbloqueie a IA pessoal',
   subtitle: 'Tenha um nutricionista e coach de IA no seu bolso.',
   bullets: [
-    'Chat IA ilimitado pra tirar dúvidas de treino e dieta',
+    'Chat IA pra tirar dúvidas de treino e dieta',
     'Sanity check: valide seu prato por foto na hora',
     'Respostas ancoradas no seu perfil e nas suas metas',
   ],
@@ -46,11 +46,24 @@ const STUDENT_LIMIT: PaywallContent = {
   title: 'Adicione mais alunos',
   subtitle: 'Você atingiu o limite de alunos do seu plano atual.',
   bullets: [
-    'Pro: gerencie até 5 alunos',
-    'Premium: alunos ilimitados',
+    'Pro: até 5 alunos',
+    'Premium: até 20 alunos',
+    'Elite: até 50 alunos',
     'Seus alunos atuais continuam sem mudança',
   ],
-  planLabel: 'Plano Professor Pro / Premium',
+  planLabel: 'Plano Professor Pro / Premium / Elite',
+  priceHint: PRICE_HINT,
+};
+
+const COACH_DISCOVERY: PaywallContent = {
+  title: 'Encontre um professor',
+  subtitle: 'Busque professores no app e peça para ser acompanhado.',
+  bullets: [
+    'Busca de professores dentro do app',
+    'Tudo do Pro incluído',
+    '20 mensagens e 15 análises de prato por dia',
+  ],
+  planLabel: 'Plano Pessoal Premium',
   priceHint: PRICE_HINT,
 };
 
@@ -64,28 +77,33 @@ export function paywallContent(feature: string | undefined): PaywallContent {
       return COACH;
     case 'student_limit':
       return STUDENT_LIMIT;
+    case 'coach_discovery':
+      return COACH_DISCOVERY;
     default:
       // Fallback seguro: trata como upsell pessoal (caso mais comum) sem quebrar a tela.
       return PERSONAL;
   }
 }
 
-export type PlanContent = { name: string; highlight?: boolean; bullets: string[] };
+export type PlanContent = { name: string; bullets: string[] };
 
 /**
  * Conteúdo do CARD de um plano (nome + bullets). Preço real vem do package do
- * RevenueCat na tela — não aqui. Professor tem Pro e Premium; comum só Pro.
+ * RevenueCat na tela, e o "Recomendado" vem de selectProductId — não daqui.
  */
-export function planContent(tier: 'pro' | 'premium', role: Role): PlanContent {
+export function planContent(tier: 'pro' | 'premium' | 'elite', role: Role): PlanContent {
   if (role === 'professor') {
+    if (tier === 'elite') {
+      return { name: 'Elite', bullets: ['Até 50 alunos', 'Tudo do Premium'] };
+    }
     if (tier === 'premium') {
       return {
         name: 'Premium',
-        highlight: true,
         bullets: [
-          'Alunos ilimitados',
-          'Tudo do Pro incluído',
-          'IA de professor completa (gerar + importar treino)',
+          'Até 20 alunos',
+          'Tudo do Pro',
+          'Apareça na busca de professores',
+          'Crie exercícios próprios',
         ],
       };
     }
@@ -98,12 +116,22 @@ export function planContent(tier: 'pro' | 'premium', role: Role): PlanContent {
       ],
     };
   }
-  // comum só tem Pro (IA pessoal)
+  // comum (IA pessoal)
+  if (tier === 'premium' || tier === 'elite') {
+    return {
+      name: 'Premium',
+      bullets: [
+        'Tudo do Pro',
+        'Encontre um professor no app',
+        '20 mensagens e 15 análises de prato por dia',
+      ],
+    };
+  }
   return {
     name: 'Pro',
     bullets: [
-      'Chat IA ilimitado pra treino e dieta',
-      'Sanity check: valide seu prato por foto',
+      '10 mensagens e 8 análises de prato por dia',
+      'Análise de prato por foto',
       'Respostas ancoradas no seu perfil e metas',
     ],
   };
