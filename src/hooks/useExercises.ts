@@ -9,6 +9,7 @@ import {
   saveExercise,
 } from '@/services/exercises';
 import { queryKeys } from '@/lib/queryKeys';
+import { tierAtLeast } from '@/lib/tier';
 import { useEntitlement } from './useEntitlement';
 import { useProfile } from './useProfile';
 import type { Exercise, Modality } from '@/types/database';
@@ -130,7 +131,7 @@ export function useDeleteExercise() {
 }
 
 /**
- * Gate do cadastro de exercício: professor com tier premium.
+ * Gate do cadastro de exercício: professor com tier premium ou acima.
  *
  * Não é só cobrança, é correção: o `RoutineEditor` é compartilhado por 6
  * telas, incluindo `app/rotina/nova.tsx` (usuário montando a própria
@@ -140,7 +141,7 @@ export function useDeleteExercise() {
  * false. É o inverso do `useAiCoachLocked`, que libera na dúvida: aqui um
  * falso-positivo viraria escrita indevida no catálogo.
  *
- * Nota: `tier === 'premium'` só resolve com assinatura de loja. Um
+ * Nota: `tierAtLeast(tier, 'premium')` só resolve com assinatura de loja. Um
  * professor `grandfather` resolve como `free` por decisão D3 do billing
  * (ver `_resolve_entitlement`), então não passa neste gate.
  */
@@ -148,5 +149,5 @@ export function useCanCreateExercise(): boolean {
   const { data: profile } = useProfile();
   const { data: entitlement } = useEntitlement();
   if (!profile || !entitlement) return false;
-  return profile.role === 'professor' && entitlement.tier === 'premium';
+  return profile.role === 'professor' && tierAtLeast(entitlement.tier, 'premium');
 }
