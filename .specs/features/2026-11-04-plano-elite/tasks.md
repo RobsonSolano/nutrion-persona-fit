@@ -540,7 +540,7 @@ matrícula; aluno abre o perfil do professor e avalia normalmente.
 ---
 
 ### T07 — Cota de IA no app: chat 20 e análise de prato 15 para assinatura própria premium+
-**Onda:** 3 · **Visual:** não · **Depende de:** T02, T03 · **Status:** pendente
+**Onda:** 3 · **Visual:** não · **Depende de:** T02, T03 · **Status:** finalizado
 
 **O quê:** Os dois checks proativos de cota do app deixam as constantes fixas e passam a usar a mesma regra
 do servidor (`own_tier` premium/elite → chat 20 e análise de prato 15; senão chat 10 e análise 8):
