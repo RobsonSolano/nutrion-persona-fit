@@ -1,147 +1,317 @@
 # Manual — Publicar o Persona Fit na App Store (primeira vez)
 
-> Do zero até o app no ar: conta de desenvolvedor Apple (US$ 99/ano), configuração do projeto
-> Expo/EAS, TestFlight, revisão e lançamento. Escrito a partir da publicação real do
-> **DOD Questões** (out/2026), com tudo o que deu errado lá, mais o que costuma derrubar apps
-> parecidos com o Persona Fit (login Google, assinaturas, câmera, IA, notificações).
+> Do zero até o app no ar: conta de desenvolvedor Apple (US$ 99/ano), acessos, configuração do
+> projeto Expo/EAS, TestFlight, página da loja (com todos os formatos de imagem e vídeo), revisão e
+> lançamento. Escrito a partir das publicações reais do **DOD Questões** e do **DOD Estudos**
+> (out/2026), com tudo o que deu errado lá, mais o que costuma derrubar apps parecidos com o
+> Persona Fit (login Google, assinaturas, câmera, IA, saúde, notificações).
 >
-> **Escrito em:** 2026-10-18. As regras da Apple mudam; confira os links oficiais do §13 antes
-> de cada etapa.
+> **Escrito em:** 2026-10-18 · **Atualizado em:** 2026-11-03 (especificações e links conferidos nas
+> páginas oficiais da Apple nesta data). As regras mudam: antes de cada etapa, confira o link
+> oficial indicado na própria seção e o §16.
 
 ---
 
-## 0. Visão geral e prazos realistas
+## 0. Visão geral
+
+### 0.1 Etapas e prazos realistas
 
 | Etapa | Tempo típico | Quem |
 |---|---|---|
 | 1. Conta Apple Developer (inscrição + pagamento + aprovação) | de algumas horas a 2 dias (pessoa física) | você |
 | 2. Contratos, impostos e banco (obrigatório para vender assinatura) | 1 a 3 dias (validação da Apple) | você |
-| 3. Criar o app no App Store Connect + produtos de assinatura | 1 h | você |
-| 4. Ajustar o projeto para iOS (Sign in with Apple, RevenueCat iOS, push, etc.) | 1 a 3 dias de código | você |
-| 5. Build na EAS + envio ao App Store Connect | 30 a 60 min | EAS |
+| 3. Criar o app no App Store Connect + informações do app + assinaturas | 1 a 2 h | você |
+| 4. Ajustar o projeto para iOS (Sign in with Apple, RevenueCat iOS, push, ícone, etc.) | 1 a 3 dias de código | você |
+| 5. Credenciais + build na EAS + envio ao App Store Connect | 30 a 60 min | EAS |
 | 6. TestFlight + teste em iPhone real | 1 dia | você |
 | 7. Página da loja (textos, capturas, privacidade, classificação etária) | 2 a 4 h | você |
 | 8. Revisão da Apple | 24 a 48 h (cada rodada) | Apple |
 | 9. Lançamento | imediato ou agendado | você |
 
-**Comece pela conta e pelos contratos (§1 e §2) já:** são as etapas com espera, e sem o contrato
+**Comece pela conta e pelos contratos (§2 e §3) já:** são as etapas com espera, e sem o contrato
 pago assinado **as assinaturas não aparecem nem no TestFlight**.
+
+### 0.2 Situação do Persona Fit hoje (conferido em 2026-11-03, branch `develop`)
+
+| Item | Situação |
+|---|---|
+| Seção `ios` no `app.config.ts` (bundle id, tablet, criptografia) | ❌ não existe (§7.1) |
+| Ícone `assets/icon.png` 1024×1024 | ⚠️ tem canal alfa (transparência) — a Apple recusa no iOS (§7.2) |
+| Sign in with Apple | ❌ não existe (§7.3) |
+| Google Sign-In no iOS (Client ID iOS + `iosUrlScheme`) | ❌ plugin sem configuração iOS (§7.3) |
+| RevenueCat no iOS | ❌ `billing.ts` só lê `EXPO_PUBLIC_RC_API_KEY_ANDROID` (§7.5) |
+| Push (`expo-notifications`) | ✅ instalado · ❌ falta chave APNs na EAS (§7.6) |
+| Exclusão de conta no app | ✅ `DangerZone` → "Excluir conta" (§7.4) |
+| Política de privacidade / Termos | ✅ `apppersonafit.vercel.app/legal/privacidade` e `/legal/termos-de-uso` |
+| `submit.production.ios.ascAppId` no `eas.json` | ❌ falta (só depois de criar o app, §4.2) |
+| `appVersionSource: remote` + `autoIncrement` | ✅ já configurado |
 
 ---
 
-## 1. Conta de desenvolvedor Apple (Apple Developer Program)
+## 1. Acessos: quem pode o quê, e onde fica cada coisa
 
-### 1.1 Pessoa física ou organização?
+### 1.1 Você será o Titular (Account Holder)
+Na conta **Individual**, quem se inscreve é o **Titular** e tem acesso a **tudo**: App Store
+Connect, Certificates/Identifiers/Profiles/Keys no developer.apple.com, contratos, impostos, banco
+e API do App Store Connect. Nenhuma das travas que tivemos no DOD (conta de outra pessoa) se aplica.
+
+> **Lição DOD:** lá a conta Individual era de outra pessoa. Usuários convidados viam
+> *"Access Unavailable"* em Certificates/Keys, e uma chave de API com papel **Developer** não
+> conseguiu criar o certificado de distribuição (erro 403 da Apple). Só destravou com uma chave
+> **Admin** gerada pela pessoa com acesso à conta.
+
+### 1.2 Se um dia convidar alguém
+Em conta **Individual**, quem você convida no App Store Connect **só acessa o App Store Connect**:
+não entra no time do Apple Developer Program e **nunca** acessa Certificates/Identifiers/Keys
+(isso só existe para contas de Organização). Resumo dos papéis
+([tabela oficial](https://developer.apple.com/help/app-store-connect/reference/account-management/role-permissions)):
+
+| O que | Titular | Admin | App Manager | Developer | Marketing |
+|---|---|---|---|---|---|
+| Aceitar contratos, renovar anuidade, **ativar a API do App Store Connect** (1ª vez) | ✅ só ele | — | — | — | — |
+| Certificados, Bundle IDs, perfis, chaves APNs (developer.apple.com) | ✅ | só em conta Organização | — | — | — |
+| Gerar chaves de API do App Store Connect | ✅ | ✅ | — | — | — |
+| Usuários e acessos, testadores sandbox | ✅ | ✅ | sandbox ✅ | — | — |
+| Criar app, preço, página da loja, enviar para revisão | ✅ | ✅ | ✅ | — | página ✅ |
+| Subir build, TestFlight | ✅ | ✅ | ✅ | ✅ | — |
+
+**Papel da chave de API usada pela EAS:** para **criar certificados/perfis** precisa ser
+**Admin**; para só **enviar builds** (submit) basta **App Manager**. Como Titular, use **Admin**.
+
+### 1.3 Links diretos (com você logado)
+
+**App Store Connect** — https://appstoreconnect.apple.com
+| O que | Onde |
+|---|---|
+| Apps (criar app, versões, TestFlight) | https://appstoreconnect.apple.com/apps |
+| Contratos, impostos e banco | **Negócios** (Business): https://appstoreconnect.apple.com/business |
+| Usuários e acessos | https://appstoreconnect.apple.com/access/users |
+| Testadores sandbox (compras de teste) | **Usuários e acesso → Sandbox** |
+| Chaves de API (Integrações) | **Usuários e acesso → Integrações → App Store Connect API** |
+| Small Business Program (15%) | https://developer.apple.com/app-store/small-business-program/ |
+
+**Apple Developer** — https://developer.apple.com/account
+| O que | Onde |
+|---|---|
+| Team ID e dados da inscrição | https://developer.apple.com/account → *Membership details* |
+| Certificados | https://developer.apple.com/account/resources/certificates/list |
+| Identifiers (Bundle IDs + capabilities) | https://developer.apple.com/account/resources/identifiers/list |
+| Perfis de provisionamento | https://developer.apple.com/account/resources/profiles/list |
+| Chaves (APNs, Sign in with Apple) | https://developer.apple.com/account/resources/authkeys/list |
+
+**Expo (EAS)** — projeto `nutrion` (`projectId 6aed6bd3-…`)
+| O que | Onde |
+|---|---|
+| Credenciais iOS (certificado, perfil, push, chave de API) | expo.dev → projeto → **Credentials → iOS → `<bundle id>`** |
+| Variáveis de ambiente (`production`) | expo.dev → projeto → **Environment variables** |
+| Builds e envios | expo.dev → projeto → **Builds** / **Submissions** |
+
+> Os caminhos do App Store Connect mudam de vez em quando. Se um link direto não abrir, entre pela
+> página inicial e siga o nome da seção (em negrito).
+
+---
+
+## 2. Conta de desenvolvedor Apple (Apple Developer Program)
+
+### 2.1 Pessoa física ou organização?
 | | **Individual (pessoa física)** | **Organização** |
 |---|---|---|
 | Nome que aparece na loja como vendedor | **seu nome legal** ("Robson Solano") | nome da empresa |
-| Exige | Apple ID com 2FA, documento com foto | **número D-U-N-S** (gratuito, pode levar 1 a 2 semanas), CNPJ, site, poder legal de assinatura |
-| Acesso de outras pessoas | dá para convidar usuários no App Store Connect, **mas só você (Titular) acessa Certificates/Keys** no developer.apple.com | vários Admins com acesso completo |
+| Exige | Apple ID com 2FA, documento com foto | **número D-U-N-S** (gratuito, 1 a 2 semanas), CNPJ, site, poder legal de assinatura |
+| Acesso de outras pessoas | convidados só no App Store Connect (§1.2) | vários Admins com acesso completo |
 
-> **Lição do DOD Questões:** a conta era **Individual** (de outra pessoa). Ninguém além do
-> Titular conseguia criar a chave de push (APNs) — a tela mostrava *"Access Unavailable"*.
-> Como o Persona Fit é seu e você mesmo vai operar, **Individual resolve**. Se um dia o app for
-> de uma empresa (CNPJ), migrar de Individual para Organização é possível, mas dá trabalho —
-> decida antes se o nome do vendedor importa.
+Como o Persona Fit é seu e você mesmo vai operar, **Individual resolve**. Migrar de Individual para
+Organização depois é possível, mas dá trabalho — decida antes se o nome do vendedor importa.
 
-### 1.2 Antes de se inscrever
-- **Apple ID com autenticação de dois fatores** ativa (use o Apple ID que vai ser o "dono" do app para sempre).
+### 2.2 Antes de se inscrever
+- **Apple ID com autenticação de dois fatores** ativa (o Apple ID que vai ser o "dono" do app para sempre).
 - **Nome legal** no Apple ID (nome e sobrenome reais). Apelido ou nome de empresa atrasa a aprovação.
 - **Endereço real** (caixa postal não é aceita), telefone e e-mail válidos.
-- Maioridade legal.
-- Documento oficial com foto (RG/CNH/passaporte) à mão — a verificação de identidade pede.
+- Maioridade legal e documento oficial com foto (RG/CNH/passaporte) à mão.
 
-### 1.3 Inscrição e pagamento (US$ 99 por ano)
+### 2.3 Inscrição e pagamento (US$ 99 por ano)
 **Caminho mais rápido para pessoa física: o app "Apple Developer" no iPhone.**
 1. Instale o app **Apple Developer** (App Store) no iPhone e entre com o Apple ID.
-2. **Conta → Inscrever-se agora** (Enroll Now). Siga: dados pessoais → verificação de identidade (foto do documento) → aceite dos termos.
-3. Pague a anuidade **no próprio app** (cobrança na forma de pagamento do Apple ID). O valor é cobrado na moeda local equivalente a US$ 99.
-4. Alternativa: pelo site https://developer.apple.com/programs/enroll/ (pagamento por cartão).
+2. **Conta → Inscrever-se agora** (Enroll Now): dados pessoais → verificação de identidade (foto do documento) → aceite dos termos.
+3. Pague a anuidade **no próprio app** (cobrança na forma de pagamento do Apple ID, em moeda local).
+   Inscrito pelo app, a anuidade **renova sozinha** como assinatura.
+4. Alternativa: pelo site https://developer.apple.com/programs/enroll/ (cartão).
 
-**Depois de pagar:** chega e-mail de confirmação. Para pessoa física costuma liberar no mesmo
-dia ou em até 48 h. Se passar de 2 dias úteis, abra contato em
-https://developer.apple.com/contact/ (*Membership and Account*).
+**Depois de pagar:** chega e-mail de confirmação. Pessoa física costuma liberar no mesmo dia ou em
+até 48 h. Passou de 2 dias úteis → https://developer.apple.com/contact/ (*Membership and Account*).
 
 **Dificuldades comuns na inscrição:**
-- **"Unable to verify identity"** → nome do Apple ID diferente do documento. Corrija o nome no Apple ID e tente de novo.
-- **Pagamento recusado** → cartão sem compras internacionais habilitadas; tente outro cartão ou o app no iPhone.
-- **Inscrição "pendente" por dias** → a Apple às vezes liga ou pede documento. Responda rápido o e-mail.
-- **Renovação anual:** se a assinatura vencer, **o app sai da loja**. Deixe a renovação automática ligada.
+- **"Unable to verify identity"** → nome do Apple ID diferente do documento. Corrija e tente de novo.
+- **Pagamento recusado** → cartão sem compras internacionais; tente outro cartão ou o app no iPhone.
+- **Inscrição "pendente" por dias** → a Apple às vezes liga ou pede documento. Responda rápido.
+- **Renovação anual:** se vencer, **o app sai da loja**. Deixe a renovação automática ligada.
 
-### 1.4 Primeiro acesso
-- **developer.apple.com/account** → confira em *Membership details* o **Team ID** (10 caracteres, ex.: `F86SNS49G9`). Anote.
-- **appstoreconnect.apple.com** → onde fica tudo de loja: apps, TestFlight, contratos, usuários.
+### 2.4 Primeiro acesso
+- https://developer.apple.com/account → *Membership details* → anote o **Team ID** (10 caracteres).
+- https://appstoreconnect.apple.com → aceite os termos que aparecerem no topo (faixa amarela).
+  **Enquanto houver contrato/termo pendente, a Apple bloqueia envios de todos os apps da conta**
+  (aconteceu no DOD: nada subia até o Titular aceitar o contrato atualizado).
 
-> ⚠️ **Pegadinha que custou um envio no DOD Questões:** o número que aparece no **canto
-> superior direito** do App Store Connect, ao lado do seu nome (ex.: *"… | 20446889…"*), **não é o
-> ID do app nem o Team ID**. É um ID interno da equipe. Ver §5.3.
+> ⚠️ **Pegadinha do DOD Questões:** o número no **canto superior direito** do App Store Connect, ao
+> lado do seu nome, **não é o ID do app nem o Team ID** (ver §8.3).
 
 ---
 
-## 2. Contratos, impostos e dados bancários (obrigatório para assinaturas)
+## 3. Contratos, impostos e dados bancários (obrigatório para assinaturas)
 
 O Persona Fit vende assinatura (RevenueCat). Na Apple isso exige o **Contrato de Apps Pagos**
-ativo. Sem ele:
-- os produtos de assinatura **não carregam** (nem no TestFlight, nem na revisão) — a revisão recusa porque "a compra não funciona";
-- você não recebe pagamentos.
+(*Paid Apps Agreement*) ativo. Sem ele os produtos de assinatura **não carregam** (nem no
+TestFlight, nem na revisão) — a revisão recusa porque "a compra não funciona" — e você não recebe.
 
-### 2.1 Passo a passo
-1. **App Store Connect → Negócios** (Business) **→ Contratos** (Agreements).
-2. **Contrato de Apps Pagos** (Paid Apps Agreement) → **Visualizar e aceitar**. Só o Titular aceita.
-3. **Impostos:** clique em **Adicionar informações fiscais**. Responda o questionário:
-   - Você **não é** pessoa dos EUA → a Apple deve te levar ao formulário **W-8BEN** (pessoa física estrangeira).
-   - Preencha nome, país (Brasil), endereço, **CPF** como "Foreign TIN".
-   - Se aparecer só o **W-9** (formulário de americano) sem opção de estrangeiro, **não preencha**: há relatos de contas presas nisso. Abra contato em https://developer.apple.com/contact/ → *Tax Setup*.
-   - A Apple também mostra páginas de impostos de outros países (ex.: Brasil, Austrália). Leia cada uma; para pessoa física no Brasil, em geral basta o W-8BEN, mas siga o que a tela pedir.
-4. **Banco:** **Adicionar conta bancária**. Conta em nome do **mesmo titular** da conta Apple. Banco brasileiro funciona (a Apple pede código SWIFT/agência/conta). O pagamento chega em reais, convertido.
-5. Status do contrato fica **"Ativo"** só depois de **impostos + banco validados** (pode levar alguns dias).
+### 3.1 Passo a passo
+1. **App Store Connect → Negócios** (https://appstoreconnect.apple.com/business).
+2. **Contrato de Apps Pagos → Visualizar e aceitar**. Só o Titular aceita.
+3. **Impostos → Adicionar informações fiscais**
+   ([ajuda oficial](https://developer.apple.com/help/app-store-connect/manage-tax-information/provide-tax-information)):
+   - Você **não é** pessoa dos EUA → formulário **W-8BEN** (pessoa física estrangeira).
+   - Nome, país (Brasil), endereço, **CPF** como *Foreign TIN*.
+   - Se aparecer só o **W-9** (formulário de americano), **não preencha**: abra contato em https://developer.apple.com/contact/ → *Tax Setup*.
+   - Podem aparecer páginas de impostos de outros países; para pessoa física no Brasil, em geral basta o W-8BEN, mas siga o que a tela pedir.
+4. **Banco → Adicionar conta bancária**, em nome do **mesmo titular** da conta Apple. Banco brasileiro funciona (SWIFT, agência, conta). O pagamento chega em reais.
+5. O contrato fica **"Ativo"** só depois de **impostos + banco validados** (alguns dias).
 
-### 2.2 Small Business Program (comissão de 15% em vez de 30%)
-- Quem fatura menos de US$ 1 milhão por ano na App Store paga **15%** em vez de 30% — **mas só se inscrever**: https://developer.apple.com/app-store/small-business-program/
-- Faça logo após o contrato ficar ativo (a redução vale a partir da aprovação, não é retroativa).
+### 3.2 Small Business Program (comissão de 15% em vez de 30%)
+- Quem fatura menos de US$ 1 milhão/ano paga **15%** — **mas só depois de se inscrever**:
+  https://developer.apple.com/app-store/small-business-program/
+- Faça logo após o contrato ficar ativo (vale a partir da aprovação, não é retroativo).
 
-### 2.3 Status de comerciante na UE (DSA)
-- Para distribuir na **União Europeia**, a Apple exige declarar se você é **comerciante (trader)** (Lei de Serviços Digitais). Se for, seu **endereço, telefone e e-mail ficam públicos** na página do app nos países da UE.
-- App que cobra assinatura normalmente é "comerciante". **Se não quiser expor seus dados**, a saída mais simples é **não distribuir na UE** (§7.5, Preços e disponibilidade).
-- Sem essa declaração, a Apple não aceita o app na loja da UE.
+### 3.3 Status de comerciante na UE (DSA)
+- Para distribuir na **União Europeia** é obrigatório declarar se você é **comerciante (trader)**
+  ([ajuda oficial](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements)).
+  Comerciante tem **endereço, telefone e e-mail públicos** na página do app nos países da UE.
+- App que cobra assinatura normalmente é "comerciante". **Se não quiser expor seus dados**, a saída
+  mais simples é **não distribuir na UE** (§10.6).
+- Sem a declaração, a Apple não aceita o app na loja da UE.
 
 ---
 
-## 3. Criar o app no App Store Connect
+## 4. Criar o app no App Store Connect
 
-### 3.1 Registrar o Bundle ID
-O Persona Fit hoje **não tem seção `ios` no `app.config.ts`**. Escolha o bundle id **definitivo**
-(não muda nunca depois de publicar). Sugestão: igual ao Android, `br.com.nutrion`.
+### 4.1 Bundle ID
+Escolha o **definitivo** (não muda nunca depois de publicar). Sugestão: igual ao Android,
+`br.com.nutrion`. A EAS registra o Bundle ID e as *capabilities* sozinha no primeiro build (§8.4).
+Se preferir à mão: [Identifiers](https://developer.apple.com/account/resources/identifiers/list)
+→ **"+" → App IDs → App** → *Explicit* `br.com.nutrion` → marque **Push Notifications**,
+**Sign in with Apple** (In-App Purchase já vem ligado).
 
-A EAS cria o Bundle ID e os certificados sozinha no primeiro build (§5). Se preferir criar à mão:
-developer.apple.com → **Certificates, IDs & Profiles → Identifiers → "+" → App IDs** → marque
-as *capabilities* que o app usa (**Push Notifications**, **Sign in with Apple**, **In-App Purchase**).
-
-### 3.2 Criar o registro do app
-1. **App Store Connect → Apps → "+" → Novo app**.
-2. Plataforma **iOS**, nome **Persona Fit** (precisa estar livre na loja inteira; se estiver em uso, tente "Persona Fit — …"), idioma principal **Português (Brasil)**, Bundle ID, **SKU** (qualquer código interno, ex.: `personafit-ios`).
-3. Depois de criado, abra o app e copie o **Apple ID do app** (o `ascAppId`): está na **URL**
+### 4.2 Criar o registro do app
+1. https://appstoreconnect.apple.com/apps → **"+" → Novo app**.
+2. Plataforma **iOS** · Nome **Persona Fit** (2 a 30 caracteres, precisa estar livre na loja inteira) ·
+   Idioma principal **Português (Brasil)** · Bundle ID · **SKU** (código interno, ex.: `personafit-ios`;
+   letras, números, `-`, `.`, `_`, sem começar com símbolo; não muda depois) · Acesso de usuários: **Acesso total**.
+3. Copie o **Apple ID do app** (o `ascAppId`): está na **URL**
    (`appstoreconnect.apple.com/apps/`**`1234567890`**`/...`) ou em *Informações do app → Apple ID*.
 
-### 3.3 Produtos de assinatura (para o RevenueCat)
-1. **App → Monetização → Assinaturas → "+" Grupo de assinaturas** (ex.: "Persona Fit Premium").
-2. Crie cada plano (mensal, anual…) com **ID do produto** (ex.: `personafit_premium_mensal`) — use os **mesmos nomes de produto que o RevenueCat espera** (ou crie lá com os IDs da Apple).
-3. Para cada produto: duração, preço (escolha a faixa), **nome e descrição de exibição** (localização pt-BR) e **captura de tela da tela de compra** + **nota de revisão** (exigidos para o produto ir junto na primeira revisão).
-4. Status deve ficar **"Pronto para envio"**. **Na primeira versão, os produtos são revisados junto com o app:** na página da versão, seção *Compras dentro do app e assinaturas*, **selecione os produtos** antes de enviar. Esquecer isso = assinatura não funciona na revisão = recusa.
+### 4.3 Informações do app (menu lateral → Geral → Informações do app)
+Vale para todas as versões. Preencha tudo antes do primeiro envio:
+
+| Campo | O que colocar |
+|---|---|
+| Nome / Subtítulo | Nome até 30 caracteres; subtítulo até 30 (ex.: "Dieta e treino com IA") |
+| Categoria | Principal **Saúde e fitness**; secundária opcional (ex.: Estilo de vida) |
+| Direitos de conteúdo | "Não contém, mostra ou acessa conteúdo de terceiros" — a menos que use conteúdo licenciado |
+| Classificação etária | Questionário (§10.4) |
+| URL da política de privacidade | `https://apppersonafit.vercel.app/legal/privacidade` (em **Privacidade do app**) |
+| Contrato de licença (EULA) | Padrão da Apple, ou personalizado com os Termos (§7.5) |
+| Bens e serviços digitais (*Digital Goods and Services*) | Se o questionário aparecer: responda que há assinatura vendida **por compra dentro do app** ([ajuda](https://developer.apple.com/help/app-store-connect/manage-app-information/complete-the-digital-goods-and-services-questionnaire)) |
+| Dispositivo médico regulamentado | **Não** — o app não é dispositivo médico ([ajuda](https://developer.apple.com/help/app-store-connect/manage-app-information/declare-regulated-medical-device-status)) |
+| Rótulos de acessibilidade (*Accessibility Nutrition Labels*) | Opcional; declare só o que testou de verdade (VoiceOver, texto maior, modo escuro…) ([ajuda](https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels)) |
 
 ---
 
-## 4. Ajustar o projeto para iOS (o que muda no código)
+## 5. Produtos de assinatura (para o RevenueCat)
+1. **App → Monetização → Assinaturas → "+" Grupo de assinaturas** (ex.: "Persona Fit Premium").
+   O nome de exibição do grupo não aceita emoji nem caracteres especiais.
+2. Crie cada plano (mensal, anual…) com **ID do produto** (ex.: `personafit_premium_mensal`) —
+   **o ID nunca pode ser reutilizado**, mesmo apagando o produto. Use os IDs que o RevenueCat espera.
+3. Em cada produto: duração, preço (faixa), **nome e descrição de exibição** (pt-BR) e, em
+   **Informações para revisão**:
+   - **captura de tela da tela de compra** (o paywall rodando). Se der *"tamanho incorreto"*, há
+     relatos de que **640×920 px** é aceito ([fórum Apple](https://developer.apple.com/forums/thread/813399));
+   - **nota de revisão** curta (onde fica o paywall).
+4. Status **"Pronto para envio"**. **Na primeira versão, os produtos vão junto com o app:** na
+   página da versão, seção *Compras dentro do app e assinaturas*, **selecione os produtos**.
+   Esquecer = assinatura não funciona na revisão = recusa.
 
-> Rodar o app no iOS **não é só buildar**: Persona Fit tem 5 pontos que a Apple trata de forma
-> diferente da Google.
+---
 
-### 4.1 `app.config.ts` — seção `ios`
+## 6. Ícone, capturas e vídeos — formatos exatos
+
+> Conferido em 2026-11-03 em
+> [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)
+> e [App preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications).
+> A Apple trocou os nomes em polegadas por "tela grande/média" — abaixo estão os dois.
+
+### 6.1 Ícone do app
+- **Não se envia ícone no App Store Connect.** Ele vem **de dentro da build**: no Expo, do
+  `icon` / `ios.icon` do `app.config.ts`
+  ([ajuda oficial](https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon)).
+- Enquanto a versão não tem build associada, a página mostra um **ícone cinza genérico** — é
+  normal. Ele aparece ao **associar a build** (§11). Trocar o ícone depois = nova versão + revisão.
+- Formato: **PNG 1024×1024, quadrado, sem transparência/canal alfa**, sem cantos arredondados
+  (o sistema arredonda). Guia de design: [HIG — App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons).
+- Opcional: ícone em camadas (efeito *Liquid Glass* do iOS 26) feito no **Icon Composer** e
+  apontado em `ios.icon` (arquivo `.icon`). O PNG simples continua aceito.
+
+### 6.2 Capturas de tela (obrigatórias)
+Formatos **.png, .jpg ou .jpeg**, **sem transparência**, **1 a 10 por tamanho**, retrato ou
+paisagem. Se a interface é igual em todos os tamanhos, mande só o **maior** de cada grupo e a Apple
+reduz para os menores.
+
+| Grupo (nome atual na Apple) | Aparelhos (simulador sugerido) | Retrato (px) | Obrigatório? |
+|---|---|---|---|
+| **iPhone com Dynamic Island — tela média** (~6,3") | iPhone 17 / 17 Pro, 16, 15 | **1206×2622** ou 1179×2556 | ✅ **Sim, sempre** (mín. 1) |
+| iPhone com Dynamic Island — tela grande (~6,9") | iPhone 17 Pro Max, 16 Pro Max, Air | **1320×2868**, 1290×2796 ou 1260×2736 | Recomendado (senão usa reduzida) |
+| iPhone com Face ID — tela grande (6,5") | iPhone 11 Pro Max, XS Max | 1284×2778 ou 1242×2688 | Só se não enviar a "tela grande" acima |
+| iPhone com Face ID — tela média | iPhone 16e, 14, 13 | 1170×2532, 1125×2436, 1080×2340 | Não |
+| iPhone com botão Home (5,5" / 4,7") | iPhone 8 Plus / SE | 1242×2208 / 750×1334 | Não |
+| **iPad 13"** | iPad Pro 13" (M5/M4), iPad Air 13" | **2064×2752** ou 2048×2732 | ✅ **Só se o app rodar em iPad** (`supportsTablet: true`) |
+| iPad 11" / 12,9" / 10,5" / 9,7" | — | vários | Não (reduzidas do 13") |
+| iPhone Duo (dobrável) | — | externa 1398×2034 · interna 2007×2853 | Não hoje; **obrigatório a partir de abr/2027** para apps compilados com SDK iOS 27.1+ |
+
+**Recomendação para o Persona Fit (só iPhone):** 4 a 6 capturas em **1320×2868** (iPhone 17 Pro
+Max) **e** as mesmas em **1206×2622** (iPhone 17 Pro). Paisagem: troque largura × altura.
+
+**Como gerar:** Simulador do Xcode com o aparelho certo → `xcrun simctl io booted screenshot tela.png`
+(sai no tamanho exato), ou print no iPhone real do mesmo tamanho. Podem ter moldura e texto de
+marketing, mas **precisam mostrar o app de verdade** (nada de tela que não existe — diretriz 2.3.3).
+
+### 6.3 Vídeos de prévia (*App Preview*, opcionais)
+| Item | Especificação |
+|---|---|
+| Quantidade | até **3 por tamanho de tela e idioma** |
+| Duração | **15 a 30 s** |
+| Arquivo | **.mov, .m4v ou .mp4** (H.264) ou .mov (ProRes 422 HQ) · **até 500 MB** |
+| Vídeo | H.264 10–12 Mbps · **máx. 30 fps** · progressivo |
+| Áudio | estéreo AAC 256 kbps, 44,1 ou 48 kHz (trilhas todas habilitadas) |
+| Resolução iPhone (todas as telas com notch/Dynamic Island) | **886×1920** retrato · 1920×886 paisagem |
+| Resolução iPhone com botão Home (5,5") | 1080×1920 retrato |
+| Resolução iPad 13" / 12,9" | **1200×1600** retrato · 1600×1200 paisagem |
+| Capa (*poster frame*) | padrão no segundo 5; dá para escolher |
+| Processamento | até 24 h depois do envio |
+
+Os vídeos aparecem **antes** das capturas. Gravação: `xcrun simctl io booted recordVideo prev.mov`
+ou gravação de tela do iPhone, depois ajuste no iMovie/Final Cut para a resolução da tabela.
+
+---
+
+## 7. Ajustar o projeto para iOS (o que muda no código)
+
+> Rodar o app no iOS **não é só buildar**: o Persona Fit tem vários pontos que a Apple trata de
+> forma diferente do Google.
+
+### 7.1 `app.config.ts` — seção `ios`
 ```ts
 ios: {
   bundleIdentifier: 'br.com.nutrion',
-  // ⚠️ Decisão PERMANENTE (ver §11.1). false = só iPhone (roda em iPad em modo compatibilidade).
+  // ⚠️ Decisão PERMANENTE (ver §14.1). false = só iPhone (roda no iPad em modo compatibilidade).
   supportsTablet: false,
+  icon: './assets/icon-ios.png', // 1024×1024 SEM transparência (ver §7.2)
   config: { usesNonExemptEncryption: false }, // pula o questionário de criptografia do TestFlight
   infoPlist: {
     // O <StatusBar> do RN usa a API global; com true o app pode fechar ao abrir (lição DOD).
@@ -149,211 +319,254 @@ ios: {
     CFBundleDevelopmentRegion: 'pt-BR',
     CFBundleLocalizations: ['pt-BR'],
   },
-  usesAppleSignIn: true, // ver §4.2
+  usesAppleSignIn: true, // ver §7.3
 },
 ```
-- As frases de permissão de **câmera e fotos** já estão no plugin `expo-image-picker` — ótimo. A Apple recusa frase genérica ("precisamos da câmera"); as suas explicam o motivo, **mantenha assim** (diretriz 5.1.1).
+- As frases de permissão de **câmera e fotos** já estão no plugin `expo-image-picker` e explicam o
+  motivo — **mantenha assim**. A Apple recusa frase genérica ("precisamos da câmera") (5.1.1).
 - `userInterfaceStyle: 'dark'` está ok.
 
-### 4.2 Login Google → precisa oferecer **Sign in with Apple** (diretriz 4.8)
-- Regra: se o app usa login de terceiro (Google) para a conta principal, precisa oferecer **também** uma opção equivalente que só peça nome/e-mail e permita **esconder o e-mail** — na prática, **Sign in with Apple**.
-- O Persona Fit tem login por e-mail **e** Google. A isenção da Apple só vale para app que usa **exclusivamente** o próprio login. Com Google presente, **inclua Sign in with Apple** para não arriscar recusa.
-- Como fazer (Expo + Supabase):
-  - `npx expo install expo-apple-authentication` e `usesAppleSignIn: true` no `ios`.
-  - Botão "Continuar com Apple" (componente oficial `AppleAuthenticationButton`, **no mínimo do mesmo tamanho/destaque do botão Google**).
-  - No Supabase: habilitar o provider **Apple** e usar `signInWithIdToken({ provider: 'apple', token })`.
-  - O e-mail pode vir como `xxxx@privaterelay.appleid.com` (e-mail oculto) — seu backend precisa aceitar.
-  - O nome do usuário **só vem no primeiro login** — salve na hora.
-- **Google no iOS:** precisa de um **Client ID do tipo iOS** no Google Cloud e do **iosUrlScheme** (Client ID invertido) no plugin `@react-native-google-signin/google-signin` do `app.config.ts`. Sem isso o login Google fecha ou falha só no iPhone.
+### 7.2 Ícone sem transparência
+`assets/icon.png` tem **canal alfa**. No Android não importa; no iOS o envio é recusado
+(*"The large app icon … can't be transparent or contain an alpha channel"*). Gere uma cópia
+achatada sobre o fundo preto e aponte em `ios.icon`:
+```bash
+# macOS, sem instalar nada: JPEG não tem alfa; depois volta para PNG
+sips -s format jpeg assets/icon.png --out /tmp/icon.jpg && \
+sips -s format png /tmp/icon.jpg --out assets/icon-ios.png
+sips -g hasAlpha assets/icon-ios.png   # deve mostrar: hasAlpha: no
+```
+(Se partes do ícone forem transparentes, confira o resultado: o fundo vira a cor da área
+transparente. Melhor exportar do arquivo de design com fundo preto `#000000`.)
 
-### 4.3 Exclusão de conta (diretriz 5.1.1(v)) — ✅ já existe
-App que permite **criar conta** precisa permitir **excluir a conta dentro do app**. O Persona Fit
-já tem (`DangerZone` → "Excluir conta"). Confirme que exclui de verdade (ou dispara a exclusão)
-e mencione o caminho nas notas de revisão.
+### 7.3 Login: Sign in with Apple + Google no iOS (diretriz 4.8)
+- **Regra:** app que usa login de terceiro (Google) para a conta principal precisa oferecer
+  **também** uma opção equivalente que só peça nome/e-mail, permita **esconder o e-mail** e não
+  rastreie para anúncio. Na prática: **Sign in with Apple**. A isenção vale só para app que usa
+  **exclusivamente** login próprio — com Google presente, inclua Apple.
+- **Sign in with Apple (Expo + Supabase):**
+  - `npx expo install expo-apple-authentication` e `usesAppleSignIn: true` no `ios`
+    ([doc Expo](https://docs.expo.dev/versions/latest/sdk/apple-authentication/)).
+  - Botão oficial `AppleAuthenticationButton`, **no mínimo do mesmo tamanho/destaque do Google**.
+  - Supabase: habilitar o provider **Apple** (Client ID = bundle id `br.com.nutrion`) e usar
+    `signInWithIdToken({ provider: 'apple', token })`
+    ([doc Supabase](https://supabase.com/docs/guides/auth/social-login/auth-apple)).
+  - O e-mail pode vir como `xxxx@privaterelay.appleid.com` — o backend precisa aceitar.
+  - O **nome só vem no primeiro login** — salve na hora.
+- **Google no iOS:** criar um **Client ID do tipo iOS** no Google Cloud (bundle `br.com.nutrion`) e
+  passar o **`iosUrlScheme`** (Client ID invertido, `com.googleusercontent.apps.…`) no plugin:
+  ```ts
+  ['@react-native-google-signin/google-signin', { iosUrlScheme: 'com.googleusercontent.apps.XXXX' }]
+  ```
+  ([doc](https://react-native-google-signin.github.io/docs/setting-up/expo)). Sem isso o login
+  Google fecha ou falha só no iPhone.
 
-### 4.4 Assinaturas (RevenueCat) no iOS
-- Hoje `src/services/billing.ts` usa só `EXPO_PUBLIC_RC_API_KEY_ANDROID`. **O iOS precisa da chave Apple do RevenueCat** (`appl_...`):
+### 7.4 Exclusão de conta (diretriz 5.1.1(v)) — ✅ já existe
+App que permite **criar conta** precisa permitir **excluir a conta dentro do app**. O Persona Fit já
+tem (`DangerZone` → "Excluir conta"). Confirme que exclui de verdade e cite o caminho nas notas de
+revisão. (No DOD Estudos, a falta desse botão era item obrigatório antes da loja pública.)
+
+### 7.5 Assinaturas (RevenueCat) no iOS
+- `src/services/billing.ts` usa só a chave Android. O iOS precisa da chave Apple (`appl_...`):
   ```ts
   const API_KEY = Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_RC_API_KEY_IOS
     : process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID;
   ```
-  e cadastrar `EXPO_PUBLIC_RC_API_KEY_IOS` nas variáveis do ambiente `production` da EAS.
-- No **RevenueCat**: adicionar o app iOS (bundle id), a **App Store Connect API Key de compras (In-App Purchase Key)** e/ou o **App-Specific Shared Secret**, importar os produtos e ligá-los às mesmas *entitlements* do Android.
-- **Regras da Apple para a tela de assinatura (3.1.2) — causa clássica de recusa:**
-  - mostrar **preço, período e o que está incluso** antes de comprar;
-  - se houver teste grátis, dizer **quanto dura e quanto cobra depois**;
-  - links visíveis para **Termos de Uso (EULA)** e **Política de Privacidade** na própria tela de compra;
-  - botão **"Restaurar compras"** (o `restorePurchases` já existe — deixe visível);
-  - na página da loja, colocar o link dos Termos no campo descrição ou usar o EULA padrão da Apple.
-- **Nada de pagamento fora da Apple (3.1.1):** conteúdo digital/assinatura **só por compra dentro do app**. Não coloque link ou texto do tipo "assine pelo site mais barato" (lição DOD: até um texto "Renove no site" é risco).
-- **Teste de compra:** **App Store Connect → Usuários e acesso → Sandbox → Testadores** → crie uma conta sandbox. No TestFlight, as compras já são sandbox (não cobram).
+  e cadastrar `EXPO_PUBLIC_RC_API_KEY_IOS` no ambiente **production** da EAS.
+- No **RevenueCat**: adicionar o app iOS (bundle id), configurar a **In-App Purchase Key**
+  ([doc](https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/in-app-purchase-key-configuration)),
+  importar os produtos e ligá-los às mesmas *entitlements* do Android
+  ([doc](https://www.revenuecat.com/docs/getting-started/entitlements)).
+- **Tela de assinatura (3.1.2) — causa clássica de recusa:**
+  - **preço, período e o que está incluso** visíveis antes de comprar;
+  - teste grátis: **quanto dura e quanto cobra depois**;
+  - links para **Termos de Uso (EULA)** e **Política de Privacidade** na própria tela;
+  - botão **"Restaurar compras"** visível (`restorePurchases` já existe);
+  - na página da loja: link dos Termos na descrição, ou EULA personalizado em *Informações do app*.
+- **Nada de pagamento fora da Apple (3.1.1):** conteúdo digital só por compra dentro do app. Nenhum
+  link/texto do tipo "assine pelo site" — no DOD, até botões "Conhecer/Renovar assinatura" que
+  abriam o site viraram ajuste obrigatório.
+- **Teste de compra:** **Usuários e acesso → Sandbox → Testadores** → conta sandbox. No TestFlight
+  as compras já são sandbox (não cobram).
 
-### 4.5 Notificações push no iOS (chave APNs) — passo a passo
+### 7.6 Notificações push no iOS (chave APNs)
 
-**Como o push do Persona Fit funciona hoje** (conferido no código):
-`src/services/pushNotifications.ts` pede a permissão, gera o **Expo Push Token**
-(`getExpoPushTokenAsync`) e salva em `profiles.expo_push_token` no Supabase. As Edge Functions
-enviam pela API da Expo (`supabase/functions/_shared/expoPush.ts` → `exp.host/--/api/v2/push/send`).
-A Expo entrega no Android pelo FCM e **no iOS pela Apple (APNs)** — e para isso a Expo precisa
-de uma **chave APNs da sua conta Apple**. Sem ela, o token iOS até é gerado, mas **nenhuma
-notificação chega no iPhone**. Nada muda no backend: o mesmo token/envio serve para os dois.
+**Como o push funciona hoje:** `src/services/pushNotifications.ts` gera o **Expo Push Token** e
+salva em `profiles.expo_push_token`; as Edge Functions enviam pela API da Expo
+(`supabase/functions/_shared/expoPush.ts`). A Expo entrega no Android pelo FCM e **no iOS pela
+Apple (APNs)** — para isso precisa de uma **chave APNs da sua conta**. Sem ela, o token iOS até é
+gerado, mas **nenhuma notificação chega no iPhone**. O backend não muda.
 
-**Passo 1 — Declarar o push no projeto** (`app.config.ts`, lista `plugins`):
-```ts
-['expo-notifications', { mode: 'production' }],
-```
-O Expo já aplica esse plugin sozinho por estar instalado, mas deixar explícito com
-`mode: 'production'` garante a permissão `aps-environment: production` no build de loja
-(o DOD Questões usa `ios.entitlements: { 'aps-environment': 'production' }`, que tem o mesmo efeito).
+1. **Declarar** em `plugins`: `['expo-notifications', { mode: 'production' }]` (garante
+   `aps-environment: production` na build de loja).
+2. **Gerar a chave (a EAS faz):** no primeiro `eas build -p ios` responda **Yes** em *"set up Push
+   Notifications"*, ou depois: `npx eas-cli credentials -p ios` → production → **Push
+   Notifications → Set up / Generate a new key**.
+3. **Ou à mão:** [Keys](https://developer.apple.com/account/resources/authkeys/list) → **"+"** →
+   `APNs Persona Fit` → **Apple Push Notifications service (APNs)** → *Sandbox & Production*,
+   *Team Scoped* → **Register** → **Download** do `.p8` (**só baixa uma vez**; guarde no cofre) →
+   suba na EAS (**Add a new key**) com Key ID e Team ID. Máximo **2 chaves APNs por time**; uma
+   serve para todos os seus apps.
+4. **Conferir:** `npx eas-cli credentials -p ios` → production mostra **Push Key**, além de
+   Distribution Certificate e Provisioning Profile.
+5. **Testar no iPhone (TestFlight):** aceitar a permissão → conferir o token no Supabase
+   (`ExponentPushToken[...]`) → enviar em https://expo.dev/notifications → testar app aberto,
+   em segundo plano e fechado. Simulador não serve para validar push.
+6. **Se não chegar:** `InvalidCredentials` → chave ausente/errada; `DeviceNotRegistered` → token
+   velho; sem token → permissão negada (no iOS o pedido aparece **uma vez só**).
 
-**Passo 2 — Gerar a chave APNs (a EAS faz por você).** Escolha um caminho:
+Boas práticas: peça a permissão **no momento certo** (ex.: ao ativar lembretes), com uma tela
+explicando antes; **o app não pode exigir push para funcionar** (5.1.2); nada de propaganda por
+push sem opt-in (4.5.4).
 
-*Caminho A (recomendado), no primeiro build:* ao rodar `npx eas-cli build -p ios --profile production`,
-a EAS pergunta algo como *"Would you like to set up Push Notifications for your project?"* →
-responda **Yes** → ela entra com seu Apple ID, **cria a chave APNs** na sua conta e guarda.
+### 7.7 IA e dados de saúde (diretrizes 5.1.2(i) e 1.4.1)
+- Texto atual da 5.1.2(i): *"You must clearly disclose where personal data will be shared with
+  third parties, **including with third-party AI**, and obtain explicit permission before doing
+  so."* O app manda **fotos de refeições e dados para IA de terceiros** → **tela de consentimento
+  explícito antes do primeiro uso da IA**, dizendo qual dado vai e para quem, e o mesmo na Política
+  de Privacidade.
+- **Saúde/nutrição:** sem promessas médicas ("cura", "trata", "diagnóstico"); aviso de que não
+  substitui nutricionista/médico. Orientação de saúde sem base vira "app médico" (1.4.1) e a
+  revisão endurece.
+- Chat de IA aberto: a Apple pode pedir mecanismo de denúncia/filtro de conteúdo impróprio.
 
-*Caminho B, a qualquer momento:*
-```bash
-npx eas-cli credentials -p ios
-```
-→ perfil **production** → **Push Notifications: Manage your Apple Push Notifications Key** →
-**Set up / Generate a new key** (a EAS cria) **ou** **Add a new key** (se você criou à mão, Passo 3).
+### 7.8 Manifesto de privacidade
+O iOS exige que app e SDKs declarem certas APIs (`PrivacyInfo.xcprivacy`). Expo SDK 54 e as
+bibliotecas atuais já trazem. Se chegar e-mail de **"Missing API declaration"** depois do upload,
+adicione em `ios.privacyManifests` o que o e-mail listar.
 
-**Passo 3 — (só se quiser criar à mão) a chave no site da Apple:**
-1. https://developer.apple.com/account/resources/authkeys/list → **"+"**.
-2. Nome: `APNs Persona Fit` → marque **Apple Push Notifications service (APNs)** → **Configure**:
-   ambiente **Sandbox & Production**, escopo **Team Scoped (All Topics)** → Continue → **Register**.
-3. **Download** do `AuthKey_XXXXXXXXXX.p8` — **só baixa uma vez**; guarde num cofre de senhas.
-   Anote o **Key ID** (10 caracteres) e o **Team ID** (developer.apple.com → Membership).
-4. Suba na EAS pelo Caminho B (**Add a new key**), informando o `.p8`, o Key ID e o Team ID.
-- A Apple permite **no máximo 2 chaves APNs por equipe**. Antes de criar, veja na lista se já existe.
-- Uma chave serve para **todos os seus apps** (escopo Team).
-- Na conta Individual, só você (Titular) acessa essa tela, e como a conta é sua isso não atrapalha.
-
-**Passo 4 — Conferir:** `npx eas-cli credentials -p ios` → perfil production deve mostrar
-**Push Key** configurada (além de Distribution Certificate e Provisioning Profile). Em
-developer.apple.com → Identifiers → `br.com.nutrion`, a capability **Push Notifications** fica marcada
-(a EAS marca sozinha).
-
-**Passo 5 — Testar no iPhone (pelo TestFlight):**
-1. Instale o build pelo TestFlight, faça login e **aceite** o pedido de notificação.
-2. Confirme no Supabase que `profiles.expo_push_token` do seu usuário foi preenchido (começa com `ExponentPushToken[...]`).
-3. Envie um teste em https://expo.dev/notifications colando o token (ou dispare pela sua Edge Function).
-4. Teste com o app **aberto**, **em segundo plano** e **fechado**.
-- Build do TestFlight/App Store usa o **APNs de produção** — por isso o `mode: 'production'`.
-- **Simulador:** o push remoto não serve para validar de verdade. Teste no iPhone.
-
-**Passo 6 — Se não chegar:**
-- Resposta da Expo com erro **`InvalidCredentials`** → chave APNs ausente ou errada na EAS (volte ao Passo 2/4).
-- **`DeviceNotRegistered`** → token velho (app reinstalado); o app precisa salvar o token novo.
-- Token não é gerado → permissão negada; no iOS o pedido aparece **uma vez só**. Depois de negar,
-  só pelos **Ajustes → Persona Fit → Notificações**. Reinstalar o app para testar de novo.
-
-**Boas práticas para a revisão e para o usuário:**
-- Peça a permissão **no momento certo** (ex.: ao ativar lembretes), com uma tela explicando o
-  benefício antes do pedido do sistema. Hoje o app pede ao registrar — confira em que tela isso ocorre.
-- **Não use push para propaganda** sem o usuário optar por isso (diretriz 4.5.4); se mandar
-  promoções, ofereça como desligar dentro do app.
-- Se um dia trocar a Expo por **Firebase (FCM) direto** no iOS, a chave APNs precisa ser enviada
-  também ao Firebase (lição DOD Questões: estava vazio lá e o push não entregava no iOS).
-
-### 4.6 IA e dados pessoais (diretriz 5.1.2 / 1.4.1)
-- O app manda **fotos de refeições e dados para IA de terceiros** (`chat-ai`, análise de pratos). A Apple exige **informar claramente** que dados vão para serviços de IA de terceiros e **pedir permissão explícita** antes. Faça uma tela de consentimento antes do primeiro uso da IA e cite isso na Política de Privacidade.
-- **Saúde/nutrição:** evite promessas médicas ("cura", "trata", "diagnóstico"). Inclua aviso de que o conteúdo não substitui nutricionista/médico. Apps com orientação de saúde sem base passam a ser tratados como "médicos" (1.4.1) e a revisão fica mais rígida.
-- Conteúdo gerado por IA: se houver chat aberto, a Apple pode pedir mecanismo de denúncia/filtro de conteúdo impróprio.
-
-### 4.7 Manifesto de privacidade
-- O iOS exige que app e SDKs declarem o uso de certas APIs (`PrivacyInfo.xcprivacy`). O Expo SDK 54 e as bibliotecas atuais já trazem os manifestos; se o App Store Connect mandar e-mail de **"Missing API declaration"** depois do upload, adicione em `ios.privacyManifests` do `app.config.ts` o que o e-mail listar.
-
-### 4.8 Versão mínima do Xcode/SDK
-- Desde **28/04/2026**, todo app enviado precisa ser compilado com **Xcode 26+ (SDK iOS 26)**. A EAS usa uma imagem compatível com o Expo 54 — não precisa de nada, mas **não force imagem antiga** no `eas.json`.
-- ⚠️ **Lição DOD (Xcode 27):** compilado com o **SDK do iOS 27**, um app Expo/RN que ainda não adotou o ciclo de vida *UIScene* **fecha ao abrir no iOS 27**. Hoje a EAS compila com Xcode 26 e não acontece. Quando a Apple passar a exigir o SDK 27 (provavelmente abril/2027), atualize o Expo para uma versão que suporte UIScene **antes** de buildar.
+### 7.9 Requisitos mínimos de build (fonte: [Upcoming requirements](https://developer.apple.com/news/upcoming-requirements/))
+- Desde **28/04/2026**: build com **Xcode 26+ (SDK iOS 26)**. A EAS já usa imagem compatível com o
+  Expo 54 — **não force imagem antiga** no `eas.json`.
+- Desde **09/09/2026**: o app precisa ter **alvo mínimo iOS 13+** (o Expo 54 já é 15.1+).
+- ⚠️ **Lição DOD (Xcode 27):** com o **SDK do iOS 27**, app Expo/RN sem ciclo de vida *UIScene*
+  **fecha ao abrir no iOS 27**. Quando a Apple exigir o SDK 27 (provavelmente abr/2027), atualize
+  o Expo para uma versão com UIScene **antes** de buildar. Nessa mesma época entram as capturas de
+  **iPhone Duo** obrigatórias para quem compilar com SDK 27.1+ (§6.2).
 
 ---
 
-## 5. Build e envio com a EAS
+## 8. Credenciais, build e envio com a EAS
 
-### 5.1 Conta da EAS
-`npx eas-cli whoami` → precisa ser a conta **dona do projeto** (o `projectId` do Persona Fit).
-Lição DOD: com a conta errada logada, tudo falha com *"Entity not authorized"*.
+### 8.1 Conta da EAS
+`npx eas-cli whoami` → precisa ser a conta **dona do projeto** (`projectId 6aed6bd3-…`). Com a
+conta errada, tudo falha com *"Entity not authorized"* (lição DOD).
 
-### 5.2 `eas.json` — adicionar o submit do iOS
+### 8.2 `eas.json` — envio do iOS
 ```jsonc
 "submit": {
   "production": {
     "android": { "...": "como já está" },
     "ios": {
-      "ascAppId": "1234567890"   // o Apple ID do APP (§3.2), NÃO o número do canto da tela
+      "ascAppId": "1234567890"   // Apple ID do APP (§4.2), NÃO o número do canto da tela
     }
   }
 }
 ```
 O `ascAppId` não é segredo — pode commitar.
 
-### 5.3 ⚠️ `ascAppId` errado = envio "ERRORED"
-No DOD Questões usamos o número `20446889670` (que aparece ao lado do nome da conta, no topo do
-App Store Connect). **Esse é o ID da equipe, não do app.** O `eas submit` terminou em
-**ERRORED** e nada chegou ao TestFlight. O certo é o número da **URL do app**.
+### 8.3 ⚠️ `ascAppId` errado = envio "ERRORED"
+No DOD Questões usamos o número do topo do App Store Connect (ao lado do nome da conta). **É o ID
+da equipe, não do app.** O `eas submit` terminou em **ERRORED**. O certo é o número da **URL do app**.
 
-### 5.4 Primeiro build (credenciais)
+### 8.4 Primeiro build (credenciais)
 ```bash
 npx eas-cli build -p ios --profile production
 ```
-- Na primeira vez pede **login com o Apple ID** (o da conta de desenvolvedor) e oferece **gerar tudo**: Distribution Certificate, Provisioning Profile, Bundle ID, chave de push. **Aceite que a EAS gere e guarde.**
-- **Não gere certificados novos** se já existirem válidos (invalida os anteriores).
-- Leva 15 a 30 min na nuvem. **Não precisa de Mac.**
-- O build number sobe sozinho (`appVersionSource: remote` + `autoIncrement` — já configurado).
+- Pede **login com o Apple ID** e oferece **gerar tudo**: Bundle ID + capabilities, **Distribution
+  Certificate**, **Provisioning Profile**, chave de push. **Aceite que a EAS gere e guarde**
+  ([doc](https://docs.expo.dev/app-signing/app-credentials/)).
+- **Não gere certificados novos** se já existirem válidos. O limite é baixo (poucos certificados de
+  distribuição por conta) e **revogar um certificado quebra as builds que dependem dele**.
+- 15 a 30 min na nuvem. **Não precisa de Mac.** O build number sobe sozinho (`autoIncrement`).
 
-### 5.5 Enviar ao App Store Connect
+### 8.5 Enviar ao App Store Connect (sem pedir login toda vez)
 ```bash
 npx eas-cli submit -p ios --profile production --latest
 ```
-- Na primeira vez, aceite que a EAS **gere uma App Store Connect API Key** (precisa ser Admin/Titular). Depois disso **o submit nunca mais pede login**.
-- ⚠️ **O arquivo do build fica na EAS só 30 dias.** Depois vira *Expired* e não dá mais para enviar — precisa buildar de novo. Envie logo depois do build.
-- A Apple processa o binário em 5 a 30 min e manda e-mail.
+Na primeira vez a EAS oferece **gerar uma chave de API do App Store Connect** — aceite (precisa
+ser Titular/Admin). Depois, **confira o vínculo** (lição DOD Estudos):
+- expo.dev → projeto → **Credentials → iOS → `br.com.nutrion`** → seção
+  **"App Store Connect API Key for EAS Submit"** precisa mostrar a chave.
+- Se estiver vazio, o `submit` cai em *"Only user authentication is supported"* e pede Apple ID
+  toda vez. Resolva em **Add an App Store Connect API key** nessa mesma tela, escolhendo a chave
+  que já está na conta.
+
+Ou num comando só: `npx eas-cli build -p ios --profile production --auto-submit`.
+- ⚠️ **O arquivo da build fica na EAS só 30 dias** (depois vira *Expired*). Envie logo.
+- A Apple processa em 5 a 30 min e manda e-mail ("ready for testing" / "has completed processing").
 
 ---
 
-## 6. TestFlight (teste antes da loja)
+## 9. TestFlight (teste antes da loja)
 
-TestFlight é o app da Apple que instala **o mesmo binário que vai para a loja**, em iPhone real.
+TestFlight instala **o mesmo binário que vai para a loja**, em iPhone real
+([visão geral](https://developer.apple.com/help/app-store-connect/test-a-beta-version/overview-of-testflight)).
+A build de teste vale **90 dias**.
 
-1. **App Store Connect → seu app → TestFlight → Testes internos → "+"** → crie um grupo (ex.: "Equipe") e se adicione. Testadores internos precisam ser **usuários do App Store Connect** (você já é).
-2. Instale o app **TestFlight** no iPhone com o mesmo Apple ID → instale o Persona Fit.
-3. Preencha **"O que testar"** na compilação.
-4. Testadores **externos** (amigos, até 10 mil, por e-mail ou link público) passam por uma revisão rápida da Apple (*Beta App Review*, até ~1 dia).
+### 9.1 Testadores internos (sem revisão, liberação imediata)
+- Precisam ser **usuários do App Store Connect** com acesso ao app (você já é). Até 100 pessoas.
+- Para incluir alguém: **Usuários e acesso → "+"** → e-mail, papel (ex.: *Developer* ou
+  *Marketing*), acesso **só ao app Persona Fit** → a pessoa **aceita o convite por e-mail**.
+- ⚠️ **Lição DOD Estudos:** na hora de adicionar ao grupo, **só aparecem quem já aceitou o
+  convite**. Se alguém "sumiu" da lista, falta aceitar.
+- **TestFlight → Testes internos → "+"** → grupo (ex.: "Equipe") → adicione as pessoas → a build
+  entra automaticamente (se *distribuição automática* estiver ligada).
 
-**O Simulador do Mac não substitui o TestFlight:** ele roda outro tipo de build, sem push, sem
-compras reais e sem a assinatura da loja. Use para ver telas; valide no iPhone.
+### 9.2 Testadores externos (qualquer e-mail ou link público, até 10 mil)
+- **TestFlight → Testes externos → "+"** → grupo → adicione e-mails **ou** ative o **link público**.
+- Antes do primeiro envio, preencha **Informações de teste**: descrição do app, e-mail de feedback,
+  contato e **conta de login para o revisor** (marque *"Início de sessão obrigatório"*).
+- A primeira build de cada versão passa pela **revisão beta** (até ~1 dia). **Não trava o teste
+  interno**, que segue normal enquanto isso.
+- Depois de aprovada, **adicione os testadores** no grupo (aprovação com 0 testadores não envia
+  nada a ninguém — aconteceu no DOD Estudos).
 
-### 6.1 Roteiro mínimo (no iPhone, pelo TestFlight)
-- [ ] Abre sem fechar sozinho (StatusBar, §4.1)
+### 9.3 Como o testador instala
+1. Instala o app **TestFlight** (App Store) no iPhone.
+2. Abre o convite por e-mail ou o link público → **Aceitar** → **Instalar**.
+3. Preencha **"O que testar"** na build para orientar.
+
+**O Simulador do Mac não substitui o TestFlight:** outro tipo de build, sem push, sem compras reais.
+
+### 9.4 Roteiro mínimo (no iPhone, pelo TestFlight)
+- [ ] Abre sem fechar sozinho (StatusBar, §7.1)
 - [ ] Login por e-mail, **Google** e **Apple** — e volta para o app
 - [ ] Fechar à força e reabrir → continua logado
-- [ ] Câmera e galeria: o pedido de permissão aparece com o texto certo
-- [ ] Análise de refeição por IA funciona (tela de consentimento antes, §4.6)
+- [ ] Câmera e galeria: pedido de permissão com o texto certo
+- [ ] Análise de refeição por IA funciona, **com a tela de consentimento antes** (§7.7)
 - [ ] **Paywall:** preços carregam, compra em **sandbox** conclui, "Restaurar compras" funciona
-- [ ] Notificação: pedido de permissão + recebimento de um push de teste
+- [ ] Notificação: pedido de permissão + recebimento de push de teste
 - [ ] Excluir conta funciona
-- [ ] (se `supportsTablet: true`) iPad em retrato e paisagem, teclado aparece nos campos
+- [ ] Ícone correto na tela inicial (sem fundo estranho, §7.2)
+- [ ] (só iPhone) abre no Simulador de iPad em modo compatibilidade sem cortar nada essencial
 
 ---
 
-## 7. Página da loja (Distribuição → versão iOS)
+## 10. Página da loja (Distribuição → versão iOS 1.0)
 
-### 7.1 Textos
-- **Nome** (até 30 caracteres), **Subtítulo** (30), **Palavras-chave** (100, separadas por vírgula, sem repetir o nome), **Descrição**, **O que há de novo** (obrigatório a partir da 2ª versão), **URL de suporte** (obrigatória — pode ser uma página do site), **URL de marketing** (opcional), **Copyright** (ex.: `2026 Robson Solano`).
+### 10.1 Textos e limites ([referência oficial](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information))
+| Campo | Limite | Observação |
+|---|---|---|
+| Nome | 2 a 30 caracteres | em *Informações do app* |
+| Subtítulo | 30 caracteres | idem |
+| Texto promocional | 170 caracteres | aparece acima da descrição; **muda sem nova revisão** |
+| Descrição | 4.000 caracteres | texto puro, sem HTML; obrigatório |
+| Palavras-chave | **100 bytes** | separadas por vírgula, sem espaço; cada uma com 3+ caracteres; **acento conta 2 bytes**; não repita nome do app/vendedor; **proibido nome de outro app/marca** |
+| O que há de novo | 4.000 caracteres | **não existe na 1ª versão**; obrigatório nas seguintes |
+| URL de suporte | — | obrigatória; **precisa levar a um contato real** (e-mail/telefone/endereço) |
+| URL de marketing | — | opcional |
+| Copyright | — | obrigatório, ex.: `2026 Robson Solano` (o © é automático) |
+| Versão | — | igual ao `version` do `app.config.ts` (ex.: `1.5.0`) |
 
-### 7.2 Capturas de tela
-- **iPhone 6,9"** (ex.: iPhone 17 Pro Max, 1320×2868) — obrigatório; a Apple reduz para os tamanhos menores.
-- **iPad 13"** — **obrigatório só se `supportsTablet: true`**. Sem elas, o envio é bloqueado.
-- Até 10 por tamanho. Podem ter moldura e texto de marketing, mas **precisam mostrar o app de verdade** (nada de tela que não existe).
-- Gere no Simulador (`xcrun simctl io <device> screenshot`) ou no iPhone.
+### 10.2 Imagens e vídeos
+Formatos e tamanhos no **§6**. Para o Persona Fit (só iPhone): capturas **1320×2868** e
+**1206×2622**; vídeo opcional **886×1920**, 15–30 s.
 
-### 7.3 Privacidade do app ("rótulo nutricional")
-Em **Privacidade do app**, declare **tudo** que o app e os SDKs coletam. Para o Persona Fit,
-provavelmente:
+### 10.3 Privacidade do app ("rótulo nutricional")
+Em **Privacidade do app** ([guia oficial](https://developer.apple.com/app-store/app-privacy-details/)),
+declare **tudo** que o app e os SDKs coletam:
 
 | Tipo | Por quê | Vinculado ao usuário? |
 |---|---|---|
@@ -365,175 +578,232 @@ provavelmente:
 | Outro conteúdo do usuário | registros, chat | Sim |
 | Interação com o produto / Dados de falhas | analytics, Sentry | conforme o SDK |
 
-Nenhum é "rastreamento" se você não cruza dados com outros apps para anúncio. **Política de
-privacidade** pública obrigatória (o app já tem: `apppersonafit.vercel.app/legal/privacidade`).
-Lição DOD: a declaração estava 3 anos desatualizada — revise quando adicionar SDK novo.
+Nada é "rastreamento" se você não cruza dados com outros apps para anúncio. URL da política:
+`https://apppersonafit.vercel.app/legal/privacidade`. Lição DOD: a declaração estava 3 anos
+desatualizada — revise quando adicionar SDK novo.
 
-### 7.4 Classificação etária
-- **Informações do app → Classificação etária → Editar.** Responda com sinceridade. A Apple acrescenta perguntas novas de tempos em tempos — em 2026 apareceu a de **caixas de itens (loot boxes)**, e enquanto não respondida aparecia um **aviso amarelo** que pode bloquear o envio.
-- Para Persona Fit, atenção a: **informações médicas/de saúde** (marque o que se aplica), conteúdo gerado por usuário (se houver chat/comunidade), e **acesso irrestrito à web** (Não, salvo se tiver navegador embutido).
-- Existe a opção de **forçar uma classificação maior** ("Substituir por uma classificação etária mais alta") — no DOD estava em +18 por um ajuste antigo. Use só se seus termos exigirem idade mínima.
+### 10.4 Classificação etária (sistema novo de 2026)
+- **Informações do app → Classificação etária → Editar.** Desde 31/01/2026 a Apple usa as faixas
+  **4+, 9+, 13+, 16+ e 18+** e um questionário novo
+  ([valores e definições](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions)).
+  App sem classificação **não pode ser publicado**.
+- Para o Persona Fit, marque **"Temas de saúde ou bem-estar"** (*Health or Wellness Topics* — a
+  própria Apple cita contagem de calorias, dieta e exercícios). "Informação médica ou de
+  tratamento" só se o app orientar condições médicas.
+- Atenção também a: conteúdo gerado por usuário/chat de IA, controles parentais e acesso irrestrito
+  à web (Não, salvo navegador embutido). Pergunta não respondida deixa **aviso amarelo** que
+  bloqueia o envio.
 
-### 7.5 Preços e disponibilidade
-- App gratuito (a receita vem da assinatura).
-- **Países:** desmarque a **UE** se não quiser expor dados de comerciante (§2.3).
-- Opção "Apps para iPhone e iPad em Macs com Apple Silicon": pode deixar ativa (o app roda em Mac M1+), mas desative se não for testar.
+### 10.5 Informações para a revisão (o ponto que mais recusa)
+- **Início de sessão obrigatório:** marque e forneça uma **conta de demonstração que não expire**,
+  com **assinatura premium ativa** e conteúdo de exemplo.
+- ⚠️ **Lição DOD (recusa real):** a conta de revisão estava com o **premium vencido**. O revisor
+  logava e não via nada → recusa 2.1. **Logue com a conta de revisão um dia antes de enviar.**
+- **Notas** (até 4.000 bytes, em inglês): login (inclusive Google/Apple), onde fica a assinatura,
+  como excluir a conta, o que a IA faz. Exemplo:
+  > Sign in with the demo account above (email + password). The account has an active Premium
+  > subscription. To analyze a meal, tap "+" and take or choose a photo; the image is sent to our
+  > AI provider only after the user consents. In-app purchases are in Profile > Premium (sandbox).
+  > Account deletion: Profile > Danger zone > Delete account.
+- **Contato:** nome, e-mail e **telefone em formato internacional** (`+55 11 9…`; o campo não
+  aceita só números) — alguém que **atenda** se a Apple ligar.
 
-### 7.6 Informações para a revisão (o ponto que mais recusa)
-- **Login necessário:** marque e **forneça uma conta de teste que funcione**, com a **assinatura premium ativa** e conteúdo de exemplo (o revisor precisa ver o app funcionando, não telas vazias).
-- ⚠️ **Lição DOD (recusa real):** a conta de revisão estava com o **premium vencido desde 2022**. O revisor logava e não via nada → recusa por "App incompleto" (2.1). **Logue com a conta de revisão um dia antes de enviar e confira o premium.**
-- **Notas** (em inglês): passo a passo do login (inclusive o Google/Apple), onde fica a assinatura, como excluir a conta, o que a IA faz. Exemplo:
-  > Sign in with the demo account above (email + password). The account has an active Premium subscription. To analyze a meal, tap "+" and take or choose a photo; the image is sent to our AI provider after the user consents. In-app purchases are in Profile > Premium (sandbox). Account deletion: Profile > Danger zone > Delete account.
-- Contato (nome, telefone, e-mail) que **atenda** se a Apple ligar.
+### 10.6 Preços e disponibilidade
+- App **gratuito** (a receita vem da assinatura).
+- **Países:** desmarque a **UE** se não quiser expor dados de comerciante (§3.3).
+- **Método de distribuição: Público** — não dá para trocar depois de aprovado.
+- "Apps para iPhone e iPad em Macs com Apple Silicon": pode deixar ativo; desative se não for testar.
 
-### 7.7 Lançamento
+### 10.7 Lançamento
 - **"Lançar esta versão manualmente"** na primeira vez: você aprova e escolhe a hora.
-- **Liberação em etapas (7 dias)** só se aplica a **atualizações** (não à primeira versão).
+- **Liberação em etapas (7 dias)** só existe para **atualizações**.
 
 ---
 
-## 8. Enviar para revisão
-1. Página da versão → **Adicionar compilação** → escolha o build.
-2. Selecione os **produtos de assinatura** (§3.3).
+## 11. Enviar para revisão
+1. Página da versão → **Compilação → "+"** → escolha a build de **produção** (é aqui que o ícone
+   aparece na página).
+2. Selecione os **produtos de assinatura** (§5).
 3. **Salvar → Adicionar para revisão → Enviar para revisão.**
 4. Status: **Aguardando revisão → Em revisão → Pronto para distribuição** (aprovado) ou **Rejeitado**.
 
-### 8.1 Se recusar (vai acontecer pelo menos uma vez — normal)
-1. Leia a mensagem em **Revisão de apps → envio → Mensagens**. Ela cita a diretriz (ex.: *2.1(a)*), o **aparelho e a versão do iOS** usados.
-2. **Reproduza no mesmo aparelho/iOS.** Se não tiver o aparelho, use o Simulador com o runtime do iOS da revisão (`xcodebuild -downloadPlatform iOS`) e um build da EAS para simulador (perfil com `"ios": { "simulator": true }`).
-3. Corrija. Se for só **dado/conta/texto da loja**, não precisa de build novo. Se for código, build novo (o número sobe sozinho).
+### 11.1 Se recusar (vai acontecer pelo menos uma vez — normal)
+1. Leia em **Revisão de apps → envio → Mensagens**: a diretriz (ex.: *2.1(a)*), **aparelho e iOS**.
+2. **Reproduza no mesmo aparelho/iOS.** Sem o aparelho: Simulador com o runtime do iOS da revisão
+   (`xcodebuild -downloadPlatform iOS`) e uma build EAS para simulador (`"ios": { "simulator": true }`).
+3. Corrija. **Dado/conta/texto da loja** não pede build nova; código pede (o número sobe sozinho).
 4. **Responda** em "Responda à equipe de revisão de apps" explicando o que foi feito.
-5. Na versão: troque a compilação (se houver nova) → **Atualizar revisão** → **Reenviar para Revisão do app**.
-- ⚠️ **Não clique no ⊖ vermelho** ao lado do item na tela do envio: ele **remove a versão do envio**.
+5. Troque a compilação (se houver nova) → **Atualizar revisão** → **Reenviar para Revisão do app**.
+- ⚠️ **Não clique no ⊖ vermelho** na tela do envio: ele **remove a versão do envio**.
 - Discordou? Dá para recorrer ao **App Review Board**, mas quase sempre é mais rápido ajustar.
 
 ---
 
-## 9. Depois de aprovado
-1. **Lançar esta versão** (se manual). Leva até 24 h para aparecer em todos os países.
-2. **Monitore o Sentry todos os dias na primeira semana** (crashes, erros de login e de compra). Complementos: App Store Connect → TestFlight → Falhas; Xcode → Organizer → Crashes.
-3. **Atualizações só de JS** → `eas update` (OTA), sem passar pela loja. **Sempre** com o ambiente de produção (`--environment production`): sem o flag, o CLI empacota o `.env` local e publica em produção (incidente real no DOD Cast).
-4. Mudança nativa (plugin, permissão, SDK) → build novo + revisão.
-5. A Apple pode revisar **atualizações OTA que mudem a natureza do app** — use OTA para correções, não para features grandes escondidas da revisão.
+## 12. Depois de aprovado
+1. **Lançar esta versão** (se manual). Até 24 h para aparecer em todos os países.
+2. **Sentry todos os dias na primeira semana** (crashes, login, compra). Complementos: TestFlight →
+   Falhas; Xcode → Organizer → Crashes.
+3. **Atualizações só de JS** → `eas update` (OTA), **sempre** com `--environment production` (sem o
+   flag, o CLI publica o `.env` local em produção — incidente real no DOD Cast).
+4. Mudança nativa (plugin, permissão, SDK, ícone) → build nova + revisão.
+5. OTA não pode mudar a natureza do app escondido da revisão — use para correções.
 
 ---
 
-## 10. Checklist final antes do primeiro envio
+## 13. Checklist final antes do primeiro envio
 
 **Conta e contratos**
-- [ ] Apple Developer ativo (renovação automática ligada)
-- [ ] Contrato de Apps Pagos **Ativo** (impostos W-8BEN + banco validados)
+- [ ] Apple Developer ativo (renovação automática ligada) e nenhum termo pendente no topo do App Store Connect
+- [ ] Contrato de Apps Pagos **Ativo** (W-8BEN + banco validados)
 - [ ] Small Business Program solicitado
 - [ ] Decisão sobre UE/DSA tomada
 
 **Projeto**
-- [ ] `ios.bundleIdentifier` definitivo e **`supportsTablet` decidido** (§11.1)
+- [ ] `ios.bundleIdentifier` definitivo e **`supportsTablet` decidido** (§14.1)
+- [ ] Ícone iOS 1024×1024 **sem alfa** (`sips -g hasAlpha` = no)
 - [ ] `usesNonExemptEncryption: false`, `UIViewControllerBasedStatusBarAppearance: false`
 - [ ] Sign in with Apple implementado (por causa do Google)
 - [ ] Google Sign-In com Client ID **iOS** + `iosUrlScheme`
-- [ ] RevenueCat com chave **iOS** + produtos da Apple ligados às entitlements
+- [ ] RevenueCat com chave **iOS** + produtos ligados às entitlements
 - [ ] Paywall com preço, período, Termos, Privacidade e Restaurar compras
-- [ ] Consentimento antes de enviar dados para IA
+- [ ] Consentimento explícito antes de enviar dados para IA
 - [ ] Excluir conta funcionando
-- [ ] Chave APNs configurada na EAS (§4.5) e push testado no iPhone
+- [ ] Chave APNs na EAS e push testado no iPhone
 - [ ] `eas.json` com `submit.production.ios.ascAppId` (ID do **app**)
+- [ ] Chave de API vinculada ao bundle em **Credentials → iOS** (submit sem login)
 
 **Loja**
+- [ ] Informações do app completas (categoria, privacidade, EULA, bens digitais, dispositivo médico = Não)
 - [ ] Assinaturas "Prontas para envio" e selecionadas na versão
-- [ ] Capturas iPhone 6,9" (+ iPad 13" se tablet)
+- [ ] Capturas iPhone **1206×2622** (obrigatória) + **1320×2868** (+ iPad 13" se tablet)
 - [ ] Privacidade do app completa
-- [ ] Classificação etária sem aviso amarelo
+- [ ] Classificação etária respondida, sem aviso amarelo
+- [ ] Distribuição **Pública**, países decididos
 - [ ] **Conta de revisão testada no dia, com premium ativo**
-- [ ] Notas de revisão explicando login, assinatura, IA e exclusão de conta
-- [ ] Teste completo no iPhone pelo TestFlight (§6.1)
+- [ ] Notas de revisão (login, assinatura, IA, exclusão) + telefone internacional
+- [ ] Teste completo no iPhone pelo TestFlight (§9.4)
 
 ---
 
-## 11. Desafios que já enfrentamos (e como evitar)
+## 14. Desafios que já enfrentamos (e como evitar)
 
-### 11.1 iPad: decisão sem volta (erro 90101)
-Uma vez publicado com suporte a iPad, **a Apple não deixa remover** (*"This bundle does not support
-one or more of the devices supported by the previous app version"*). O DOD Questões teve que
-voltar a suportar iPad por causa disso.
-- `supportsTablet: false` → só iPhone; no iPad roda "em modo iPhone". Menos trabalho, sem capturas de iPad.
-- `supportsTablet: true` → exige capturas de iPad, layout decente em tela grande e **teste em iPad** (a revisão do DOD foi feita **num iPad**, mesmo sendo app de celular).
-- O Persona Fit usa `orientation: 'default'` (destravado pela Play). Se ligar o iPad, teste paisagem.
-- **Decisão para o Persona Fit (2026-10-18): começar só com iPhone (`supportsTablet: false`).**
-  - **Adicionar** iPad depois é permitido a qualquer momento (só **remover** que não é).
-  - App só de iPhone **continua aparecendo para quem procura no iPad** e roda ampliado, em modo
-    compatibilidade. A Apple **pode revisar nesse modo** (diretriz 2.4.1): o app precisa abrir e
-    funcionar no iPad mesmo assim, só não precisa de layout próprio.
-  - Teste rápido antes do envio: rodar o build no Simulador de um iPad e conferir que abre,
-    loga e não corta nada essencial.
+### 14.1 iPad: decisão sem volta (erro 90101)
+Publicado com iPad, **a Apple não deixa remover** (*"This bundle does not support one or more of
+the devices supported by the previous app version"*). O DOD Questões teve que voltar a suportar
+iPad, e no DOD Estudos as capturas de iPad viraram obrigatórias por causa disso.
+- `supportsTablet: false` → só iPhone; no iPad roda "em modo iPhone". Sem capturas de iPad.
+- `supportsTablet: true` → capturas de iPad 13", layout em tela grande e **teste em iPad** (a
+  revisão do DOD foi feita **num iPad**).
+- **Decisão para o Persona Fit (2026-10-18): começar só com iPhone.** Adicionar iPad depois é
+  permitido; remover não. A Apple **pode revisar no iPad em modo compatibilidade** (2.4.1): precisa
+  abrir e funcionar, só não precisa de layout próprio.
 
-### 11.2 App fecha ao abrir (StatusBar)
-`UIViewControllerBasedStatusBarAppearance: true` + `<StatusBar>` do RN = app fecha no iOS.
-Use `false`.
+### 14.2 App fecha ao abrir (StatusBar)
+`UIViewControllerBasedStatusBarAppearance: true` + `<StatusBar>` do RN = app fecha. Use `false`.
 
-### 11.3 Build "Expired"
-Arquivo do build some da EAS em 30 dias. Envie logo.
+### 14.3 Build "Expired"
+Arquivo da build some da EAS em 30 dias. Envie logo.
 
-### 11.4 Conta de revisão quebrada
+### 14.4 Conta de revisão quebrada
 Premium vencido → revisor não vê conteúdo → recusa 2.1. Teste a conta no dia do envio.
 
-### 11.5 "Teclado não apareceu" / login não abre
-A revisão do DOD relatou que o teclado do login não apareceu (iPadOS 27). Não reproduzimos, mas
-adicionamos um **plano B**: se a tela de login do sistema não abrir, abrir no navegador e mandar
-o erro ao Sentry. Vale para qualquer login via navegador (OAuth). Teste o login no **mesmo
-aparelho/iOS** da revisão (§8.1).
+### 14.5 "Teclado não apareceu" / login não abre
+A revisão do DOD relatou teclado do login sem aparecer (iPadOS 27). Plano B: se a tela de login do
+sistema não abrir, abrir no navegador e mandar o erro ao Sentry. Teste no **mesmo aparelho/iOS**.
 
-### 11.6 ID errado no `ascAppId`
+### 14.6 ID errado no `ascAppId`
 Número do canto da tela = ID da equipe. Use o da URL do app.
 
-### 11.7 Conta Individual: só o Titular acessa chaves
-Na conta Individual, usuários convidados **não acessam** Certificates/Keys. No Persona Fit você é o
-Titular — sem esse bloqueio. Só não convide alguém esperando que ele resolva certificados.
+### 14.7 Chave de API com papel errado / não vinculada (DOD Estudos)
+- Chave **Developer** não cria certificado de distribuição (403). Use **Admin**.
+- Chave cadastrada na conta da Expo mas **não vinculada ao bundle** → submit pede Apple ID. Vincule
+  em Credentials → iOS → bundle → *App Store Connect API Key for EAS Submit*.
 
-### 11.8 Texto que manda pagar fora da Apple
-Qualquer "assine/renove pelo site" é risco (3.1.1/3.1.3). Mantenha a compra **só pela loja**.
+### 14.8 Ícone cinza na página da versão
+Não é erro: o ícone vem da build e só aparece depois de **associar uma build** à versão (§11).
 
-### 11.9 Privacidade e classificação desatualizadas
-Perguntas novas (loot boxes) e SDKs novos exigem revisar **Privacidade do app** e
+### 14.9 Ícone com transparência
+PNG com canal alfa é recusado no upload iOS. Use a cópia achatada (§7.2).
+
+### 14.10 Grupo externo aprovado, ninguém recebeu
+A revisão beta aprova a **build**; quem recebe são os **testadores do grupo**. Grupo com 0
+testadores = ninguém recebe. Adicione e-mails ou ligue o link público.
+
+### 14.11 Texto que manda pagar fora da Apple
+Qualquer "assine/renove pelo site" é risco (3.1.1). Compra **só pela loja**.
+
+### 14.12 Privacidade e classificação desatualizadas
+SDK novo e perguntas novas do questionário exigem revisar **Privacidade do app** e
 **Classificação etária** antes de cada versão importante.
 
-### 11.10 Mac / Xcode local (se um dia buildar no Mac)
-- `git` para de funcionar após atualizar o Xcode → `sudo xcodebuild -license accept`.
-- Xcode novo pode tornar **erro** o alvo mínimo antigo de bibliotecas (pods abaixo do iOS 15) e exigir patches no `Podfile`.
-- O Xcode 27 instalado aqui veio **sem a janela do Simulador**; contornamos com `xcrun simctl` + Maestro.
-- **Recomendação:** use **só a EAS** para builds de loja. Mac local só para depurar.
+### 14.13 Mac / Xcode local (se um dia buildar no Mac)
+- `git` para após atualizar o Xcode → `sudo xcodebuild -license accept`.
+- Xcode novo pode tornar **erro** o alvo mínimo antigo de bibliotecas e exigir patches no `Podfile`.
+- **Recomendação:** use **só a EAS** para builds de loja. Mac local só para depurar e gerar capturas.
 
-### 11.11 OTA de produção sem o ambiente certo
+### 14.14 OTA de produção sem o ambiente certo
 `eas update` sem `--environment production` publicou o `.env` local em produção no DOD Cast →
-tela "Configuração inválida" para todos. Use sempre o ambiente de produção.
+tela "Configuração inválida" para todos.
 
 ---
 
-## 12. Comandos de referência
+## 15. Comandos de referência
 ```bash
 npx eas-cli whoami
-npx eas-cli build  -p ios --profile production          # build de loja
-npx eas-cli submit -p ios --profile production --latest # envio ao App Store Connect
-npx eas-cli credentials -p ios                          # ver/gerir certificados, push, API key
-npx eas-cli build:version:set -p ios                    # ajustar build number (raro)
+npx eas-cli build  -p ios --profile production                 # build de loja
+npx eas-cli build  -p ios --profile production --auto-submit   # build + envio
+npx eas-cli submit -p ios --profile production --latest        # envio ao App Store Connect
+npx eas-cli credentials -p ios                                 # certificados, push, chave de API
+npx eas-cli build:version:set -p ios                           # ajustar build number (raro)
 npx eas-cli update --branch production --environment production --message "..."  # OTA
+
+# Capturas e vídeo no Simulador (tamanho exato do aparelho)
+xcrun simctl list devices available | grep -E "iPhone 17 Pro|iPad Pro 13"
+xcrun simctl io booted screenshot tela-01.png
+xcrun simctl io booted recordVideo prev.mov      # Ctrl+C para parar
+
+# Conferir imagens
+sips -g pixelWidth -g pixelHeight -g hasAlpha arquivo.png
 ```
 
 ---
 
-## 13. Links oficiais
-- Inscrição no programa: https://developer.apple.com/programs/enroll/
-- Suporte de inscrição: https://developer.apple.com/support/enrollment/
-- Diretrizes de revisão: https://developer.apple.com/app-store/review/guidelines/
-- Requisitos de SDK (Xcode 26 desde 28/04/2026): https://developer.apple.com/news/upcoming-requirements/
-- Small Business Program: https://developer.apple.com/app-store/small-business-program/
-- Impostos (App Store Connect): https://developer.apple.com/help/app-store-connect/provide-tax-information/tax-forms-overview
-- Contato Apple Developer: https://developer.apple.com/contact/
-- Expo — Sign in with Apple: https://docs.expo.dev/versions/latest/sdk/apple-authentication/
-- Expo — Submit iOS: https://docs.expo.dev/submit/ios/
-- RevenueCat — App Store Connect: https://www.revenuecat.com/docs/getting-started/entitlements
-- Guia de recusas (RevenueCat): https://www.revenuecat.com/blog/growth/the-ultimate-guide-to-app-store-rejections/
+## 16. Links oficiais (conferidos em 2026-11-03)
 
-**Fontes usadas na pesquisa (out/2026):** Apple Developer (enrollment, upcoming requirements, tax
-forms, forums sobre W-8BEN), Expo blog (*App Store Connect minimum SDK 26*), RevenueCat
-(*ultimate guide to App Store rejections*), reportagens sobre a exigência de status de
-comerciante da UE (TechRepublic, SD Times), além da experiência direta com o DOD Questões.
+**Conta e negócios**
+- Inscrição: https://developer.apple.com/programs/enroll/
+- Papéis no Developer Program: https://developer.apple.com/help/account/access/roles/
+- Permissões por papel no App Store Connect: https://developer.apple.com/help/app-store-connect/reference/account-management/role-permissions
+- Impostos: https://developer.apple.com/help/app-store-connect/manage-tax-information/provide-tax-information
+- Small Business Program: https://developer.apple.com/app-store/small-business-program/
+- DSA (comerciante na UE): https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements
+- Contato Apple Developer: https://developer.apple.com/contact/
+
+**Regras e requisitos**
+- Diretrizes de revisão: https://developer.apple.com/app-store/review/guidelines/
+- Requisitos de SDK e prazos: https://developer.apple.com/news/upcoming-requirements/
+- Privacidade do app: https://developer.apple.com/app-store/app-privacy-details/
+- Classificação etária: https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions
+
+**Página da loja e imagens**
+- Capturas de tela: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
+- Vídeos de prévia: https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications
+- Campos da versão (limites): https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
+- Ícone: https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon · HIG: https://developer.apple.com/design/human-interface-guidelines/app-icons
+- Bens e serviços digitais: https://developer.apple.com/help/app-store-connect/manage-app-information/complete-the-digital-goods-and-services-questionnaire
+- Dispositivo médico regulamentado: https://developer.apple.com/help/app-store-connect/manage-app-information/declare-regulated-medical-device-status
+- Rótulos de acessibilidade: https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels
+
+**TestFlight e API**
+- TestFlight: https://developer.apple.com/help/app-store-connect/test-a-beta-version/overview-of-testflight
+- App Store Connect API: https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api
+
+**Expo, RevenueCat, Supabase, Google**
+- Expo — credenciais: https://docs.expo.dev/app-signing/app-credentials/
+- Expo — Submit iOS: https://docs.expo.dev/submit/ios/
+- Expo — Sign in with Apple: https://docs.expo.dev/versions/latest/sdk/apple-authentication/
+- Supabase — Login com Apple: https://supabase.com/docs/guides/auth/social-login/auth-apple
+- Google Sign-In no Expo: https://react-native-google-signin.github.io/docs/setting-up/expo
+- RevenueCat — In-App Purchase Key: https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/in-app-purchase-key-configuration
+- RevenueCat — Entitlements: https://www.revenuecat.com/docs/getting-started/entitlements
+- Guia de recusas (RevenueCat): https://www.revenuecat.com/blog/growth/the-ultimate-guide-to-app-store-rejections/
