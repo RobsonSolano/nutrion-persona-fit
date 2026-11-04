@@ -4,29 +4,25 @@ import { useEntitlement } from '@/hooks/useEntitlement';
 import { useStudents } from '@/hooks/useStudents';
 import { openPaywall } from '@/lib/paywall';
 import { colors } from '@/lib/theme';
-
-const TIER_LABEL: Record<string, string> = {
-  free: 'Free',
-  pro: 'Pro',
-  premium: 'Premium',
-};
+import { TIER_LABEL, tierAtLeast } from '@/lib/tier';
 
 /**
  * Badge de plano na home do professor: mostra o tier atual + uso de alunos
- * (X/limite) e, quando não é premium, um atalho de upgrade (abre o paywall).
- * Premium ganha coroa e sem contador (ilimitado).
+ * (X/limite) e, quando há plano acima, um atalho de upgrade (abre o paywall).
+ * Premium e Elite ganham coroa.
  */
 export default function CoachPlanBadge() {
   const ent = useEntitlement().data;
   const count = useStudents().data?.length ?? 0;
 
   const tier = ent?.tier ?? 'free';
-  const limit = ent?.student_limit; // null = ilimitado
-  const isPremium = tier === 'premium';
-  const canUpgrade = !isPremium;
+  const limit = ent?.student_limit; // null = servidor antigo: sem contador
+  const isPremium = tierAtLeast(tier, 'premium');
+  // Professor compra até Elite; no Elite não há plano acima.
+  const canUpgrade = !tierAtLeast(tier, 'elite');
   const atLimit = limit != null && count >= limit;
 
-  const upgradeFeature = tier === 'pro' ? 'student_limit' : 'coach_generate_plan';
+  const upgradeFeature = tierAtLeast(tier, 'pro') ? 'student_limit' : 'coach_generate_plan';
 
   const accent = isPremium ? colors.accent : colors.violetSoft;
 
@@ -46,16 +42,16 @@ export default function CoachPlanBadge() {
         )}
         <View className="flex-1">
           <Text className="text-text text-sm font-bold">
-            Plano {TIER_LABEL[tier] ?? 'Free'}
+            Plano {TIER_LABEL[tier]}
           </Text>
-          <Text
-            className="text-[12px] mt-0.5"
-            style={{ color: atLimit ? colors.warn : colors.textDim }}
-          >
-            {limit == null
-              ? 'Alunos ilimitados'
-              : `${count}/${limit} aluno${limit === 1 ? '' : 's'}${atLimit ? ' · limite atingido' : ''}`}
-          </Text>
+          {limit != null && (
+            <Text
+              className="text-[12px] mt-0.5"
+              style={{ color: atLimit ? colors.warn : colors.textDim }}
+            >
+              {`${count}/${limit} aluno${limit === 1 ? '' : 's'}${atLimit ? ' · limite atingido' : ''}`}
+            </Text>
+          )}
         </View>
       </View>
 

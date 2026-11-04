@@ -242,7 +242,7 @@ export default function CoachPerfilScreen() {
               <Text className="text-text-muted text-[11px] leading-relaxed">
                 Com isso ligado, usuários do app te encontram por região e
                 especialidade e podem pedir pra ser seus alunos. Só professores
-                com plano Premium aparecem na busca.
+                com plano Premium ou Elite aparecem na busca.
               </Text>
 
               {isPublic && (
