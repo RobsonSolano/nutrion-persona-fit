@@ -7,12 +7,13 @@ export type AppConfig = {
   update_title: string | null;
   update_message: string | null;
   android_store_url: string | null;
+  ios_store_url: string | null;
 };
 
 export async function getAppConfig(): Promise<AppConfig | null> {
   const { data, error } = await supabase
     .from('app_config')
-    .select('min_version, recommended_version, update_title, update_message, android_store_url')
+    .select('min_version, recommended_version, update_title, update_message, android_store_url, ios_store_url')
     .maybeSingle();
   if (error) throw error;
   return data;

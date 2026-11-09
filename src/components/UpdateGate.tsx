@@ -5,15 +5,20 @@ import { Download } from 'lucide-react-native';
 import { ConfirmModal } from '@/components/ui';
 import { useAppUpdate } from '@/hooks/useAppUpdate';
 import { colors } from '@/lib/theme';
-import { PLAY_APP_URL, PLAY_WEB_URL } from '@/lib/playStore';
-import { chooseUpdatePath } from '@/lib/storeUpdate';
+import {
+  chooseUpdatePath,
+  defaultUpdateMessage,
+  storeUpdateTarget,
+  type StoreUrls,
+} from '@/lib/storeUpdate';
 
-async function abrirLoja(url: string | null) {
+async function abrirLoja(urls: Partial<StoreUrls> | null | undefined) {
+  const { url, fallback } = storeUpdateTarget(Platform.OS, urls);
   try {
-    await Linking.openURL(url || PLAY_APP_URL);
+    await Linking.openURL(url);
   } catch {
-    // Sem o app da Play (emulador, aparelho sem Google): a página web resolve.
-    await Linking.openURL(PLAY_WEB_URL);
+    // Sem o app da loja (emulador, aparelho sem loja instalada): a página web resolve.
+    await Linking.openURL(fallback);
   }
 }
 
@@ -44,7 +49,7 @@ function moduloInApp(): InAppUpdates | null {
  * da loja ([INA]-01, -02). Cancelar o fluxo nativo deixa o aviso como está
  * ([INA]-03) — na mínima, segue bloqueado.
  */
-async function atualizar(storeUrl: string | null) {
+async function atualizar(urls: Partial<StoreUrls> | null | undefined) {
   const mod = Platform.OS === 'android' ? moduloInApp() : null;
   try {
     const info = mod ? await mod.checkForUpdate() : null;
@@ -52,7 +57,7 @@ async function atualizar(storeUrl: string | null) {
   } catch {
     // Play indisponível ou erro no fluxo nativo: o link resolve.
   }
-  await abrirLoja(storeUrl);
+  await abrirLoja(urls);
 }
 
 /**
@@ -67,7 +72,7 @@ export default function UpdateGate() {
   if (requirement === 'none' || (requirement === 'recommended' && adiado)) return null;
 
   const bloqueado = requirement === 'blocked';
-  const onAtualizar = () => void atualizar(config?.android_store_url ?? null);
+  const onAtualizar = () => void atualizar(config);
 
   return (
     <ConfirmModal
@@ -75,10 +80,7 @@ export default function UpdateGate() {
       onClose={() => (bloqueado ? undefined : setAdiado(true))}
       title={config?.update_title || 'Nova versão disponível'}
       message={
-        config?.update_message ||
-        (bloqueado
-          ? 'Esta versão do app não é mais suportada. Atualize na Play Store pra continuar.'
-          : 'Tem uma versão nova do app na Play Store, com melhorias e correções.')
+        config?.update_message || defaultUpdateMessage(Platform.OS, bloqueado)
       }
       icon={<Download size={26} color={colors.accent} />}
       actions={
