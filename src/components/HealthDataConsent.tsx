@@ -26,7 +26,9 @@ export default function HealthDataConsent({ accepted, onChange }: Props) {
       <Text className="text-text-dim text-[12px] leading-relaxed">
         Autorizo o tratamento dos meus dados de saúde (medidas, registros de
         alimentação e treino, fotos e conversas com a IA) para gerar metas,
-        planos e recomendações personalizadas, conforme a{' '}
+        planos e recomendações personalizadas. Para gerar as análises, minhas
+        fotos, registros e conversas são enviados a um provedor de IA de
+        terceiros, conforme a{' '}
         <Text
           className="text-violet-soft font-semibold"
           onPress={openPrivacy}
