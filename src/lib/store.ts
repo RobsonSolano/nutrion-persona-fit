@@ -8,6 +8,10 @@ export type StoreKind = 'apple' | 'google';
 /** Gerenciar assinaturas na Apple. */
 export const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
+/** Página do app na App Store (esquema nativo e fallback web). */
+export const APPLE_APP_URL = 'itms-apps://apps.apple.com/';
+export const APPLE_WEB_URL = 'https://apps.apple.com/';
+
 export function storeKind(os: string): StoreKind {
   return os === 'ios' ? 'apple' : 'google';
 }
