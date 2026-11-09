@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, Text, View, Pressable } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Check, Crown, X } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,8 @@ import Screen from '@/components/ui/Screen';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { colors } from '@/lib/theme';
-import { paywallContent, planContent } from '@/lib/paywallContent';
+import { paywallContent, planContent, renewalNotice, legalLinks } from '@/lib/paywallContent';
+import { useLegalDocs } from '@/hooks/useLegalDocs';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntitlement } from '@/hooks/useEntitlement';
@@ -48,6 +49,11 @@ export default function PaywallScreen() {
   const { user } = useAuth();
   const { data: entitlement } = useEntitlement();
   const { data: offerings } = useOfferings();
+  const { byType } = useLegalDocs();
+  const links = legalLinks({
+    termos_uso: byType('termos_uso')?.url,
+    privacidade: byType('privacidade')?.url,
+  });
   const alert = useAlert();
 
   // productId em compra (ou 'restore'); null = ocioso.
@@ -292,6 +298,29 @@ export default function PaywallScreen() {
                   </Card>
                 );
               })}
+
+              <View className="px-2">
+                <Text className="text-text-muted text-[11px] leading-relaxed text-center">
+                  {renewalNotice(Platform.OS)}
+                </Text>
+                <Text className="text-text-muted text-[11px] leading-relaxed text-center mt-2">
+                  <Text
+                    className="text-violet-soft font-semibold"
+                    accessibilityRole="link"
+                    onPress={() => Linking.openURL(links.termos)}
+                  >
+                    Termos de Uso
+                  </Text>
+                  {' · '}
+                  <Text
+                    className="text-violet-soft font-semibold"
+                    accessibilityRole="link"
+                    onPress={() => Linking.openURL(links.privacidade)}
+                  >
+                    Política de Privacidade
+                  </Text>
+                </Text>
+              </View>
 
               <Button
                 label="Já assinei · Restaurar compras"

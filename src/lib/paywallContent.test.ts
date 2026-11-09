@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paywallContent, planContent, coachUpgradeFeature } from './paywallContent';
+import { paywallContent, planContent, coachUpgradeFeature, renewalNotice, legalLinks } from './paywallContent';
 
 describe('paywallContent', () => {
   it('chat e sanity_check apontam pro plano pessoal', () => {
@@ -119,5 +119,36 @@ describe('coachUpgradeFeature', () => {
     expect(coachUpgradeFeature('pro')).toBe('student_limit');
     expect(coachUpgradeFeature('premium')).toBe('student_limit');
     expect(coachUpgradeFeature('elite')).toBe('student_limit');
+  });
+});
+
+describe('renewalNotice ([IOS]-07)', () => {
+  it('iOS cita conta Apple, 24 horas e Ajustes', () => {
+    const t = renewalNotice('ios');
+    expect(t).toContain('conta Apple');
+    expect(t).toContain('24 horas');
+    expect(t).toContain('Ajustes');
+  });
+
+  it('Android cita Google Play', () => {
+    expect(renewalNotice('android')).toContain('Google Play');
+  });
+
+  it('web cai no texto Google', () => {
+    expect(renewalNotice('web')).toBe(renewalNotice('android'));
+  });
+});
+
+describe('legalLinks ([IOS]-07)', () => {
+  it('usa as URLs do catálogo quando existem', () => {
+    const l = legalLinks({ termos_uso: 'https://x/t', privacidade: 'https://x/p' });
+    expect(l).toEqual({ termos: 'https://x/t', privacidade: 'https://x/p' });
+  });
+
+  it('cai no fallback do hotsite quando falta URL', () => {
+    const l = legalLinks({});
+    expect(l.termos).toBe('https://apppersonafit.vercel.app/legal/termos-de-uso');
+    expect(l.privacidade).toBe('https://apppersonafit.vercel.app/legal/privacidade');
+    expect(legalLinks({ termos_uso: '' }).termos).toBe(l.termos);
   });
 });

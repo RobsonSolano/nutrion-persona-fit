@@ -3,6 +3,7 @@
 
 import type { Role } from '@/lib/purchaseSelection';
 import { tierAtLeast } from './tier';
+import { storeKind } from './store';
 
 export type PaywallContent = {
   title: string;
@@ -152,5 +153,30 @@ export function planContent(tier: 'pro' | 'premium' | 'elite', role: Role): Plan
       'Análise de prato por foto',
       'Respostas ancoradas no seu perfil e metas',
     ],
+  };
+}
+
+/**
+ * Texto de renovação automática exigido pela diretriz 3.1.2 da Apple (e equivalente na Play).
+ * Recebe `Platform.OS`; tudo que não é 'ios' usa o texto Google.
+ */
+export function renewalNotice(os: string): string {
+  if (storeKind(os) === 'apple') {
+    return 'Assinatura mensal com renovação automática. A cobrança é feita na sua conta Apple ao confirmar a compra, e a assinatura renova sozinha, salvo se for cancelada até 24 horas antes do fim do período. Gerencie ou cancele em Ajustes > seu nome > Assinaturas.';
+  }
+  return 'Assinatura mensal com renovação automática. A cobrança é feita na sua conta Google Play, e a assinatura renova sozinha até você cancelar. Gerencie ou cancele na Play Store, em Pagamentos e assinaturas.';
+}
+
+export const TERMS_FALLBACK_URL = 'https://apppersonafit.vercel.app/legal/termos-de-uso';
+export const PRIVACY_FALLBACK_URL = 'https://apppersonafit.vercel.app/legal/privacidade';
+
+/** URLs dos links legais do paywall; sem URL do catálogo (carregando/offline), usa o hotsite. */
+export function legalLinks(urls: { termos_uso?: string | null; privacidade?: string | null }): {
+  termos: string;
+  privacidade: string;
+} {
+  return {
+    termos: urls.termos_uso || TERMS_FALLBACK_URL,
+    privacidade: urls.privacidade || PRIVACY_FALLBACK_URL,
   };
 }
