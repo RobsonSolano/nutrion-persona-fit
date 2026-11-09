@@ -32,6 +32,10 @@ const plugins: ExpoConfig['plugins'] = [
     },
   ],
   './plugins/withUnlockedScannerOrientation',
+  // Podfile do iOS: modular headers do Google Sign-In e alvo mínimo 15.1 (Xcode 27).
+  './plugins/withIosPodfileFixes',
+  // Push no iOS: entitlement aps-environment de produção (a chave APNs fica na EAS).
+  ['expo-notifications', { mode: 'production' }],
   // Sentry plugin desabilitado temporariamente — upload de source maps
   // estava falhando no build EAS (sentry-cli exit 1). SDK do Sentry no JS
   // (src/lib/sentry.ts) continua funcionando e capturando exceptions; só
@@ -80,6 +84,23 @@ const config: ExpoConfig = {
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+  },
+  ios: {
+    bundleIdentifier: 'br.com.personafit',
+    // Só iPhone (decisão sem volta: manual §14.1).
+    supportsTablet: false,
+    // 1024×1024 sem canal alfa (a Apple recusa transparência).
+    icon: './assets/icon-ios.png',
+    // Pula o questionário de criptografia do TestFlight.
+    config: { usesNonExemptEncryption: false },
+    infoPlist: {
+      // O <StatusBar> do RN usa a API global; com true o app pode fechar ao abrir.
+      UIViewControllerBasedStatusBarAppearance: false,
+      CFBundleDevelopmentRegion: 'pt-BR',
+      CFBundleLocalizations: ['pt-BR'],
+      // Retrato travado só no iOS; vence o `orientation: 'default'` global (Android).
+      UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
+    },
   },
   plugins,
   experiments: {
