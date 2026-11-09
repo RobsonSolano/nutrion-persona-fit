@@ -136,7 +136,7 @@ npm run typecheck
 ---
 
 ### T04 — Login no iOS sem Google, dica de senha e consentimento de IA de terceiros
-**Onda:** 2 · **Visual:** sim · **Depende de:** T01 · **Status:** pendente
+**Onda:** 2 · **Visual:** sim · **Depende de:** T01 · **Status:** finalizado (conferido no Simulador iPhone 17 Pro Max em 2026-11-09)
 **O quê:** no iOS a tela de login não mostra "Continuar com Google" nem o divisor "ou", e nenhum caminho chama `GoogleSignin`; aparece uma dica para quem criou a conta com Google no Android. No Android nada muda. O consentimento de dados de saúde (cadastro, cadastro de professor e tela de reconsentimento) passa a dizer que os dados vão para um provedor de IA de terceiros.
 **Arquivos:** `app/(auth)/login.tsx`, `src/services/auth.ts`, `src/lib/socialLogin.ts`, `src/lib/socialLogin.test.ts`, `src/components/HealthDataConsent.tsx`, `.specs/project/STATE.md`
 **Da spec:**
@@ -174,7 +174,7 @@ npm run typecheck
 ---
 
 ### T05 — Paywall conforme a diretriz 3.1.2
-**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** finalizado (conferido no Simulador iPhone 17 Pro Max em 2026-11-09)
 **O quê:** o paywall mostra, junto dos planos, o texto de renovação automática da loja da plataforma e links tocáveis para Termos de Uso e Política de Privacidade; "Restaurar compras" segue visível.
 **Arquivos:** `app/paywall.tsx`, `src/lib/paywallContent.ts`, `src/lib/paywallContent.test.ts`
 **Da spec:**
@@ -206,7 +206,7 @@ npm run typecheck
 ---
 
 ### T06 — Gerenciar assinatura e textos com a loja da plataforma
-**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** finalizado (conferido no Simulador iPhone 17 Pro Max em 2026-11-09)
 **O quê:** "Gerenciar assinatura" abre o gerenciamento de assinaturas da Apple no iOS e o da Play no Android; os textos que hoje citam Google Play/Play Store passam a citar a loja da plataforma, no cartão "Minha assinatura" e no perfil do professor.
 **Arquivos:** `src/components/SubscriptionCard.tsx`, `app/encontrar-professor/[id].tsx`
 **Da spec:**
@@ -232,7 +232,7 @@ npm run typecheck
 ---
 
 ### T07 — Aviso de atualização por plataforma e `app_config.ios_store_url`
-**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** pendente
+**Onda:** 2 · **Visual:** sim · **Depende de:** T01, T02 · **Status:** finalizado
 **O quê:** `app_config` ganha a coluna `ios_store_url` (migration idempotente + teste SQL); o app passa a lê-la; no iOS o `UpdateGate` abre `ios_store_url` (ou a App Store) e nunca a Play, e os textos padrão dizem "App Store"; no Android tudo segue como hoje (fluxo nativo da Play + "Play Store").
 **Arquivos:** `supabase/migrations/20261109120000_app_config_ios_store_url.sql`, `supabase/tests/app_config_ios_store_url.test.sql`, `src/services/appConfig.ts`, `src/components/UpdateGate.tsx`, `src/lib/storeUpdate.ts`, `src/lib/storeUpdate.test.ts`
 **Da spec:**
