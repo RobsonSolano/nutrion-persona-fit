@@ -4,7 +4,6 @@ import { invokeChatAi } from '@/services/chat';
 import { captureError } from '@/lib/sentry';
 import {
   countTodayUserMessages,
-  DAILY_USER_MESSAGE_LIMIT,
   listChatMessages,
   MAX_MESSAGE_CHARS,
   type StoredChatMessage,
@@ -12,6 +11,7 @@ import {
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { handleNeedsUpgrade } from '@/lib/paywall';
 import { useAuth } from './useAuth';
+import { useAiQuotaState } from './useAiUsage';
 
 export type ChatMessage = {
   id: string;
@@ -22,7 +22,7 @@ export type ChatMessage = {
   pending?: boolean;
 };
 
-export { DAILY_USER_MESSAGE_LIMIT, MAX_MESSAGE_CHARS };
+export { MAX_MESSAGE_CHARS };
 
 function toUiMessage(m: StoredChatMessage): ChatMessage {
   return {
@@ -113,8 +113,11 @@ export function useChat() {
   const abortRef = useRef<AbortController | null>(null);
 
   const dailyCount = countQ.data ?? 0;
-  const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
-  const limitReached = remaining === 0;
+  const {
+    limit: dailyLimit,
+    remaining,
+    limitReached,
+  } = useAiQuotaState('chat', dailyCount);
   const isSending = pending !== null;
 
   // Typewriter: incrementa displayedLength via setTimeout encadeado.
@@ -326,7 +329,7 @@ export function useChat() {
     retryLastMessage,
     canRetry: !!lastError?.retryable,
     dailyCount,
-    dailyLimit: DAILY_USER_MESSAGE_LIMIT,
+    dailyLimit,
     remaining,
     limitReached,
     maxChars: MAX_MESSAGE_CHARS,

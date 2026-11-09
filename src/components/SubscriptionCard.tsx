@@ -13,13 +13,8 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
-
-
-const TIER_LABEL: Record<string, string> = {
-  free: 'Free',
-  pro: 'Pro',
-  premium: 'Premium',
-};
+import { coachUpgradeFeature } from '@/lib/paywallContent';
+import { TIER_LABEL, tierAtLeast } from '@/lib/tier';
 
 /**
  * "Minha assinatura" — entrada proativa de plano no Perfil (comum + professor).
@@ -43,15 +38,15 @@ export default function SubscriptionCard() {
     ent?.source === 'store_apple' ||
     ent?.source === 'stripe';
 
-  // Comum só chega a Pro; professor vai até Premium.
-  const canUpgrade = isProfessor ? tier !== 'premium' : tier === 'free';
+  // Professor compra até Elite; comum até Premium.
+  const canUpgrade = !tierAtLeast(tier, isProfessor ? 'elite' : 'premium');
 
   // Aluno herda o acesso do professor — não contrata plano.
   if (isStudent) return null;
 
   function upgradeFeature(): string {
-    if (isProfessor) return tier === 'pro' ? 'student_limit' : 'coach_generate_plan';
-    return 'chat';
+    if (isProfessor) return coachUpgradeFeature(tier);
+    return tierAtLeast(tier, 'pro') ? 'coach_discovery' : 'chat';
   }
 
   async function handleRestore() {
@@ -96,13 +91,13 @@ export default function SubscriptionCard() {
       </Text>
 
       <View className="flex-row items-center gap-2 mb-1">
-        {tier === 'premium' ? (
+        {tierAtLeast(tier, 'premium') ? (
           <Crown size={16} color={colors.accent} />
         ) : (
           <Sparkles size={16} color={tier === 'pro' ? colors.accent : colors.textMuted} />
         )}
         <Text className="text-text text-base font-bold">
-          Plano {TIER_LABEL[tier] ?? 'Free'}
+          Plano {TIER_LABEL[tier]}
         </Text>
         {isTrial && (
           <View className="rounded-full bg-violet/15 border border-violet/40 px-2 py-0.5">
@@ -111,11 +106,9 @@ export default function SubscriptionCard() {
         )}
       </View>
 
-      {isProfessor && (
+      {isProfessor && ent?.student_limit != null && (
         <Text className="text-text-dim text-xs mb-3">
-          {ent?.student_limit == null
-            ? 'Alunos ilimitados.'
-            : `Até ${ent.student_limit} aluno(s).`}
+          {`Até ${ent.student_limit} ${ent.student_limit === 1 ? 'aluno' : 'alunos'}.`}
         </Text>
       )}
 
@@ -123,7 +116,7 @@ export default function SubscriptionCard() {
         {canUpgrade && (
           <Button
             label="Fazer upgrade"
-            onPress={() => openPaywall(upgradeFeature())}
+            onPress={() => openPaywall(upgradeFeature(), 'upgrade')}
             variant="primary"
             size="md"
             icon={<Crown size={14} color={colors.bg} />}

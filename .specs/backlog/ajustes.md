@@ -119,3 +119,11 @@ substitui plano manual ativo), chamada pelo webhook + `fn:deploy`.
 `resolve_entitlement` já devolve `via`, `store_active` e `manual`; o tipo `Entitlement` do app não
 declara esses campos. Bônus: assinatura da loja já vencida ainda mostra "Gerenciar assinatura".
 **Esforço:** baixo-médio — tipo + lógica do card; exige OTA.
+
+## Home do professor mostra "Falta preencher: carregando."
+**Origem:** teste no emulador do Plano Elite (2026-11-04).
+**Onde:** Home do professor (card "Você não aparece na busca"), visto com professor Premium e Elite.
+**O que é:** o card lista o que falta no perfil público, mas mostra o texto de carregamento como se
+fosse um item pendente ("Falta preencher: carregando."). Provável estado de loading tratado como dado.
+**Gravidade:** atrapalha o usuário (cosmético, mas confunde quem quer aparecer na busca).
+**Esforço:** baixo — tratar o estado de carregamento no card; exige OTA.

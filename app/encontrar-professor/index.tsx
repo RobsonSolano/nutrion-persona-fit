@@ -17,6 +17,7 @@ import EspecialidadePicker from '@/components/coach/EspecialidadePicker';
 import { colors } from '@/lib/theme';
 import { SERVICE_MODES, SERVICE_MODE_LABELS } from '@/lib/especialidades';
 import { useCoachSearch } from '@/hooks/useEnrollment';
+import { useCoachDiscoveryLocked, useCoachDiscoveryRedirect } from '@/hooks/useCoachDiscoveryGate';
 
 export default function EncontrarProfessorScreen() {
   const router = useRouter();
@@ -31,7 +32,9 @@ export default function EncontrarProfessorScreen() {
     () => ({ uf, city, specialties, serviceMode, query: query.trim() || null }),
     [uf, city, specialties, serviceMode, query],
   );
-  const q = useCoachSearch(filtros);
+  const locked = useCoachDiscoveryLocked();
+  const q = useCoachSearch(filtros, !locked);
+  useCoachDiscoveryRedirect(locked, q.error);
 
   const filtrosAtivos =
     (uf ? 1 : 0) + (city ? 1 : 0) + specialties.length + (serviceMode ? 1 : 0);
@@ -207,7 +210,7 @@ function EmptyState({ temFiltro }: { temFiltro: boolean }) {
       <Text className="text-text-muted text-xs text-center mt-2 leading-relaxed">
         {temFiltro
           ? 'Tente ampliar a região ou tirar alguma especialidade.'
-          : 'Só professores com plano Premium e perfil público aparecem na busca. A lista cresce conforme eles entram.'}
+          : 'Só professores com plano Premium ou Elite e perfil público aparecem na busca. A lista cresce conforme eles entram.'}
       </Text>
     </View>
   );

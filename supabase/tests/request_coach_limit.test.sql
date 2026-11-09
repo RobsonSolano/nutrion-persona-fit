@@ -39,6 +39,14 @@ select ('ffffffff-0000-0000-0000-00000000000' || n)::uuid, 'premium', 'store_pla
 on conflict (user_id) do update set tier = excluded.tier, source = excluded.source,
   status = excluded.status, period_end = excluded.period_end;
 
+-- O usuário comum precisa de Pessoal Premium para pedir matrícula (gate do
+-- plano Elite): sem isso ele tomaria needs_upgrade antes de chegar nas travas.
+insert into public.subscriptions (user_id, tier, source, status, period_end) values
+  ('ffffffff-0000-0000-0000-000000000010', 'premium', 'store_play', 'active',
+   now() + interval '30 days')
+on conflict (user_id) do update set tier = excluded.tier, source = excluded.source,
+  status = excluded.status, period_end = excluded.period_end;
+
 set local session_replication_role = origin;
 
 do $$

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Check, Crown, X } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -14,7 +14,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { useOfferings } from '@/hooks/useOfferings';
 import { useAlert } from '@/components/GlobalAlertProvider';
-import { availablePlans, findPackage, type Plan, type Role } from '@/lib/purchaseSelection';
+import {
+  availablePlans,
+  findPackage,
+  selectProductId,
+  type Plan,
+  type Role,
+} from '@/lib/purchaseSelection';
 import {
   purchasePackage,
   restore,
@@ -29,14 +35,15 @@ import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * Paywall contextual (#2/#5b). Header vem do feature do 402; o corpo mostra os
- * planos compráveis do usuário (availablePlans): professor free vê Pro+Premium,
- * pro vê Premium. Preço real do RevenueCat. pro→premium usa troca de plano com
- * proração (billing.purchasePackage com oldProductId). Aluno não compra.
+ * planos compráveis do usuário (availablePlans): a escada acima do tier atual
+ * (professor: Pro/Premium/Elite; comum: Pro/Premium). Preço real do RevenueCat. Upgrade com
+ * assinatura de loja ativa usa troca de plano com proração (billing.purchasePackage com
+ * oldProductId). Aluno não compra.
  */
 export default function PaywallScreen() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { feature } = useLocalSearchParams<{ feature?: string }>();
+  const { feature, origin } = useLocalSearchParams<{ feature?: string; origin?: string }>();
   const { data: profile } = useProfile();
   const { user } = useAuth();
   const { data: entitlement } = useEntitlement();
@@ -47,15 +54,23 @@ export default function PaywallScreen() {
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const busy = busyPlan !== null;
 
-  const header = paywallContent(feature);
+  const header = paywallContent(feature, origin === 'upgrade' ? 'upgrade' : undefined);
   const role = profile?.role as Role | undefined;
   const currentTier = entitlement?.tier ?? 'free';
   const isAluno = role === 'aluno';
   const plans = availablePlans({ role, currentTier });
+  const recommendedId = selectProductId({
+    role,
+    feature,
+    currentTier,
+  });
+  // Professor no Elite que estourou o limite: o Elite é o maior plano → atalho pro suporte.
+  const isTopPlanLimit =
+    role === 'professor' && currentTier === 'elite' && feature === 'student_limit';
   const dataReady = profile !== undefined && entitlement !== undefined;
 
   /** Re-busca o entitlement até refletir a compra + reconcilia acesso dos alunos. */
-  async function refreshEntitlement(targetTier?: 'pro' | 'premium'): Promise<boolean> {
+  async function refreshEntitlement(targetTier?: 'pro' | 'premium' | 'elite'): Promise<boolean> {
     const { satisfied } = await pollUntil({
       fn: fetchEntitlement,
       done: (e) => (targetTier ? e.tier === targetTier : e.tier !== 'free'),
@@ -92,12 +107,13 @@ export default function PaywallScreen() {
     }
     setBusyPlan(plan.productId);
     try {
-      // pro→premium: troca de plano (substitui a assinatura atual, sem 2ª cobrança).
-      const oldProductId =
-        currentTier !== 'free' ? await getActiveProductId().catch(() => null) : null;
-      // Falha fechado: se já é pago mas não confirmamos o produto atual, NÃO compra
+      // Troca de plano (ex.: premium → elite): só quando há assinatura de loja ativa. Sem ela
+      // (trial do servidor, parceria, pago por fora) é compra normal.
+      const hasStoreSub = entitlement?.store_active === true;
+      const oldProductId = hasStoreSub ? await getActiveProductId().catch(() => null) : null;
+      // Falha fechado: se há assinatura de loja mas não confirmamos o produto atual, NÃO compra
       // (evitaria substituir e criaria uma 2ª assinatura = cobrança dupla).
-      if (currentTier !== 'free' && !oldProductId) {
+      if (hasStoreSub && !oldProductId) {
         alert.showAlert({
           type: 'warning',
           title: 'Não consegui confirmar seu plano atual',
@@ -203,6 +219,22 @@ export default function PaywallScreen() {
                 esses recursos no seu acompanhamento.
               </Text>
             </Card>
+          ) : plans.length === 0 && isTopPlanLimit ? (
+            <Card padding="lg">
+              <Text className="text-text text-base font-semibold mb-1">
+                O Elite é o maior plano
+              </Text>
+              <Text className="text-text-dim text-[15px] leading-5 mb-4">
+                Você está no Elite, com até 50 alunos. Precisa de mais? Fale com o suporte.
+              </Text>
+              <Button
+                label="Falar com o suporte"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={() => router.push('/suporte/nova' as Href)}
+              />
+            </Card>
           ) : plans.length === 0 ? (
             <Card padding="lg">
               <Text className="text-text text-base font-semibold mb-1">Tudo certo!</Text>
@@ -215,17 +247,18 @@ export default function PaywallScreen() {
               {plans.map((plan) => {
                 const c = planContent(plan.tier, role as Role);
                 const pkg = findPackage(offerings, plan.productId);
+                const highlight = plan.productId === recommendedId;
                 const price = pkg?.product.priceString ?? null;
                 return (
                   <Card
                     key={plan.productId}
-                    accent={c.highlight ? 'violet' : undefined}
-                    glow={c.highlight}
+                    accent={highlight ? 'violet' : undefined}
+                    glow={highlight}
                     padding="lg"
                   >
                     <View className="flex-row items-center justify-between mb-3">
                       <Text className="text-text text-lg font-bold">{c.name}</Text>
-                      {c.highlight && (
+                      {highlight && (
                         <View className="rounded-full border border-violet/50 bg-violet/15 px-2.5 py-0.5">
                           <Text className="text-violet-soft text-[11px] font-bold">Recomendado</Text>
                         </View>
@@ -249,7 +282,7 @@ export default function PaywallScreen() {
                     )}
                     <Button
                       label={`Assinar ${c.name}`}
-                      variant={c.highlight ? 'primary' : 'secondary'}
+                      variant={highlight ? 'primary' : 'secondary'}
                       size="lg"
                       fullWidth
                       loading={busyPlan === plan.productId}

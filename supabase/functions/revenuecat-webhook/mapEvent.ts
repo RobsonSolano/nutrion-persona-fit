@@ -1,8 +1,9 @@
 // Mapa de evento do RevenueCat → estado de subscriptions (revenuecat-integration #5a).
 // TS PURO (sem imports Deno) — testável por vitest. O index.ts (Deno) importa daqui.
+import type { Tier } from '../_shared/tier.ts';
 
 export type SubState = {
-  tier: 'free' | 'pro' | 'premium';
+  tier: Tier;
   status: 'active' | 'in_trial' | 'canceled' | 'expired';
   period_end: string | null;
 };
@@ -19,7 +20,8 @@ export function mapRevenueCatEvent(
   if (!userId) return null;
 
   const ents = (e?.entitlement_ids as string[] | undefined) ?? [];
-  const baseTier: 'pro' | 'premium' = ents.includes('premium') ? 'premium' : 'pro';
+  // Prioridade: elite > premium > pro.
+  const baseTier = (['elite', 'premium'] as const).find((t) => ents.includes(t)) ?? 'pro';
   const expMs = e?.expiration_at_ms as number | undefined;
   const periodEnd = expMs ? new Date(expMs).toISOString() : null;
 

@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, type ChatMessage } from '@/hooks/useChat';
 import { useProfile } from '@/hooks/useProfile';
-import { useAiPersonalLocked } from '@/hooks/useEntitlement';
+import { useAiPersonalLocked, useAiFreeNotice } from '@/hooks/useEntitlement';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Screen } from '@/components/ui';
 import PaywallNotice from '@/components/ui/PaywallNotice';
@@ -48,6 +48,7 @@ export default function ChatScreen() {
   } = useChat();
   const profileQ = useProfile();
   const aiLocked = useAiPersonalLocked();
+  const showFreeNotice = useAiFreeNotice();
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const isKeyboardOpen = kbHeight > 0;
@@ -131,9 +132,11 @@ export default function ChatScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-text text-base font-bold">Nutri IA</Text>
-              <Text className="text-violet-soft text-[10px]" numberOfLines={1}>
-                ✨ temporariamente gratuito
-              </Text>
+              {showFreeNotice && (
+                <Text className="text-violet-soft text-[10px]" numberOfLines={1}>
+                  ✨ temporariamente gratuito
+                </Text>
+              )}
             </View>
           </View>
           <View

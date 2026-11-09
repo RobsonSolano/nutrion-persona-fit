@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 
-export const DAILY_USER_MESSAGE_LIMIT = 10;
 export const MAX_MESSAGE_CHARS = 255;
 /** Quantas msgs históricas mostrar na UI (msgs antigas continuam no banco). */
 export const HISTORY_VISIBLE_LIMIT = 100;

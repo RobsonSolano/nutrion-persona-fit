@@ -3,7 +3,7 @@
 // Ver .specs/features/2026-06-22-billing-core/spec.md (contrato) e
 //     .specs/features/2026-06-22-paywall-ui/ (consumo).
 
-export type Tier = 'free' | 'pro' | 'premium';
+export type Tier = 'free' | 'pro' | 'premium' | 'elite';
 
 export type EntitlementSource =
   | 'store_play'
@@ -17,10 +17,12 @@ export type EntitlementSource =
 
 export type Entitlement = {
   tier: Tier;
+  own_tier?: Tier; // tier da assinatura PRÓPRIA, antes de herdar do professor
+  store_active?: boolean; // assinatura de loja ativa (servidor antigo não manda)
   source: EntitlementSource;
   ai_personal: boolean; // chat IA + sanity check
   ai_coach: boolean; // coach-generate-plan + coach-import-workout-ai (só professor)
-  student_limit: number | null; // null = ilimitado (só professor)
+  student_limit: number | null; // null só para comum/aluno; professor sempre tem número
   trial_end: string | null;
 };
 
@@ -30,4 +32,5 @@ export type FeatureKey =
   | 'sanity_check'
   | 'coach_generate_plan'
   | 'coach_import_workout'
-  | 'student_limit';
+  | 'student_limit'
+  | 'coach_discovery'; // busca de professores (Pessoal Premium)

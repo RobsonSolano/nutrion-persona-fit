@@ -58,4 +58,20 @@ describe('mapRevenueCatEvent', () => {
   it('sem expiration_at_ms → period_end null', () => {
     expect(mapRevenueCatEvent(ev('RENEWAL', { expiration_at_ms: undefined }))?.state.period_end).toBeNull();
   });
+
+  it('ELITE-05 elite → tier elite', () => {
+    expect(mapRevenueCatEvent(ev('INITIAL_PURCHASE', { entitlement_ids: ['elite'] }))?.state).toMatchObject({ tier: 'elite', status: 'active' });
+  });
+
+  it('ELITE-05 elite+premium → elite', () => {
+    expect(mapRevenueCatEvent(ev('RENEWAL', { entitlement_ids: ['premium', 'elite'] }))?.state.tier).toBe('elite');
+  });
+
+  it('ELITE-05 CANCELLATION de elite mantém elite/canceled', () => {
+    expect(mapRevenueCatEvent(ev('CANCELLATION', { entitlement_ids: ['elite'] }))?.state).toMatchObject({ tier: 'elite', status: 'canceled' });
+  });
+
+  it('ELITE-05 EXPIRATION → free', () => {
+    expect(mapRevenueCatEvent(ev('EXPIRATION', { entitlement_ids: ['elite'] }))?.state).toMatchObject({ tier: 'free', status: 'expired' });
+  });
 });

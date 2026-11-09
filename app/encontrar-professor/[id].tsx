@@ -33,6 +33,9 @@ import { isValidPhone, maskPhoneBR, parsePhoneInput } from '@/lib/phone';
 import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useEntitlement } from '@/hooks/useEntitlement';
+import { tierAtLeast } from '@/lib/tier';
+import { useCoachDiscoveryLocked, useCoachDiscoveryRedirect } from '@/hooks/useCoachDiscoveryGate';
+import { handleNeedsUpgrade } from '@/lib/paywall';
 import { recordLegalAcceptanceSafe } from '@/services/legal';
 
 
@@ -40,9 +43,11 @@ export default function PerfilPublicoProfessorScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const alert = useAlert();
-  const q = useCoachPublicProfile(id ?? null);
   const profileQ = useProfile();
   const entQ = useEntitlement();
+  const locked = useCoachDiscoveryLocked();
+  const q = useCoachPublicProfile(id ?? null, !locked);
+  useCoachDiscoveryRedirect(locked, q.error);
   const requestM = useRequestCoach();
   const [notaTocada, setNotaTocada] = useState<number | null>(null);
 
@@ -67,8 +72,7 @@ export default function PerfilPublicoProfessorScreen() {
   const coach = q.data;
   const role = profileQ.data?.role;
   const jaEhAluno = role === 'aluno';
-  const temAssinaturaPropria =
-    entQ.data?.tier === 'pro' || entQ.data?.tier === 'premium';
+  const temAssinaturaPropria = tierAtLeast(entQ.data?.tier, 'pro');
 
   async function enviar() {
     if (!coach) return;
@@ -88,6 +92,7 @@ export default function PerfilPublicoProfessorScreen() {
       });
     } catch (err) {
       setConfirmando(false);
+      if (handleNeedsUpgrade(err)) return;
       alert.showError(err);
     }
   }
