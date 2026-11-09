@@ -6,7 +6,7 @@
 ## Objetivo
 
 Deixar o código do Persona Fit pronto para o primeiro envio à App Store: build iOS que abre,
-loga (e-mail, Google, Apple), compra assinatura pela Apple, recebe push e passa nas diretrizes
+loga (e-mail e senha; login social no iOS fica para depois), compra assinatura pela Apple, recebe push e passa nas diretrizes
 que mais recusam (4.8, 3.1.1, 3.1.2, 5.1.1(v), 5.1.2(i)). Os passos de console (conta Apple,
 contratos, App Store Connect, capturas, TestFlight) ficam no manual. Aqui entra só o que é
 código/config versionado, mais a lista de pré-requisitos manuais que o código depende.
@@ -19,6 +19,14 @@ código/config versionado, mais a lista de pré-requisitos manuais que o código
 | Orientação no iOS | **Retrato travado só no iOS** (infoPlist) | Android segue destravado por exigência da Play (telas grandes). No iPhone, paisagem sem teste = layout quebrado = recusa por bug |
 | Revogação Apple na exclusão de conta | **Sim — re-login Apple na hora de excluir** | Diretriz 5.1.1(v): app com Sign in with Apple deve revogar o token via REST da Apple. O `authorizationCode` dura 5 min, então pegar um novo na exclusão evita guardar refresh token |
 | Bundle ID | `br.com.personafit` (**confirmado 2026-11-03**) | Escolha do dev pela marca. Android segue `br.com.nutrion` (IDs independentes por plataforma). Bundle ID não limita países — disponibilidade é escolhida no App Store Connect e pode ser ampliada depois |
+
+## Decisões do dev (2026-11-09)
+
+| Decisão | Escolha | Por quê |
+|---|---|---|
+| Login social no iOS | **Sem Google e sem Apple na 1ª versão iOS** (opção B) | A 4.8 só exige Sign in with Apple se houver login social. Implementar Apple + revogação na exclusão custava ~1,5 dia e 4 passos de console; esconder o Google no iOS é minutos. Android não muda. Sign in with Apple entra numa versão futura (build nativo, não OTA) |
+| Planos na App Store | Mesmos 5 produtos da Play, em 2 grupos (Professor: pro/premium/elite · Pessoal: pro/premium) | Release 1.28.0 criou Elite e Pessoal Premium depois desta spec |
+| Podfile | Config plugin com modular headers e alvo mínimo 15.1 | Achado ao gerar os prints no simulador (Xcode 27) |
 
 ## Achados da auditoria que o manual não cobria
 

@@ -193,11 +193,11 @@ TestFlight, nem na revisão) — a revisão recusa porque "a compra não funcion
 ## 4. Criar o app no App Store Connect
 
 ### 4.1 Bundle ID
-Escolha o **definitivo** (não muda nunca depois de publicar). Sugestão: igual ao Android,
-`br.com.nutrion`. A EAS registra o Bundle ID e as *capabilities* sozinha no primeiro build (§8.4).
+**`br.com.personafit`** (definitivo, confirmado em 2026-11-03; não muda depois de publicar).
+O Android segue `br.com.nutrion`: os IDs são independentes por plataforma. A EAS registra o Bundle ID e as *capabilities* sozinha no primeiro build (§8.4).
 Se preferir à mão: [Identifiers](https://developer.apple.com/account/resources/identifiers/list)
-→ **"+" → App IDs → App** → *Explicit* `br.com.nutrion` → marque **Push Notifications**,
-**Sign in with Apple** (In-App Purchase já vem ligado).
+→ **"+" → App IDs → App** → *Explicit* `br.com.personafit` → marque **Push Notifications**
+(In-App Purchase já vem ligado). **Sign in with Apple** só quando o login com Apple entrar (versão futura).
 
 ### 4.2 Criar o registro do app
 1. https://appstoreconnect.apple.com/apps → **"+" → Novo app**.
@@ -308,7 +308,7 @@ ou gravação de tela do iPhone, depois ajuste no iMovie/Final Cut para a resolu
 ### 7.1 `app.config.ts` — seção `ios`
 ```ts
 ios: {
-  bundleIdentifier: 'br.com.nutrion',
+  bundleIdentifier: 'br.com.personafit',
   // ⚠️ Decisão PERMANENTE (ver §14.1). false = só iPhone (roda no iPad em modo compatibilidade).
   supportsTablet: false,
   icon: './assets/icon-ios.png', // 1024×1024 SEM transparência (ver §7.2)
@@ -348,12 +348,12 @@ transparente. Melhor exportar do arquivo de design com fundo preto `#000000`.)
   - `npx expo install expo-apple-authentication` e `usesAppleSignIn: true` no `ios`
     ([doc Expo](https://docs.expo.dev/versions/latest/sdk/apple-authentication/)).
   - Botão oficial `AppleAuthenticationButton`, **no mínimo do mesmo tamanho/destaque do Google**.
-  - Supabase: habilitar o provider **Apple** (Client ID = bundle id `br.com.nutrion`) e usar
+  - Supabase: habilitar o provider **Apple** (Client ID = bundle id `br.com.personafit`) e usar
     `signInWithIdToken({ provider: 'apple', token })`
     ([doc Supabase](https://supabase.com/docs/guides/auth/social-login/auth-apple)).
   - O e-mail pode vir como `xxxx@privaterelay.appleid.com` — o backend precisa aceitar.
   - O **nome só vem no primeiro login** — salve na hora.
-- **Google no iOS:** criar um **Client ID do tipo iOS** no Google Cloud (bundle `br.com.nutrion`) e
+- **Google no iOS:** criar um **Client ID do tipo iOS** no Google Cloud (bundle `br.com.personafit`) e
   passar o **`iosUrlScheme`** (Client ID invertido, `com.googleusercontent.apps.…`) no plugin:
   ```ts
   ['@react-native-google-signin/google-signin', { iosUrlScheme: 'com.googleusercontent.apps.XXXX' }]
@@ -487,7 +487,7 @@ npx eas-cli submit -p ios --profile production --latest
 ```
 Na primeira vez a EAS oferece **gerar uma chave de API do App Store Connect** — aceite (precisa
 ser Titular/Admin). Depois, **confira o vínculo** (lição DOD Estudos):
-- expo.dev → projeto → **Credentials → iOS → `br.com.nutrion`** → seção
+- expo.dev → projeto → **Credentials → iOS → `br.com.personafit`** → seção
   **"App Store Connect API Key for EAS Submit"** precisa mostrar a chave.
 - Se estiver vazio, o `submit` cai em *"Only user authentication is supported"* e pede Apple ID
   toda vez. Resolva em **Add an App Store Connect API key** nessa mesma tela, escolhendo a chave

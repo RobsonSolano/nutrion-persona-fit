@@ -75,3 +75,13 @@ bundle 8: `expo.modules.notifications...builders.DownloadImageKt$downloadImage` 
 baixando a imagem anexada a um push. Nossos pushes não mandam imagem (`send-push-notification`,
 `_shared/push*`), então esse caminho nem roda. É análise estática de código de biblioteca: só sai
 com upgrade do `expo-notifications` / SDK.
+
+## Login com Apple e com Google no iPhone
+**Origem:** decisão de 2026-11-09 na spec `2026-11-03-publicacao-ios`. A primeira versão iOS sai sem login
+social para não exigir o Sign in with Apple (diretriz 4.8).
+**O que é:** no iOS, ter o botão oficial "Entrar com Apple" (`expo-apple-authentication` + `signInWithIdToken`
+provider `apple`) e o "Continuar com Google" (`iosClientId`). A exclusão de conta precisa revogar o token da
+Apple (5.1.1(v)), com uma chave Sign in with Apple (.p8) no servidor. Os requisitos já estão escritos na spec
+(antigos [IOS]-03, [IOS]-04 e [IOS]-11) e nos pré-requisitos M1–M4.
+**Ganho:** cadastro com um toque no iPhone, e quem entrou com Google no Android não precisa criar senha.
+**Dificuldade:** Média (~1,5 dia de código + 4 passos de console). **Exige build nativo novo** (não vai por OTA).
