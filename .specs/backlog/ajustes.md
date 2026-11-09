@@ -134,3 +134,19 @@ fosse um item pendente ("Falta preencher: carregando."). Provável estado de loa
 vez de redirecionar para o login. Comportamento antigo, não é regressão da feature iOS.
 **Impacto:** baixo (só via link direto, sem sessão).
 **Esforço:** minutos, redirecionar para o login quando não há sessão.
+
+## Notas de "O que há de novo" do OTA 1.28.0 saíram desatualizadas
+**Origem:** visto em 2026-11-09, ao preparar os prints da App Store.
+**Onde:** `app.config.ts` → `extra.releaseNotes`
+**O que é:** o OTA do Plano Elite (1.28.0) foi publicado com a novidade antiga "Suporte e sugestões no Perfil".
+Quem atualizou viu no aviso uma novidade de uma versão anterior.
+**Gravidade:** cosmético. **Esforço:** minutos. Atualizar o texto **antes** do próximo `npm run update:production`
+(por exemplo, para falar do Plano Elite e do Pessoal Premium).
+
+## `expo run:ios` não encontra o Simulator do Xcode 27
+**Origem:** primeiro build iOS para o simulador (2026-11-09).
+**Onde:** CLI do Expo ("Can't determine id of Simulator app"; `open -a Simulator` também falha).
+**O que é:** no Xcode 27 o Simulator não é achado pelo nome. Contorno usado: `xcodebuild -workspace ios/PersonaFit.xcworkspace
+-scheme PersonaFit -configuration Release -sdk iphonesimulator` + `xcrun simctl install`. Pode sumir com um upgrade do
+`expo`/`@expo/cli`.
+**Gravidade:** atrapalha o dev. **Esforço:** minutos para testar o upgrade.
