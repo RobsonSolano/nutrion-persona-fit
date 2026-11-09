@@ -36,9 +36,9 @@ Um app pessoal-primeiro (Android) que entende perfil, hábitos e logs do usuári
 
 ## Scope
 
-**Dentro:** app pessoal Android (Play Store), Supabase remoto único (sem staging), edge functions em Deno.
+**Dentro:** app pessoal Android (Play Store) e iOS (App Store, só iPhone), Supabase remoto único (sem staging), edge functions em Deno.
 
-**Fora (por enquanto):** iOS, web, modo offline, premium/pagamento, multi-perfil.
+**Fora (por enquanto):** web, modo offline, premium/pagamento, multi-perfil.
 
 ## Convenções
 

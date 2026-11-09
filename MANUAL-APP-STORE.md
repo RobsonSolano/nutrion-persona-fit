@@ -31,20 +31,31 @@
 **Comece pela conta e pelos contratos (§2 e §3) já:** são as etapas com espera, e sem o contrato
 pago assinado **as assinaturas não aparecem nem no TestFlight**.
 
-### 0.2 Situação do Persona Fit hoje (conferido em 2026-11-03, branch `develop`)
+### 0.2 Situação do Persona Fit hoje (conferido em 2026-11-09, branch `feature/publicacao-ios`)
 
 | Item | Situação |
 |---|---|
-| Seção `ios` no `app.config.ts` (bundle id, tablet, criptografia) | ❌ não existe (§7.1) |
-| Ícone `assets/icon.png` 1024×1024 | ⚠️ tem canal alfa (transparência) — a Apple recusa no iOS (§7.2) |
-| Sign in with Apple | ❌ não existe (§7.3) |
-| Google Sign-In no iOS (Client ID iOS + `iosUrlScheme`) | ❌ plugin sem configuração iOS (§7.3) |
-| RevenueCat no iOS | ❌ `billing.ts` só lê `EXPO_PUBLIC_RC_API_KEY_ANDROID` (§7.5) |
-| Push (`expo-notifications`) | ✅ instalado · ❌ falta chave APNs na EAS (§7.6) |
+| Seção `ios` no `app.config.ts` (bundle id, tablet, criptografia, retrato) | ✅ feita (§7.1) |
+| Ícone iOS `assets/icon-ios.png` sem canal alfa | ✅ feito (§7.2) |
+| Login social no iOS (Sign in with Apple) | Fora da 1ª versão, por decisão (§7.3). Sem Google no iOS, não exige Apple (4.8) |
+| Google Sign-In no iOS | ✅ botão escondido no iOS; login por e-mail e senha, com dica de senha para quem entrou só com Google (§7.3) |
+| RevenueCat por plataforma (`billing.ts`) | ✅ feito · ⚠️ falta a chave `EXPO_PUBLIC_RC_API_KEY_IOS` na EAS production (M5, §7.5) |
+| Webhook `revenuecat-webhook` com `store_apple` | ✅ feito · ⚠️ deploy pendente (`--no-verify-jwt`) |
+| Paywall com texto de renovação e links de Termos e Privacidade (3.1.2) | ✅ feito (§7.5) |
+| Gerenciar assinatura pela loja da plataforma | ✅ feito (App Store no iOS, Play Store no Android) |
+| `UpdateGate` com `ios_store_url` | ✅ feito · ⚠️ migration `20261109120000` pendente de deploy; campo no painel admin no backlog |
+| Consentimento de saúde citando IA de terceiros (5.1.2(i)) | ✅ feito (§7.7) |
+| Podfile (modular headers, alvo 15.1) via plugin `plugins/withIosPodfileFixes.js` | ✅ feito · build Release no Simulador passou |
+| Push (`expo-notifications`) | ✅ instalado · ❌ falta chave APNs na EAS (M7, §7.6) |
 | Exclusão de conta no app | ✅ `DangerZone` → "Excluir conta" (§7.4) |
-| Política de privacidade / Termos | ✅ `apppersonafit.vercel.app/legal/privacidade` e `/legal/termos-de-uso` |
-| `submit.production.ios.ascAppId` no `eas.json` | ❌ falta (só depois de criar o app, §4.2) |
+| Política de privacidade / Termos | ✅ `apppersonafit.vercel.app/legal/privacidade` e `/legal/termos-de-uso` (citar Apple nos pagamentos: backlog) |
+| `submit.production.ios.ascAppId` no `eas.json` | ❌ falta (só depois de criar o app, §4.2; M7) |
 | `appVersionSource: remote` + `autoIncrement` | ✅ já configurado |
+| `npm run update:*` com `--environment` | ✅ feito (§14.14) |
+| Capturas da App Store (6,9" e 6,3") | ✅ prontas em `../nutrion-brand/capturas/app-store-2026-11/` |
+
+Observação do Xcode 27: `expo run:ios` não reconhece o Simulador. Compile com `xcodebuild` e instale com
+`xcrun simctl install`.
 
 ---
 
@@ -318,8 +329,10 @@ ios: {
     UIViewControllerBasedStatusBarAppearance: false,
     CFBundleDevelopmentRegion: 'pt-BR',
     CFBundleLocalizations: ['pt-BR'],
+    // App só em retrato no iOS (o Android segue como está).
+    UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
   },
-  usesAppleSignIn: true, // ver §7.3
+  // Sem usesAppleSignIn: a 1ª versão iOS não tem login social (ver §7.3).
 },
 ```
 - As frases de permissão de **câmera e fotos** já estão no plugin `expo-image-picker` e explicam o
@@ -339,27 +352,18 @@ sips -g hasAlpha assets/icon-ios.png   # deve mostrar: hasAlpha: no
 (Se partes do ícone forem transparentes, confira o resultado: o fundo vira a cor da área
 transparente. Melhor exportar do arquivo de design com fundo preto `#000000`.)
 
-### 7.3 Login: Sign in with Apple + Google no iOS (diretriz 4.8)
-- **Regra:** app que usa login de terceiro (Google) para a conta principal precisa oferecer
-  **também** uma opção equivalente que só peça nome/e-mail, permita **esconder o e-mail** e não
-  rastreie para anúncio. Na prática: **Sign in with Apple**. A isenção vale só para app que usa
-  **exclusivamente** login próprio — com Google presente, inclua Apple.
-- **Sign in with Apple (Expo + Supabase):**
-  - `npx expo install expo-apple-authentication` e `usesAppleSignIn: true` no `ios`
-    ([doc Expo](https://docs.expo.dev/versions/latest/sdk/apple-authentication/)).
-  - Botão oficial `AppleAuthenticationButton`, **no mínimo do mesmo tamanho/destaque do Google**.
-  - Supabase: habilitar o provider **Apple** (Client ID = bundle id `br.com.personafit`) e usar
-    `signInWithIdToken({ provider: 'apple', token })`
-    ([doc Supabase](https://supabase.com/docs/guides/auth/social-login/auth-apple)).
-  - O e-mail pode vir como `xxxx@privaterelay.appleid.com` — o backend precisa aceitar.
-  - O **nome só vem no primeiro login** — salve na hora.
-- **Google no iOS:** criar um **Client ID do tipo iOS** no Google Cloud (bundle `br.com.personafit`) e
-  passar o **`iosUrlScheme`** (Client ID invertido, `com.googleusercontent.apps.…`) no plugin:
-  ```ts
-  ['@react-native-google-signin/google-signin', { iosUrlScheme: 'com.googleusercontent.apps.XXXX' }]
-  ```
-  ([doc](https://react-native-google-signin.github.io/docs/setting-up/expo)). Sem isso o login
-  Google fecha ou falha só no iPhone.
+### 7.3 Login: decisão de não ter login social no iOS (diretriz 4.8)
+- **Decisão de 2026-11-09 (opção B):** a 1ª versão iOS sai **sem Google e sem Apple**. A 4.8 só exige
+  Sign in with Apple quando o app oferece login de terceiro. Sem Google no iOS, a regra não se aplica.
+- **O que o app faz hoje:** no iPhone o botão "Continuar com Google" fica escondido. O login é por
+  e-mail e senha. A tela mostra uma dica para quem entrou só com Google no Android: usar
+  "Esqueci a senha" para criar uma senha (testado no Supabase local, a conta é a mesma).
+- **Android não muda.** O Google segue funcionando lá.
+- **Não instalar** `expo-apple-authentication` nem pôr `usesAppleSignIn` agora.
+- **Quando quiser o login social no iPhone:** o item "Login com Apple e com Google no iPhone" está em
+  `.specs/backlog/melhorias.md`. Exige botão oficial da Apple, provider Apple no Supabase,
+  Client ID iOS do Google (`iosUrlScheme` no plugin) e revogação do token da Apple na exclusão de
+  conta (5.1.1(v)). Também exige build nativo novo.
 
 ### 7.4 Exclusão de conta (diretriz 5.1.1(v)) — ✅ já existe
 App que permite **criar conta** precisa permitir **excluir a conta dentro do app**. O Persona Fit já
@@ -367,13 +371,14 @@ tem (`DangerZone` → "Excluir conta"). Confirme que exclui de verdade e cite o 
 revisão. (No DOD Estudos, a falta desse botão era item obrigatório antes da loja pública.)
 
 ### 7.5 Assinaturas (RevenueCat) no iOS
-- `src/services/billing.ts` usa só a chave Android. O iOS precisa da chave Apple (`appl_...`):
+- `src/services/billing.ts` já escolhe a chave por plataforma (✅ feito). O iOS usa a chave Apple (`appl_...`):
   ```ts
   const API_KEY = Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_RC_API_KEY_IOS
     : process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID;
   ```
-  e cadastrar `EXPO_PUBLIC_RC_API_KEY_IOS` no ambiente **production** da EAS.
+  Falta cadastrar `EXPO_PUBLIC_RC_API_KEY_IOS` no ambiente **production** da EAS (M5), antes do build.
+  Sem a chave, os botões do paywall ficam desativados no iOS.
 - No **RevenueCat**: adicionar o app iOS (bundle id), configurar a **In-App Purchase Key**
   ([doc](https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/in-app-purchase-key-configuration)),
   importar os produtos e ligá-los às mesmas *entitlements* do Android
@@ -744,6 +749,8 @@ SDK novo e perguntas novas do questionário exigem revisar **Privacidade do app*
 ### 14.14 OTA de produção sem o ambiente certo
 `eas update` sem `--environment production` publicou o `.env` local em produção no DOD Cast →
 tela "Configuração inválida" para todos.
+No Persona Fit os scripts já passam o ambiente: `npm run update:production` usa `--environment production`
+e `npm run update:preview` usa `--environment preview`.
 
 ---
 

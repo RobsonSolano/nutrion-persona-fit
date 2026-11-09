@@ -1459,3 +1459,37 @@ entitlements no RevenueCat devem se chamar `pro`/`premium` (o `mapEvent.ts` deci
 
 - **Reset de senha para conta só-Google (IOS-03): funciona.** Testado no Supabase local: usuário criado via admin API com `app_metadata.provider = google` e sem senha; `resetPasswordForEmail` + `verifyOtp(recovery)` + `updateUser({ password })` + `signInWithPassword` entrou com o mesmo `user.id`. Dica de senha no login do iOS habilitada (`IOS_PASSWORD_HINT_ENABLED = true`). Limite do teste: sem linha em `auth.identities` com provider google (usuário simulado pela admin API).
 - Consentimento de saúde (`HealthDataConsent`) agora cita provedor de IA de terceiros; versão do documento legal não mudou (só o texto do componente).
+
+### Decisões (spec `2026-11-03-publicacao-ios`, branch `feature/publicacao-ios`)
+- **Sem login social no iOS na 1ª versão (opção B).** Google escondido no iPhone, sem Sign in with Apple. [IOS]-04 e [IOS]-11 adiados (item em `melhorias.md`). Android não muda.
+- Bundle `br.com.personafit`, só iPhone (`supportsTablet: false`), retrato só no iOS (`infoPlist`), ícone `icon-ios.png` sem alfa.
+- 5 produtos em 2 grupos na App Store: Professor (`nutrion_prof_pro` R$ 15,90, `nutrion_prof_premium` R$ 29,90, `nutrion_prof_elite` R$ 49,90) e Pessoal (`nutrion_comum_pro` R$ 15,90, `nutrion_comum_premium` R$ 29,90), todos mensais.
+- Podfile ajustado por plugin (`plugins/withIosPodfileFixes.js`: modular headers e alvo mínimo 15.1).
+- Webhook grava `store_apple` para compra iOS. Paywall com texto de renovação por loja e links de Termos e Privacidade (3.1.2). Gerenciar assinatura e textos seguem a loja da plataforma.
+- `npm run update:preview` e `update:production` passam `--environment`. `releaseNotes` do `app.config.ts` fica para o próximo OTA.
+
+### Verificação (2026-11-09)
+- Build Release para o Simulador iOS passou (`xcodebuild`), com prebuild e `pod install` ok. `expo run:ios` não reconhece o Simulador do Xcode 27: usar `xcodebuild` + `xcrun simctl install`.
+- Conferência visual no iPhone 17 Pro Max: login iOS sem Google e com dica de senha; consentimento citando IA de terceiros; paywall com texto de renovação Apple, Termos, Privacidade e Restaurar (botões desativados sem `EXPO_PUBLIC_RC_API_KEY_IOS`, esperado); `SubscriptionCard` e `UpdateGate` dizendo App Store.
+- `/paywall` por deep link sem sessão gira para sempre: comportamento antigo, registrado em `backlog/ajustes.md`.
+- Capturas da App Store (6,9" e 6,3") prontas em `../nutrion-brand/capturas/app-store-2026-11/`.
+
+### ORDEM DE DEPLOY obrigatória (publicação iOS)
+1. Migration `20261109120000_app_config_ios_store_url` em produção, **antes** de qualquer OTA com o `select` novo de `app_config`. Sem a coluna o PostgREST dá erro, o `useAppUpdate` cai em `'none'` e o aviso de atualização some em silêncio.
+2. `supabase functions deploy revenuecat-webhook --no-verify-jwt`, antes do primeiro build iOS.
+3. OTA para o Android (só depois da migration).
+4. Variável `EXPO_PUBLIC_RC_API_KEY_IOS` no EAS (environment production), antes do build.
+5. Primeiro build iOS (`eas build -p ios`, nativo, não é OTA), depois de M5 a M7.
+6. `ascAppId` no `eas.json` (`submit.production.ios`) só quando o app existir no App Store Connect. Nunca placeholder: ID errado = envio "ERRORED".
+
+### Pendências manuais (publicação iOS)
+- **M5:** RevenueCat iOS (app, In-App Purchase Key, produtos, entitlements) e `EXPO_PUBLIC_RC_API_KEY_IOS` na EAS production.
+- **M6:** criar os 5 produtos nos 2 grupos de assinatura no App Store Connect (preços acima). Professor pro, premium e elite no mesmo grupo, para a troca de plano não cobrar em dobro.
+- **M7:** chave APNs na EAS e `ascAppId` no `eas.json`, depois de criar o app.
+- **M8:** preencher `app_config.ios_store_url` depois que o app estiver na loja.
+- Painel admin sem campo `ios_store_url` e política do hotsite sem citar Apple: ver `backlog/melhorias.md`.
+
+### Limitações conhecidas (publicação iOS)
+- Troca de plano entre lojas diferentes (comprou na Play, quer mudar no iPhone, ou o inverso) não é tratada: cada loja só gerencia a própria assinatura.
+- "Gerenciar assinatura" abre a loja da plataforma atual, não a loja de origem da compra.
+- Teste do reset de senha usou usuário simulado pela admin API (sem identity Google real).
