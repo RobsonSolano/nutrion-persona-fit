@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { IS_EXPO_GO } from '@/lib/platform';
 import { isValidEmail } from '@/lib/email';
 import { supabase } from './supabase';
@@ -50,6 +51,9 @@ export class AuthCancelled extends Error {
 }
 
 export async function signInWithGoogle() {
+  if (Platform.OS === 'ios') {
+    throw new Error('Login com Google indisponível no iPhone. Entre com e-mail e senha.');
+  }
   const { GoogleSignin, statusCodes } = loadGoogleSignin();
   configureGoogleSignin();
 

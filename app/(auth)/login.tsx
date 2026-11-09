@@ -28,6 +28,7 @@ import TermsAcceptance from '@/components/TermsAcceptance';
 import HealthDataConsent from '@/components/HealthDataConsent';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
+import { loginOptions } from '@/lib/socialLogin';
 import {
   Button,
   ConfirmModal,
@@ -63,6 +64,10 @@ function GoogleMark() {
 export default function LoginScreen() {
   const router = useRouter();
   const { loginWithGoogle, loginWithEmail, signUp } = useAuth();
+  const { showGoogle, showExpoGoGoogleTip, showIosPasswordHint } = loginOptions(
+    Platform.OS,
+    IS_EXPO_GO,
+  );
   const alert = useAlert();
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
@@ -178,7 +183,7 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {!IS_EXPO_GO && (
+          {showGoogle && (
             <View className="mb-5">
               <Button
                 label="Continuar com Google"
@@ -305,7 +310,16 @@ export default function LoginScreen() {
             )}
           </View>
 
-          {IS_EXPO_GO && (
+          {mode === 'login' && showIosPasswordHint && (
+            <View className="mt-4 rounded-2xl bg-violet/10 border border-violet/30 px-4 py-3">
+              <Text className="text-violet-soft text-[11px] leading-relaxed">
+                Criou a conta com o Google no Android? Toque em “Esqueci a senha” e
+                use o mesmo e-mail para criar uma senha.
+              </Text>
+            </View>
+          )}
+
+          {showExpoGoGoogleTip && (
             <View className="mt-5 rounded-2xl bg-violet/10 border border-violet/30 px-4 py-3">
               <Text className="text-violet-soft text-[11px] leading-relaxed">
                 💡 Você está no Expo Go. Login com Google fica disponível no APK
