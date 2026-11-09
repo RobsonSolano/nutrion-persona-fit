@@ -272,7 +272,7 @@ npx vitest run src/lib/storeUpdate.test.ts && npx vitest run && npm run typechec
 ---
 
 ### T08 — Scripts de OTA, documentação e verificação final
-**Onda:** 3 · **Visual:** não · **Depende de:** T01, T02, T03, T04, T05, T06, T07 · **Status:** pendente
+**Onda:** 3 · **Visual:** não · **Depende de:** T01, T02, T03, T04, T05, T06, T07 · **Status:** finalizado
 **O quê:** os scripts de OTA passam o ambiente da EAS; o manual, o PROJECT e o STATE refletem o que foi implementado, as decisões, as pendências manuais e a ordem de deploy; o backlog ganha os itens deixados de fora. Fecha com a verificação completa do critério de pronto.
 **Arquivos:** `package.json`, `MANUAL-APP-STORE.md`, `.specs/project/PROJECT.md`, `.specs/project/STATE.md`, `.specs/backlog/melhorias.md`
 **Da spec:**
