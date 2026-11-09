@@ -89,6 +89,20 @@ describe('findPackage', () => {
     );
   });
 
+  it('[IOS]-05 acha os 5 IDs iOS (sem sufixo :mensal)', () => {
+    const ids = [
+      'nutrion_prof_pro',
+      'nutrion_prof_premium',
+      'nutrion_prof_elite',
+      'nutrion_comum_pro',
+      'nutrion_comum_premium',
+    ];
+    const ios = { all: { o: { availablePackages: ids.map((i) => pkg(i)) } } };
+    for (const id of ids) {
+      expect(findPackage(ios, id)?.product.identifier).toBe(id);
+    }
+  });
+
   it('não achou → null', () => {
     expect(findPackage(offerings, 'inexistente')).toBeNull();
   });

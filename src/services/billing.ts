@@ -5,16 +5,22 @@
 // Verdade do acesso = resolve_entitlement (servidor), NÃO o customerInfo (feedback local,
 // burlável). Pós-compra o paywall re-busca o entitlement via pollUntil (webhook #5a é async).
 
+import { Platform } from 'react-native';
 import { IS_EXPO_GO } from '@/lib/platform';
+import { rcApiKeyFor, usesGoogleProductChange } from '@/lib/store';
 import type {
   PurchasesPackage,
   PurchasesOfferings,
   CustomerInfo,
 } from 'react-native-purchases';
 
-const API_KEY = process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID;
+// Acesso literal a process.env.EXPO_PUBLIC_*: o Expo só embute assim no bundle.
+const API_KEY = rcApiKeyFor(Platform.OS, {
+  ios: process.env.EXPO_PUBLIC_RC_API_KEY_IOS,
+  android: process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID,
+});
 
-/** Billing só opera em dev/release build (não Expo Go) e com a key configurada. */
+/** Billing só opera em dev/release build (não Expo Go) e com a key da plataforma configurada. */
 export const isBillingAvailable = !IS_EXPO_GO && !!API_KEY;
 
 export class BillingUnavailableError extends Error {
@@ -66,7 +72,7 @@ export async function getOfferings(): Promise<PurchasesOfferings | null> {
 }
 
 /**
- * Product identifier da assinatura ativa (Google), ou null. Usado pra troca de
+ * Product identifier da assinatura ativa (Play ou App Store), ou null. Usado pra troca de
  * plano (pro→premium): precisamos do produto antigo pra substituir em vez de
  * criar uma 2ª assinatura.
  */
@@ -77,9 +83,10 @@ export async function getActiveProductId(): Promise<string | null> {
 }
 
 /**
- * Compra um package. Com `oldProductId`, faz TROCA de plano (Google product
- * change) com proração imediata — substitui a assinatura atual (evita cobrança
- * dupla no pro→premium). Sem ele, é compra normal (free→qualquer).
+ * Compra um package. No Android, com `oldProductId`, faz TROCA de plano (Google product
+ * change) com proração imediata — substitui a assinatura atual (evita cobrança dupla).
+ * No iOS a compra é simples: a Apple troca o plano dentro do grupo de assinatura (os planos
+ * precisam estar no mesmo grupo no App Store Connect). Sem `oldProductId`, é compra normal.
  */
 export async function purchasePackage(
   pkg: PurchasesPackage,
@@ -87,7 +94,7 @@ export async function purchasePackage(
 ): Promise<CustomerInfo> {
   if (!isBillingAvailable) throw new BillingUnavailableError();
   const Purchases = load();
-  if (opts?.oldProductId) {
+  if (usesGoogleProductChange(Platform.OS, opts?.oldProductId)) {
     const { customerInfo } = await Purchases.purchasePackage(pkg, null, {
       oldProductIdentifier: opts.oldProductId,
       prorationMode: Purchases.PRORATION_MODE.IMMEDIATE_AND_CHARGE_PRORATED_PRICE,
