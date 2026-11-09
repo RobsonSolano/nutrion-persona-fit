@@ -85,3 +85,17 @@ Apple (5.1.1(v)), com uma chave Sign in with Apple (.p8) no servidor. Os requisi
 (antigos [IOS]-03, [IOS]-04 e [IOS]-11) e nos pré-requisitos M1–M4.
 **Ganho:** cadastro com um toque no iPhone, e quem entrou com Google no Android não precisa criar senha.
 **Dificuldade:** Média (~1,5 dia de código + 4 passos de console). **Exige build nativo novo** (não vai por OTA).
+
+## Campo `ios_store_url` no painel admin (nutrion-painel)
+**Origem:** spec `2026-11-03-publicacao-ios`, fora do escopo registrado em 2026-11-09.
+**O que é:** o app já lê `app_config.ios_store_url` (migration `20261109120000`), mas o painel admin
+(repo `nutrion-painel`) não tem campo para editar. Hoje só dá para preencher por SQL.
+**Ganho:** o dev troca o link da App Store sem SQL. Pré-requisito: o app já estar na loja (M8).
+**Dificuldade:** Baixa. Lembrar que o painel não tem deploy automático (`vercel --prod`).
+
+## Política de privacidade do hotsite citando Apple (pagamentos e login)
+**Origem:** spec `2026-11-03-publicacao-ios`, fora do escopo registrado em 2026-11-09.
+**O que é:** atualizar `/legal/privacidade` e os Termos no hotsite para citar a Apple (App Store) como
+processadora de pagamentos no iOS. A política já cita o Groq como provedor de IA.
+**Ganho:** texto coerente com a ficha da App Store e com a diretriz 5.1.1.
+**Dificuldade:** Baixa. O hotsite tem repo próprio.

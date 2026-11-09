@@ -127,3 +127,10 @@ declara esses campos. Bônus: assinatura da loja já vencida ainda mostra "Geren
 fosse um item pendente ("Falta preencher: carregando."). Provável estado de loading tratado como dado.
 **Gravidade:** atrapalha o usuário (cosmético, mas confunde quem quer aparecer na busca).
 **Esforço:** baixo — tratar o estado de carregamento no card; exige OTA.
+
+## /paywall aberto por deep link sem sessão fica girando para sempre
+**Origem:** encontrado em 2026-11-09, na conferência visual da spec `2026-11-03-publicacao-ios`.
+**O que é:** abrir `/paywall` por deep link sem usuário logado deixa a tela em carregamento sem fim, em
+vez de redirecionar para o login. Comportamento antigo, não é regressão da feature iOS.
+**Impacto:** baixo (só via link direto, sem sessão).
+**Esforço:** minutos, redirecionar para o login quando não há sessão.
