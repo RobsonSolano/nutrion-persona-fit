@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -30,7 +31,7 @@ import {
   useRequestCoach,
 } from '@/hooks/useEnrollment';
 import { isValidPhone, maskPhoneBR, parsePhoneInput } from '@/lib/phone';
-import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
+import { storeName, subscriptionsUrl } from '@/lib/store';
 import { useProfile } from '@/hooks/useProfile';
 import { useEntitlement } from '@/hooks/useEntitlement';
 import { tierAtLeast } from '@/lib/tier';
@@ -286,16 +287,16 @@ export default function PerfilPublicoProfessorScreen() {
                     <Text className="text-text-dim text-[11px] mt-1.5 leading-relaxed">
                       Ela continua valendo — você fica com o melhor acesso entre o seu
                       e o do professor, então nada é perdido. Mas o app não cancela
-                      assinatura por você: se não quiser mais pagar, cancele na Play
-                      Store.
+                      assinatura por você: se não quiser mais pagar, cancele na{' '}
+                      {storeName(Platform.OS)}.
                     </Text>
                     <Pressable
-                      onPress={() => void Linking.openURL(PLAY_SUBSCRIPTIONS_URL)}
+                      onPress={() => void Linking.openURL(subscriptionsUrl(Platform.OS))}
                       className="flex-row items-center gap-1.5 mt-2.5 active:opacity-70"
                     >
                       <ExternalLink size={13} color={colors.accent} />
                       <Text className="text-accent text-[11px] font-semibold">
-                        Gerenciar assinatura na Play Store
+                        Gerenciar assinatura na {storeName(Platform.OS)}
                       </Text>
                     </Pressable>
                   </View>

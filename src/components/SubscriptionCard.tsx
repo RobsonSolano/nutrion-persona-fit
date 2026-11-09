@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, Platform, Text, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { Crown, Sparkles, RefreshCw, ExternalLink } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,14 +12,15 @@ import { syncMyCoachAccess } from '@/services/suspension';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import { PLAY_SUBSCRIPTIONS_URL } from '@/lib/playStore';
+import { storeName, subscriptionsUrl } from '@/lib/store';
 import { coachUpgradeFeature } from '@/lib/paywallContent';
 import { TIER_LABEL, tierAtLeast } from '@/lib/tier';
 
 /**
  * "Minha assinatura" — entrada proativa de plano no Perfil (comum + professor).
- * Upgrade = compra no app (paywall). Downgrade/cancelar = gerenciado pela Play
- * (deep-link), pois assinatura do Google Play não se cancela dentro do app.
+ * Upgrade = compra no app (paywall). Downgrade/cancelar = gerenciado pela loja da
+ * plataforma (deep-link: App Store no iOS, Play Store no Android), pois assinatura de loja
+ * não se cancela dentro do app.
  */
 export default function SubscriptionCard() {
   const { user } = useAuth();
@@ -126,7 +127,7 @@ export default function SubscriptionCard() {
         {hasStoreSub && (
           <Button
             label="Gerenciar assinatura"
-            onPress={() => Linking.openURL(PLAY_SUBSCRIPTIONS_URL)}
+            onPress={() => Linking.openURL(subscriptionsUrl(Platform.OS))}
             variant="secondary"
             size="md"
             icon={<ExternalLink size={14} color={colors.text} />}
@@ -145,7 +146,7 @@ export default function SubscriptionCard() {
 
       {canUpgrade && (
         <Text className="text-text-muted text-[11px] mt-3 leading-relaxed">
-          Cancelamento e troca de plano são feitos na Google Play.
+          Cancelamento e troca de plano são feitos na {storeName(Platform.OS)}.
         </Text>
       )}
     </Card>
