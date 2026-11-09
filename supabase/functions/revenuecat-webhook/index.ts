@@ -36,7 +36,7 @@ serve(async (req: Request) => {
   const { error } = await supa.from('subscriptions').upsert(
     {
       user_id: mapped.userId,
-      source: 'store_play',
+      source: mapped.source,
       rc_app_user_id: mapped.userId,
       tier: mapped.state.tier,
       status: mapped.state.status,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapRevenueCatEvent } from './mapEvent';
+import { mapRevenueCatEvent, storeToSource } from './mapEvent';
 
 const ev = (type: string, extra: Record<string, unknown> = {}) => ({
   event: {
@@ -73,5 +73,31 @@ describe('mapRevenueCatEvent', () => {
 
   it('ELITE-05 EXPIRATION → free', () => {
     expect(mapRevenueCatEvent(ev('EXPIRATION', { entitlement_ids: ['elite'] }))?.state).toMatchObject({ tier: 'free', status: 'expired' });
+  });
+
+  it('IOS-06 storeToSource: APP_STORE e MAC_APP_STORE → store_apple', () => {
+    expect(storeToSource('APP_STORE')).toBe('store_apple');
+    expect(storeToSource('MAC_APP_STORE')).toBe('store_apple');
+  });
+
+  it('IOS-06 storeToSource: PLAY_STORE → store_play', () => {
+    expect(storeToSource('PLAY_STORE')).toBe('store_play');
+  });
+
+  it('IOS-06 storeToSource: ausente, null, número ou desconhecido → store_play', () => {
+    for (const v of [undefined, null, 42, 'STRIPE', 'PROMOTIONAL', '', 'app_store']) {
+      expect(storeToSource(v)).toBe('store_play');
+    }
+  });
+
+  it('IOS-06 INITIAL_PURCHASE com APP_STORE → source store_apple', () => {
+    expect(mapRevenueCatEvent(ev('INITIAL_PURCHASE', { store: 'APP_STORE' }))?.source).toBe('store_apple');
+  });
+
+  it('IOS-06 todos os tipos tratados trazem source (inclusive EXPIRATION)', () => {
+    for (const t of ['INITIAL_PURCHASE', 'RENEWAL', 'PRODUCT_CHANGE', 'UNCANCELLATION', 'CANCELLATION', 'BILLING_ISSUE', 'EXPIRATION']) {
+      expect(mapRevenueCatEvent(ev(t, { store: 'APP_STORE' }))?.source).toBe('store_apple');
+      expect(mapRevenueCatEvent(ev(t))?.source).toBe('store_play');
+    }
   });
 });
