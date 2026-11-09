@@ -1454,3 +1454,8 @@ entitlements no RevenueCat devem se chamar `pro`/`premium` (o `mapEvent.ts` deci
   (ex: `app/(coach)/index.tsx`, `app/onboarding/resultado.tsx`, `src/services/auth.ts`),
   pré-existentes na develop. Decidido não tratar junto do billing-core (evitar scope creep).
   Candidato a um `chore(lint)` dedicado.
+
+## Publicação iOS (2026-11-09)
+
+- **Reset de senha para conta só-Google (IOS-03): funciona.** Testado no Supabase local: usuário criado via admin API com `app_metadata.provider = google` e sem senha; `resetPasswordForEmail` + `verifyOtp(recovery)` + `updateUser({ password })` + `signInWithPassword` entrou com o mesmo `user.id`. Dica de senha no login do iOS habilitada (`IOS_PASSWORD_HINT_ENABLED = true`). Limite do teste: sem linha em `auth.identities` com provider google (usuário simulado pela admin API).
+- Consentimento de saúde (`HealthDataConsent`) agora cita provedor de IA de terceiros; versão do documento legal não mudou (só o texto do componente).
