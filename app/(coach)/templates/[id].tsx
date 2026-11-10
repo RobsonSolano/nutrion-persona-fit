@@ -42,6 +42,7 @@ import {
   type TemplateExerciseInsert,
 } from '@/types/database';
 import { toExerciseInsert } from '@/lib/exerciseInsert';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function TemplateDetailScreen() {
   const router = useRouter();
@@ -73,7 +74,7 @@ export default function TemplateDetailScreen() {
       onError: (err) => {
         Alert.alert(
           'Não consegui salvar',
-          err instanceof Error ? err.message : 'Tenta de novo.',
+          friendlyMessage(err),
         );
       },
     });
@@ -98,7 +99,7 @@ export default function TemplateDetailScreen() {
             } catch (err) {
               Alert.alert(
                 'Não consegui excluir',
-                err instanceof Error ? err.message : 'Tenta de novo.',
+                friendlyMessage(err),
               );
             }
           },

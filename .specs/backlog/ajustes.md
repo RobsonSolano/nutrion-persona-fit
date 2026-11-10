@@ -150,3 +150,54 @@ Quem atualizou viu no aviso uma novidade de uma versão anterior.
 -scheme PersonaFit -configuration Release -sdk iphonesimulator` + `xcrun simctl install`. Pode sumir com um upgrade do
 `expo`/`@expo/cli`.
 **Gravidade:** atrapalha o dev. **Esforço:** minutos para testar o upgrade.
+
+## Capacidade da IA: plano gratuito do Groq aguenta ~1 análise por minuto por modelo
+**Origem:** medido em 2026-11-10, no hotfix 1.28.1 (erro "Failed to validate JSON" na análise de refeição).
+**Onde:** conta Groq (service tier `on_demand`), usada por `chat-ai`, `coach-generate-plan`, `onboarding-plan` e `pushAi`.
+**O que é:** limite de 8000 tokens/min no `gpt-oss-120b` e no `gpt-oss-20b`; o `qwen/qwen3.8-27b` tem 7000 de entrada e
+1000 de saída por minuto. Cada análise de refeição reserva ~5000 (prompt ~3000 + `max_tokens` 2000). O hotfix passou o
+texto por 120b → 20b, o que dá ~2 análises por minuto **no app inteiro**; foto só tem o qwen. Com mais usuários ativos
+ao mesmo tempo, o 429 volta, agora com a mensagem "Muitas requisições, aguarde ~Ns".
+**Gravidade:** alta assim que houver uso simultâneo. **Esforço:** minutos para subir de plano (Dev Tier, pago por uso)
+no console do Groq; ou horas para enxugar a referência TACO do prompt (é a maior parte dos ~3000 tokens).
+
+## plan-generator tem a própria cópia do retry e o mesmo risco de JSON truncado
+**Origem:** revisão do hotfix 1.28.1 (2026-11-10).
+**Onde:** `supabase/functions/_shared/plan-generator.ts` (`fetchWithRetry` + `fetchGroqPlan`, ~linha 641).
+**O que é:** chama `gpt-oss-120b` em JSON mode com `max_tokens: 3500` e sem `reasoning_effort`, a mesma combinação
+que truncava a análise de refeição. O loop dele não repete `json_validate_failed` e repete 429 no mesmo modelo. A troca
+é usar `groqFetchWithFailover(GROQ_URL, key, textModelChain(model), payload)` de `_shared/groqRetry.ts` e apagar a cópia.
+Ficou fora do hotfix porque muda o raciocínio da geração de plano sem medição (1 erro `coach_plan` em 30 dias).
+Antes: medir o uso de tokens de raciocínio com um plano real.
+**Gravidade:** média. **Esforço:** horas (medir + trocar + testar).
+
+## Erros das edge functions viajam como texto, e o app adivinha se é técnico
+**Origem:** revisão do hotfix 1.28.1 (2026-11-10).
+**Onde:** `chat-ai` devolve o texto do Groq em `detail`; `src/services/{sanityCheck,onboarding,coach,students}.ts` montam
+`` `${status} · ${detail}` ``; `src/lib/friendlyError.ts` decide por regex (`TECHNICAL_MARKERS`).
+**O que é:** a correção de fundo é a edge logar o detalhe e devolver só um código estável, e os services lançarem um
+`ApiError { status, code }` tipado (como já fazem `DailyLimitError`/`NeedsUpgradeError`), com o `parseError` decidindo
+pelo código. Uma regra de lint contra `err.message` dentro de `Alert.alert`/`showAlert` evita a próxima tela vazar.
+**Gravidade:** baixa (o hotfix já cobre as telas). **Esforço:** horas.
+
+## Lembretes de push (água, proteína, sequência, treino) não chegam: gateway responde 401
+**Origem:** visto em 2026-11-10, no hotfix 1.28.3 (investigando por que o alerta de IA nunca rodou).
+**Onde:** `supabase/config.toml` + jobs `nutrion-*` de `20261001000000_agenda_crons_de_push.sql`.
+**O que é:** os `nutrion-*` mandam só o `X-Cron-Secret` (do Vault), sem `Authorization`. As functions
+`cron-water-reminder`, `cron-protein-reminder`, `cron-streak-warning`, `cron-streak-celebrations` e
+`cron-daily-workout-check` não têm `verify_jwt = false` no `config.toml` (só a de inatividade tem), então o gateway
+responde `401 UNAUTHORIZED_NO_AUTH_HEADER` antes da function. Prova: o mesmo formato chamando o `cron-ai-quota-alert`
+deu 401, e o `push_history` dos últimos 7 dias só tem `inactivity_reminder`. O pg_cron marca "succeeded" porque só
+enfileira a requisição. Os `cron-*` manuais (que tinham Authorization) estavam com JSON quebrado e foram removidos no
+1.28.3. **Correção:** `verify_jwt = false` nas 5 no `config.toml` + redeploy delas. **Decisão de produto antes:**
+liga lembretes que os usuários nunca receberam (teto de 3 pushes/dia do `pushAi` continua valendo).
+Também: `cron-inactivity-reminders` e `inactivity-reminders-daily` chamam a mesma function às 12:00; uma das chamadas
+deu 403 em 2026-11-10 — conferir e deixar uma só.
+**Gravidade:** alta (feature de engajamento parada). **Esforço:** minutos + teste.
+
+## Envio de e-mail por Gmail SMTP duplicado em duas functions
+**Origem:** hotfix 1.28.2 (2026-11-10).
+**Onde:** `supabase/functions/coach-send-credentials/index.ts` e `supabase/functions/cron-ai-quota-alert/index.ts`.
+**O que é:** as duas montam o `SMTPClient` do denomailer com a mesma conexão e o mesmo cuidado com `close()`. Extrair
+um `_shared/mailer.ts` (`sendGmail({ to, subject, content, html? })`) e usar nas duas; exige redeploy das duas.
+**Gravidade:** baixa. **Esforço:** minutos.

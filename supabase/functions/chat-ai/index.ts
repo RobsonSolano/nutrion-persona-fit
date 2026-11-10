@@ -14,7 +14,9 @@ import { dailyAiQuota } from '../_shared/aiQuota.ts';
 import { TACO_ALIMENTOS, formatTacoForPrompt } from '../_shared/tacoReference.ts';
 import {
   DEFAULT_TEXT_MODEL,
-  groqFetchWithRetry,
+  groqBody,
+  groqFetchWithFailover,
+  textModelChain,
 } from '../_shared/groqRetry.ts';
 import {
   aplicarTetoDensidade,
@@ -32,14 +34,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
 
-// Modelos Groq (trocáveis via env var sem redeploy). Defaults verificados
-// disponíveis na conta em 2026-08-27 — llama-3.3/llama-4-scout foram
-// descontinuados (404). VISION_MODEL default também precisa de revisão: ver
-// nota em _shared/groqRetry.ts.
-//   openai/gpt-oss-120b — texto (default atual)
+// Modelos Groq (trocáveis via env var sem redeploy). Produção usa os secrets;
+// os defaults só valem se eles caírem, e por isso precisam existir na conta
+// (verificado em 2026-11-10: llama-3.3 e llama-4-scout foram descontinuados).
 const TEXT_MODEL = Deno.env.get('GROQ_MODEL') ?? DEFAULT_TEXT_MODEL;
-const VISION_MODEL =
-  Deno.env.get('GROQ_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
+const VISION_MODEL = Deno.env.get('GROQ_VISION_MODEL') ?? 'qwen/qwen3.8-27b';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -388,7 +387,10 @@ serve(async (req: Request) => {
           : userMessage;
 
     const isMultimodal = !!body.imageBase64;
-    const modelToUse = isMultimodal ? VISION_MODEL : TEXT_MODEL;
+    // Foto só tem o modelo de visão; texto percorre a cadeia (ver
+    // textModelChain). modelToUse vira o modelo que de fato respondeu.
+    const models = isMultimodal ? [VISION_MODEL] : textModelChain(TEXT_MODEL);
+    let modelToUse = models[0];
 
     const userContent = isMultimodal
       ? [
@@ -437,48 +439,49 @@ serve(async (req: Request) => {
     // continuam síncronos (devolvem JSON estrito de uma vez).
     const useStream = !!body.stream && isChatMode && !isMultimodal;
 
-    const requestBody = JSON.stringify({
-        model: modelToUse,
-        messages,
-        // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
-        // de conversa; no sanity check ela só adiciona variância entre duas
-        // análises da MESMA refeição, que é justo o que atrapalha medir.
-        temperature: isChatMode ? 0.6 : 0.15,
-        // Subiu junto com o sanity itemizado (SAN-10): cada item passou a ter
-        // 6 campos nomeados em vez de ser só uma string. A conta, pra não virar
-        // número mágico: ~35 tokens por item + ~150 de overhead (consistency,
-        // macros, feedback). Um prato carregado de 10-12 itens fica em ~500-600
-        // tokens, então 1400 dá folga de ~2x. Sem folga o JSON trunca
-        // (json_validate_failed, já aconteceu no caminho de visão).
-        max_tokens: isMultimodal ? 2400 : 1400,
-        top_p: 0.9,
-        stream: useStream,
-        // Visão usa o qwen (único modelo de visão da Groq), que é "reasoning":
-        // por padrão gasta 1000+ tokens "pensando", estoura o max_tokens e
-        // trunca o JSON (erro json_validate_failed). reasoning_effort:'none'
-        // desliga o raciocínio → JSON direto, rápido e sem estourar o TPM do
-        // free tier. (llama, no caminho de texto, não é reasoning — não recebe.)
-        ...(isMultimodal ? { reasoning_effort: 'none' } : {}),
-        // JSON mode no sanity_check: força a API a retornar JSON valido.
-        // Resolve definitivamente o problema do modelo retornar texto livre
-        // que o parser nao consegue extrair.
-        ...(isChatMode ? {} : { response_format: { type: 'json_object' } }),
-      });
+    const payload = {
+      messages,
+      // INS-01: contagem de caloria não quer criatividade. 0.6 é temperatura
+      // de conversa; no sanity check ela só adiciona variância entre duas
+      // análises da MESMA refeição, que é justo o que atrapalha medir.
+      temperature: isChatMode ? 0.6 : 0.15,
+      // Subiu junto com o sanity itemizado (SAN-10): ~35 tokens por item +
+      // ~150 de overhead; um prato de 10-12 itens fica em ~500-600 tokens.
+      // Mas max_tokens também paga o RACIOCÍNIO do modelo (ver
+      // reasoningEffortFor): medido em 2026-11-10 com o prompt real, o
+      // gpt-oss-120b em `low` gastou até 1451 no total (no default, 1247 só
+      // pensando, e aí o JSON truncava). 2000 cobre o pior caso com folga.
+      max_tokens: isMultimodal ? 2400 : 2000,
+      top_p: 0.9,
+      stream: useStream,
+      // JSON mode no sanity_check: força a API a retornar JSON valido.
+      // Resolve definitivamente o problema do modelo retornar texto livre
+      // que o parser nao consegue extrair.
+      ...(isChatMode ? {} : { response_format: { type: 'json_object' } }),
+    };
 
     // Stream (chat texto) segue direto — não dá pra repetir um corpo já
-    // consumido. Sanity check (texto e FOTO) é síncrono e ganha retry: era o
-    // único caminho de IA sem nenhuma resiliência, e o de foto roda num
-    // modelo de visão instável com JSON.
-    const groqRes = useStream
-      ? await fetch(GROQ_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-          },
-          body: requestBody,
-        })
-      : await groqFetchWithRetry(GROQ_URL, GROQ_API_KEY, requestBody, 3);
+    // consumido. O resto é síncrono e vai pelo failover (ver groqRetry.ts).
+    let groqRes: Response;
+    if (useStream) {
+      groqRes = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: groqBody(payload, modelToUse),
+      });
+    } else {
+      const result = await groqFetchWithFailover(
+        GROQ_URL,
+        GROQ_API_KEY,
+        models,
+        payload,
+      );
+      groqRes = result.res;
+      modelToUse = result.model;
+    }
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();

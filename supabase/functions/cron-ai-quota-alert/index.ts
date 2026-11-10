@@ -1,7 +1,7 @@
 // NutriOn — Edge Function cron-ai-quota-alert
-// Roda de hora em hora. Conta rate_limits da última hora em
-// ai_usage_log. Se passar de THRESHOLD, dispara push pra todos
-// os admins (admin_users + profile com expo_push_token).
+// Roda de hora em hora. Conta rate_limits e falhas de IA da última hora em
+// ai_usage_log. Se passar dos limites (ver alertRule.ts), dispara push pra
+// todos os admins (admin_users + profile com expo_push_token).
 //
 // Anti-spam: só envia se NÃO existir alerta enviado na última 1h
 // em push_history com data->>kind = 'ai_quota_alert'.
@@ -12,12 +12,14 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { sendExpoPush } from '../_shared/expoPush.ts';
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import { FAILURE_CODES, aiAlertFor } from './alertRule.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET');
-
-const THRESHOLD = 10; // rate_limits/hora a partir do qual alertamos
+const GMAIL_USER = Deno.env.get('GMAIL_USER');
+const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -42,43 +44,62 @@ serve(async (req: Request) => {
 
     const sinceIso = new Date(Date.now() - 3600 * 1000).toISOString();
 
-    // 1. Conta rate_limits e os principais erros da última hora
-    const { count: rateLimitCount, error: rlErr } = await supa
-      .from('ai_usage_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('error_code', 'rate_limit')
-      .gte('created_at', sinceIso);
-    if (rlErr) {
-      return json({ error: 'count_failed', detail: rlErr.message }, 500);
+    // 1. Conta rate_limits e falhas de IA da última hora
+    const countSince = (codes: string[]) =>
+      supa
+        .from('ai_usage_log')
+        .select('id', { count: 'exact', head: true })
+        .in('error_code', codes)
+        .gte('created_at', sinceIso);
+    const [rl, fl] = await Promise.all([
+      countSince(['rate_limit']),
+      countSince(FAILURE_CODES),
+    ]);
+    if (rl.error || fl.error) {
+      return json(
+        { error: 'count_failed', detail: (rl.error ?? fl.error)!.message },
+        500,
+      );
     }
 
-    const rateLimits = rateLimitCount ?? 0;
-    if (rateLimits < THRESHOLD) {
-      return json({ ok: true, rateLimits, threshold: THRESHOLD, sent: false });
+    const counts = { rateLimits: rl.count ?? 0, failures: fl.count ?? 0 };
+    // `{"test": true}` no body força um alerta de teste: valida e-mail e push
+    // ponta a ponta sem esperar um incidente. Grava com kind próprio para não
+    // acionar o anti-spam dos alertas reais.
+    const isTest = await req
+      .json()
+      .then((b) => b?.test === true)
+      .catch(() => false);
+    const alert = isTest
+      ? {
+          title: 'Persona Fit: teste do alerta de IA',
+          body: `Teste. Agora: ${counts.failures} falhas e ${counts.rateLimits} rate_limits na última hora.`,
+        }
+      : aiAlertFor(counts);
+    if (!alert) {
+      return json({ ok: true, ...counts, sent: false });
     }
+    const kind = isTest ? 'ai_quota_alert_test' : 'ai_quota_alert';
 
     // 2. Verifica se já alertamos na última hora (anti-spam)
     const { data: recentAlerts } = await supa
       .from('push_history')
       .select('id')
       .gte('sent_at', sinceIso)
-      .contains('data', { kind: 'ai_quota_alert' })
+      .contains('data', { kind })
       .limit(1);
-    if (recentAlerts && recentAlerts.length > 0) {
+    if (!isTest && recentAlerts && recentAlerts.length > 0) {
       return json({
         ok: true,
-        rateLimits,
-        threshold: THRESHOLD,
+        ...counts,
         sent: false,
         reason: 'already_alerted_in_last_hour',
       });
     }
 
-    // 3. Lista admins com push_token. NÃO existe FK direta entre
-    //    admin_users e profiles (ambas referenciam auth.users) — então
-    //    PostgREST não consegue inferir o join, e a sintaxe `!inner`
-    //    falha. Faz em 2 etapas: pega IDs dos admins, depois cruza
-    //    com profiles.
+    // 3. Lista admins. NÃO existe FK direta entre admin_users e profiles
+    //    (ambas referenciam auth.users) — então PostgREST não consegue
+    //    inferir o join. Faz em 2 etapas: IDs dos admins, depois profiles.
     const { data: adminRows, error: admErr } = await supa
       .from('admin_users')
       .select('id');
@@ -89,13 +110,7 @@ serve(async (req: Request) => {
       .map((a: { id: string }) => a.id as string)
       .filter(Boolean);
     if (adminIds.length === 0) {
-      return json({
-        ok: true,
-        rateLimits,
-        threshold: THRESHOLD,
-        sent: false,
-        reason: 'no_admins',
-      });
+      return json({ ok: true, ...counts, sent: false, reason: 'no_admins' });
     }
 
     const { data: adminsWithToken, error: profErr } = await supa
@@ -109,53 +124,50 @@ serve(async (req: Request) => {
         500,
       );
     }
+    const withToken = new Set(
+      (adminsWithToken ?? []).map((p: { id: string }) => p.id as string),
+    );
 
-    const targets = (adminsWithToken ?? [])
-      .map((p: { id: string }) => p.id as string)
-      .filter(Boolean);
-    if (targets.length === 0) {
-      return json({
-        ok: true,
-        rateLimits,
-        threshold: THRESHOLD,
-        sent: false,
-        reason: 'no_admin_with_token',
-      });
-    }
+    // 4. E-mail para todos os admins: é o canal que chega mesmo sem push
+    //    habilitado no celular (em 2026-11-10 o único admin não tinha token,
+    //    e este alerta nunca tinha sido entregue a ninguém).
+    const { title, body } = alert;
+    const { emailed, emailError } = await emailAdmins(supa, adminIds, title, body);
 
-    // 4. Dispara push direto (sem passar por sendPushAi pq é alerta crítico,
-    //    sem opt-out, sem cooldown, sem IA).
-    const title = 'NutriOn: cota IA em risco';
-    const body = `${rateLimits} rate_limits na última hora. Verifique Groq.`;
+    // 5. Push direto (sem sendPushAi: alerta crítico, sem opt-out, sem
+    //    cooldown, sem IA). Toda linha vai para push_history, com ou sem
+    //    token, para o anti-spam valer também quando só o e-mail saiu.
     let sent = 0;
-    for (const userId of targets) {
-      const result = await sendExpoPush(supa, userId, {
-        title,
-        body,
-        data: { kind: 'ai_quota_alert', rateLimits, threshold: THRESHOLD },
-      });
-      if (result.ok && !('skipped' in result)) sent++;
-      // Registra em push_history pra anti-spam funcionar
+    for (const userId of adminIds) {
+      const result = withToken.has(userId)
+        ? await sendExpoPush(supa, userId, {
+            title,
+            body,
+            data: { kind, ...counts },
+          })
+        : null;
+      const delivered = !!result && result.ok && !('skipped' in result);
+      if (delivered) sent++;
       await supa.from('push_history').insert({
         user_id: userId,
         type: 'coach_adherence_alert', // reuso de tipo existente
         title,
         body,
-        data: { kind: 'ai_quota_alert', rateLimits, threshold: THRESHOLD },
+        data: { kind, ...counts, emailed },
         ai_generated: false,
-        status: result.ok && !('skipped' in result) ? 'sent' : 'failed',
-        skip_reason:
-          result.ok && 'skipped' in result ? 'no_token' : null,
+        status: delivered ? 'sent' : 'failed',
+        skip_reason: delivered ? null : 'no_token',
       });
     }
 
     return json({
       ok: true,
-      rateLimits,
-      threshold: THRESHOLD,
+      ...counts,
       sent: true,
-      targets: targets.length,
-      delivered: sent,
+      test: isTest,
+      emailed,
+      emailError,
+      pushed: sent,
     });
   } catch (err) {
     console.error('[cron-ai-quota-alert] unexpected:', err);
@@ -165,6 +177,64 @@ serve(async (req: Request) => {
     );
   }
 });
+
+/** Manda o alerta por e-mail (Gmail SMTP, mesmos secrets do
+ *  coach-send-credentials) para o e-mail de conta de cada admin, um envio por
+ *  destinatário como lá. Falha de SMTP não derruba o cron (o push ainda
+ *  tenta), mas volta em `emailError` na resposta para dar pra diagnosticar
+ *  sem acesso aos logs. */
+async function emailAdmins(
+  // deno-lint-ignore no-explicit-any
+  supa: any,
+  adminIds: string[],
+  title: string,
+  body: string,
+): Promise<{ emailed: number; emailError: string | null }> {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    return { emailed: 0, emailError: 'missing_smtp_secret' };
+  }
+  const emails: string[] = [];
+  for (const id of adminIds) {
+    const { data, error } = await supa.auth.admin.getUserById(id);
+    if (error) return { emailed: 0, emailError: `get_user: ${error.message}` };
+    if (data?.user?.email) emails.push(data.user.email);
+  }
+  if (emails.length === 0) return { emailed: 0, emailError: 'no_admin_email' };
+
+  const client = new SMTPClient({
+    connection: {
+      hostname: 'smtp.gmail.com',
+      port: 465,
+      tls: true,
+      auth: { username: GMAIL_USER, password: GMAIL_APP_PASSWORD },
+    },
+  });
+  let emailed = 0;
+  let emailError: string | null = null;
+  try {
+    for (const to of emails) {
+      await client.send({
+        from: `Persona Fit <${GMAIL_USER}>`,
+        to,
+        subject: title,
+        content: body,
+        html: `<p>${body}</p>`,
+      });
+      emailed++;
+    }
+  } catch (err) {
+    console.error('[cron-ai-quota-alert] falha no e-mail:', err);
+    emailError = `smtp: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300);
+  } finally {
+    // close() pode ser void ou Promise conforme a versão, e pode lançar.
+    try {
+      await client.close();
+    } catch {
+      // conexão já fechada — nada a fazer
+    }
+  }
+  return { emailed, emailError };
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

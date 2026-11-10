@@ -28,7 +28,7 @@ import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useDailySanityUsage } from '@/hooks/useAiUsage';
 import { useAiPersonalLocked } from '@/hooks/useEntitlement';
-import { DailyLimitError } from '@/lib/dailyLimit';
+import { DailyLimitError, sanityDoneAlert } from '@/lib/dailyLimit';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,15 +41,6 @@ import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
 import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
-
-// Aviso amigável de cota diária esgotada — mesmo texto no check proativo
-// (antes de tentar) e no reativo (429 daily_limit vindo do servidor).
-const sanityDoneAlert = (limit: number) =>
-  ({
-    title: 'Análises de hoje concluídas ✅',
-    message: `Você já usou suas ${limit} análises de prato de hoje. Elas renovam amanhã — te espero lá! 🙌`,
-    type: 'info',
-  }) as const;
 
 export default function SanityCheckScreen() {
   const router = useRouter();
