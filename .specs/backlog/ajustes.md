@@ -156,3 +156,21 @@ Antes: medir o uso de tokens de raciocínio com um plano real.
 `ApiError { status, code }` tipado (como já fazem `DailyLimitError`/`NeedsUpgradeError`), com o `parseError` decidindo
 pelo código. Uma regra de lint contra `err.message` dentro de `Alert.alert`/`showAlert` evita a próxima tela vazar.
 **Gravidade:** baixa (o hotfix já cobre as telas). **Esforço:** horas.
+
+## Crons de push duplicados em produção (podem mandar notificação em dobro)
+**Origem:** visto em 2026-11-10, no hotfix 1.28.2 (consulta a `cron.job`).
+**Onde:** pg_cron de produção.
+**O que é:** cada lembrete aparece duas vezes com horários diferentes: `cron-daily-workout-check` (23:30) e
+`nutrion-daily-workout-check` (23:30); `cron-protein-reminder` (00:00) e `nutrion-protein-reminder` (00:15);
+`cron-streak-celebrations` (23:30) e `nutrion-streak-celebrations` (22:00); `cron-streak-warning` (00:30) e
+`nutrion-streak-warning` (21:00); `cron-water-reminder` (23:00) e `nutrion-water-reminder` (22:45);
+`cron-inactivity-reminders` e `inactivity-reminders-daily` (12:00). Conferir se as functions têm anti-duplicado
+(push_history/cooldown) antes de concluir que o usuário recebe dois avisos; depois, remover um de cada par.
+**Gravidade:** média (push repetido irrita e leva a desligar notificações). **Esforço:** minutos para conferir.
+
+## Envio de e-mail por Gmail SMTP duplicado em duas functions
+**Origem:** hotfix 1.28.2 (2026-11-10).
+**Onde:** `supabase/functions/coach-send-credentials/index.ts` e `supabase/functions/cron-ai-quota-alert/index.ts`.
+**O que é:** as duas montam o `SMTPClient` do denomailer com a mesma conexão e o mesmo cuidado com `close()`. Extrair
+um `_shared/mailer.ts` (`sendGmail({ to, subject, content, html? })`) e usar nas duas; exige redeploy das duas.
+**Gravidade:** baixa. **Esforço:** minutos.
