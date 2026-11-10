@@ -7,6 +7,7 @@ import { useCreatePhysicalAssessment } from '@/hooks/usePhysicalAssessments';
 import { useStudentDetail } from '@/hooks/useStudents';
 import { colors } from '@/lib/theme';
 import type { PhysicalAssessmentInput } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function NovaAvaliacaoScreen() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function NovaAvaliacaoScreen() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     }
   }

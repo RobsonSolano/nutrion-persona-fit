@@ -18,8 +18,8 @@ export const DEFAULT_TEXT_MODEL = 'openai/gpt-oss-120b';
 /** Modelos de texto para failover quando o primário está em surto de 5xx.
  *  `gpt-oss-20b` é da mesma família do default, aceita o mesmo schema JSON e
  *  responde rápido (~2s) — verificado gerando plano válido em 2026-08-27.
- *  Ordem = preferência. O primário é tentado primeiro (com retry); só se ele
- *  cair de vez a cadeia entra. */
+ *  Ordem = preferência. Usado pelo plan-generator e, via textModelChain, pelo
+ *  chat-ai. */
 export const FALLBACK_TEXT_MODELS = ['openai/gpt-oss-20b'];
 
 /** Status HTTP que valem retry: rate limit e erros de servidor. 4xx (fora
@@ -32,32 +32,119 @@ export function isRetryableGroqStatus(status: number): boolean {
 }
 
 /**
- * fetch ao Groq com retry em erro transiente (5xx / 429), no mesmo endpoint.
- * Compartilhado pelo chat-ai (sanity + foto) e disponível pra quem mais
- * precisar. Não faz failover de modelo — quem quiser isso compõe por cima
- * (o plan-generator faz). Não usar em requisição com stream: o corpo é
- * consumido pelo caller.
+ * 400 `json_validate_failed`: o JSON mode do Groq gerou algo que não é JSON
+ * válido (cortado no max_tokens ou malformado) e a própria API recusa devolver.
+ * Não é body ruim nosso: é variância de geração, e outra tentativa costuma
+ * passar. Comunidade do Groq relata ~10% disso no gpt-oss com JSON mode; em
+ * 2026-11-09 chegou ao usuário como "502 · 400: Failed to validate JSON".
  */
-export async function groqFetchWithRetry(
+export function isJsonValidateFailed(status: number, bodyText: string): boolean {
+  if (status !== 400) return false;
+  try {
+    return JSON.parse(bodyText)?.error?.code === 'json_validate_failed';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `reasoning_effort` certo por família de modelo, ou undefined quando o modelo
+ * não raciocina (mandar o parâmetro a um modelo sem raciocínio dá 400).
+ *
+ * Nos modelos de raciocínio o "pensamento" sai do MESMO max_tokens da resposta.
+ * - gpt-oss (texto): o default é `medium`, que num prompt de conta item a item
+ *   come o orçamento e trunca o JSON. Aceita low/medium/high, não `none`.
+ * - qwen (visão): `none` desliga o raciocínio de vez.
+ */
+export function reasoningEffortFor(model: string): 'low' | 'none' | undefined {
+  if (model.startsWith('openai/gpt-oss')) return 'low';
+  if (model.startsWith('qwen/')) return 'none';
+  return undefined;
+}
+
+/** Cadeia de modelos de texto: o primário e os fallbacks, sem repetir. Não
+ *  inclui o modelo de visão de propósito: foto não tem fallback, e gastar a
+ *  cota dele com texto derruba a próxima análise com foto. */
+export function textModelChain(primary: string): string[] {
+  return [...new Set([primary, ...FALLBACK_TEXT_MODELS])];
+}
+
+/** Corpo da requisição para um modelo: o payload + `model` + o
+ *  `reasoning_effort` certo para a família. Toda chamada ao Groq passa por
+ *  aqui, então nenhum caller precisa lembrar da regra do raciocínio. */
+export function groqBody(payload: Record<string, unknown>, model: string): string {
+  const effort = reasoningEffortFor(model);
+  return JSON.stringify({
+    ...payload,
+    model,
+    ...(effort ? { reasoning_effort: effort } : {}),
+  });
+}
+
+type FailoverOptions = {
+  /** Base do backoff entre tentativas no mesmo modelo (ms). Teste usa 0. */
+  backoffMs?: number;
+};
+
+/**
+ * fetch síncrono ao Groq percorrendo `models` em ordem. Devolve a resposta e
+ * QUAL modelo respondeu (para log e telemetria).
+ *
+ * Tentativas: 1 por modelo quando há fallback; 3 quando o modelo é o único
+ * (visão). No free tier cada modelo tem ~8k tokens/min e cada análise reserva
+ * ~5k, então repetir no mesmo modelo logo em seguida quase sempre dá 429: o
+ * próximo modelo, com a cota dele livre, é a tentativa que vale.
+ *
+ * Passa adiante em 5xx, 429 e `json_validate_failed`; em cadeia de um modelo
+ * só, repete 5xx e `json_validate_failed`, e 429 volta na hora (a cota não
+ * volta em 600ms). Qualquer outro 4xx volta na hora (é erro nosso).
+ *
+ * A resposta de erro devolvida tem o body intacto para o caller ler. Não usar
+ * com stream.
+ */
+export async function groqFetchWithFailover(
   url: string,
   apiKey: string,
-  body: string,
-  maxAttempts = 2,
-): Promise<Response> {
-  for (let attempt = 1; ; attempt++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body,
-    });
-    if (res.ok || attempt >= maxAttempts || !isRetryableGroqStatus(res.status)) {
-      return res;
+  models: string[],
+  payload: Record<string, unknown>,
+  { backoffMs = 600 }: FailoverOptions = {},
+): Promise<{ res: Response; model: string }> {
+  const attempts = models.length === 1 ? 3 : 1;
+  let last = { model: models[0], status: 0, text: '', headers: new Headers() };
+  const failure = () => ({
+    res: new Response(last.text, { status: last.status, headers: last.headers }),
+    model: last.model,
+  });
+
+  for (const model of models) {
+    const body = groqBody(payload, model);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body,
+      });
+      if (res.ok) return { res, model };
+
+      const text = await res.text().catch(() => '');
+      last = { model, status: res.status, text, headers: res.headers };
+      if (
+        !isRetryableGroqStatus(res.status) &&
+        !isJsonValidateFailed(res.status, text)
+      ) {
+        return failure();
+      }
+      console.warn(
+        `[groq] ${model} ${res.status} na tentativa ${attempt}: ${text.slice(0, 300)}`,
+      );
+      if (res.status === 429) break;
+      if (attempt < attempts) {
+        await new Promise((r) => setTimeout(r, backoffMs * attempt));
+      }
     }
-    console.warn(`[groq] ${res.status} na tentativa ${attempt}, repetindo...`);
-    await res.body?.cancel();
-    await new Promise((r) => setTimeout(r, 600 * attempt));
   }
+  return failure();
 }

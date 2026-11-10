@@ -15,6 +15,7 @@ import { useAnamnese, useUpsertAnamnese } from '@/hooks/useAnamnese';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/lib/theme';
 import type { StudentAnamnesePatch } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function AnamneseScreen() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function AnamneseScreen() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     }
   }

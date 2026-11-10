@@ -111,9 +111,12 @@ const config: ExpoConfig = {
     // (tudo publicado antes de 2026-08-26) vê o modal genérico — as notas
     // aparecem do update seguinte em diante.
     releaseNotes: {
-      novidades: ['💬 Suporte e sugestões no Perfil: mande dúvidas ou ideias e receba a resposta aqui no app.'],
+      novidades: [],
       melhorias: [],
-      ajustes: [],
+      ajustes: [
+        '🍽️ A análise de refeição com IA ficou mais estável e não deve mais falhar ao calcular os macros.',
+        '💬 Mensagens de erro mais claras em todo o app.',
+      ],
     },
   },
 };

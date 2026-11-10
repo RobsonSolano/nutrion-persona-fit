@@ -10,6 +10,7 @@ import {
 } from '@/hooks/usePhysicalAssessments';
 import { colors } from '@/lib/theme';
 import type { PhysicalAssessment } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 type Props = {
   studentId: string;
@@ -77,7 +78,7 @@ export default function AssessmentList({ studentId }: Props) {
     } catch (err) {
       Alert.alert(
         'Não consegui excluir',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     } finally {
       setPendingDelete(null);
@@ -96,8 +97,7 @@ export default function AssessmentList({ studentId }: Props) {
     return (
       <Card padding="md">
         <Text className="text-danger text-xs">
-          Erro ao carregar avaliações.{' '}
-          {listQ.error instanceof Error ? listQ.error.message : ''}
+          Erro ao carregar avaliações. Tente novamente mais tarde.
         </Text>
       </Card>
     );
