@@ -217,6 +217,39 @@ describe('groqFetchWithFailover', () => {
     expect(calls.models).toEqual(['a', 'b']);
   });
 
+  // A Groq já descontinuou dois modelos nossos (llama-3.3, llama-4-scout).
+  // Corpo real de 2026-11-10 para um modelo morto.
+  it('modelo descontinuado pula para o próximo em vez de falhar', async () => {
+    const dead = JSON.stringify({
+      error: {
+        message: 'The model `x` does not exist or you do not have access to it.',
+        type: 'invalid_request_error',
+        code: 'model_not_found',
+      },
+    });
+    const calls = mockFetch([respond(404, dead), respond(200, okBody)]);
+    const { res, model } = await run(['morto', 'vivo']);
+    expect(res.status).toBe(200);
+    expect(model).toBe('vivo');
+    expect(calls.models).toEqual(['morto', 'vivo']);
+  });
+
+  it('model_decommissioned também pula, e não repete no mesmo modelo', async () => {
+    const dead = JSON.stringify({ error: { code: 'model_decommissioned' } });
+    const calls = mockFetch([respond(400, dead), respond(200, okBody)]);
+    await run(['morto', 'vivo']);
+    expect(calls.models).toEqual(['morto', 'vivo']);
+  });
+
+  it('modelo morto numa cadeia de um só volta na hora (sem 3 tentativas)', async () => {
+    const calls = mockFetch([
+      respond(404, '{"error":{"code":"model_not_found"}}'),
+    ]);
+    const { res } = await run(['v']);
+    expect(res.status).toBe(404);
+    expect(calls.models).toEqual(['v']);
+  });
+
   it('429 em cadeia de um modelo só volta na hora', async () => {
     const calls = mockFetch([respond(429, '{}')]);
     const { res } = await run(['v']);

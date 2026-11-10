@@ -39,11 +39,23 @@ export function isRetryableGroqStatus(status: number): boolean {
  * 2026-11-09 chegou ao usuário como "502 · 400: Failed to validate JSON".
  */
 export function isJsonValidateFailed(status: number, bodyText: string): boolean {
-  if (status !== 400) return false;
+  return status === 400 && groqErrorCode(bodyText) === 'json_validate_failed';
+}
+
+/** Modelo que a Groq tirou do ar (`model_not_found` / `model_decommissioned`).
+ *  Já aconteceu duas vezes (llama-3.3, llama-4-scout). Repetir no mesmo modelo
+ *  não adianta, mas o próximo da cadeia responde — sem isso, a retirada de um
+ *  modelo derruba a feature até alguém trocar o secret. */
+export function isModelGone(bodyText: string): boolean {
+  const code = groqErrorCode(bodyText);
+  return code === 'model_not_found' || code === 'model_decommissioned';
+}
+
+function groqErrorCode(bodyText: string): string | undefined {
   try {
-    return JSON.parse(bodyText)?.error?.code === 'json_validate_failed';
+    return JSON.parse(bodyText)?.error?.code;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -95,9 +107,9 @@ type FailoverOptions = {
  * ~5k, então repetir no mesmo modelo logo em seguida quase sempre dá 429: o
  * próximo modelo, com a cota dele livre, é a tentativa que vale.
  *
- * Passa adiante em 5xx, 429 e `json_validate_failed`; em cadeia de um modelo
- * só, repete 5xx e `json_validate_failed`, e 429 volta na hora (a cota não
- * volta em 600ms). Qualquer outro 4xx volta na hora (é erro nosso).
+ * Passa adiante em 5xx, 429, `json_validate_failed` e modelo descontinuado;
+ * em cadeia de um modelo só, repete 5xx e `json_validate_failed`, e 429/modelo
+ * morto voltam na hora. Qualquer outro 4xx volta na hora (é erro nosso).
  *
  * A resposta de erro devolvida tem o body intacto para o caller ler. Não usar
  * com stream.
@@ -131,7 +143,11 @@ export async function groqFetchWithFailover(
 
       const text = await res.text().catch(() => '');
       last = { model, status: res.status, text, headers: res.headers };
+      // 429 e modelo morto: este modelo não vai responder agora, vai pro
+      // próximo sem repetir. 5xx e json_validate_failed: pode repetir nele.
+      const nextModel = res.status === 429 || isModelGone(text);
       if (
+        !nextModel &&
         !isRetryableGroqStatus(res.status) &&
         !isJsonValidateFailed(res.status, text)
       ) {
@@ -140,7 +156,7 @@ export async function groqFetchWithFailover(
       console.warn(
         `[groq] ${model} ${res.status} na tentativa ${attempt}: ${text.slice(0, 300)}`,
       );
-      if (res.status === 429) break;
+      if (nextModel) break;
       if (attempt < attempts) {
         await new Promise((r) => setTimeout(r, backoffMs * attempt));
       }
