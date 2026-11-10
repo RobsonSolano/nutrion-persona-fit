@@ -16,6 +16,11 @@ supunha "llama no texto, não raciocina", o que deixou de valer quando o llama-3
 `friendlyMessage(err)`. Alerta de cota unificado em `sanityDoneAlert` (`src/lib/dailyLimit.ts`).
 **Limite que segue:** plano gratuito do Groq ≈ 1 análise/min por modelo (backlog: Dev Tier).
 **Deploy:** edge `chat-ai` (`supabase functions deploy chat-ai`) + OTA da branch `hotfix/1.28.1` (sem migration).
+**Hotfix 1.28.2 (mesmo dia, para não voltar):** modelo descontinuado (`model_not_found`/`model_decommissioned`) passa
+para o próximo da cadeia em vez de falhar. `cron-ai-quota-alert` passa a alertar também com **3+ falhas de IA por hora**
+(regra em `alertRule.ts`) e manda **e-mail** aos admins (Gmail SMTP) além do push — o único admin não tinha push
+habilitado e o alerta nunca tinha sido entregue. Teste ponta a ponta: chamar a function com body `{"test": true}`.
+Deploy: `chat-ai` e `cron-ai-quota-alert` (sem OTA).
 
 ### Plano Elite e Pessoal Premium (2026-11-04)
 
