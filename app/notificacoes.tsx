@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { colors } from '@/lib/theme';
 import type { PushType } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 type PushTypeMeta = {
   type: PushType;
@@ -111,7 +112,7 @@ export default function NotificacoesScreen() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     }
   }

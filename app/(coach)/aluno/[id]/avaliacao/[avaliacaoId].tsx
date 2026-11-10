@@ -24,6 +24,7 @@ import type {
   PhysicalAssessment,
   PhysicalAssessmentInput,
 } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function DetalheAvaliacaoScreen() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function DetalheAvaliacaoScreen() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     }
   }
@@ -69,7 +70,7 @@ export default function DetalheAvaliacaoScreen() {
     } catch (err) {
       Alert.alert(
         'Não consegui excluir',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     } finally {
       setConfirmDel(false);

@@ -13,6 +13,7 @@ import {
 import { useProfile } from '@/hooks/useProfile';
 import { captureError } from '@/lib/sentry';
 import type { OnboardingInput, OnboardingPlan } from '@/services/onboarding';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 const STAGES = [
   'Analisando seu perfil...',
@@ -88,9 +89,9 @@ export default function OnboardingLoading() {
       router.replace('/onboarding/resultado' as Href);
     } catch (err) {
       const phase: 'generate' | 'save' = planRef.current ? 'save' : 'generate';
-      const message =
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.';
-      if (!/limite/i.test(message)) {
+      const raw = err instanceof Error ? err.message : '';
+      const message = friendlyMessage(err);
+      if (!/limite/i.test(raw)) {
         captureError(err, {
           feature: phase === 'save' ? 'onboarding_save' : 'onboarding_plan',
         });

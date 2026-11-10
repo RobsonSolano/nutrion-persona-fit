@@ -11,6 +11,7 @@ import { Button, Card, Logo, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { useSkipOnboarding } from '@/hooks/useOnboarding';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function OnboardingIntro() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function OnboardingIntro() {
     } catch (err) {
       Alert.alert(
         'Ops',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        friendlyMessage(err),
       );
     }
   }

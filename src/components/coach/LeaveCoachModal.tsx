@@ -6,6 +6,7 @@ import { useAlert } from '@/components/GlobalAlertProvider';
 import { useLeaveCoach } from '@/hooks/useEnrollment';
 import { LEAVE_REASON_MAX, LEAVE_REASON_MIN, leaveReasonOk } from '@/lib/leaveReason';
 import { colors } from '@/lib/theme';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 type Props = {
   visible: boolean;
@@ -40,7 +41,7 @@ export default function LeaveCoachModal({ visible, coachName, onClose }: Props) 
     } catch (err) {
       alert.showAlert({
         title: 'Não consegui encerrar',
-        message: err instanceof Error ? err.message : 'Tente de novo em instantes.',
+        message: friendlyMessage(err),
         type: 'error',
       });
     }

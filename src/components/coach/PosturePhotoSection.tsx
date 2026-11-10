@@ -17,6 +17,7 @@ import {
 } from '@/services/physicalAssessments';
 import { useUpdatePhysicalAssessment } from '@/hooks/usePhysicalAssessments';
 import { colors } from '@/lib/theme';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 const MAX_PHOTOS = 6;
 const TARGET_WIDTH = 1280;
@@ -93,7 +94,7 @@ export default function PosturePhotoSection({
     } catch (err) {
       Alert.alert(
         'Não consegui enviar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     } finally {
       setBusy(false);
@@ -112,7 +113,7 @@ export default function PosturePhotoSection({
     } catch (err) {
       Alert.alert(
         'Não consegui remover',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     } finally {
       setBusy(false);

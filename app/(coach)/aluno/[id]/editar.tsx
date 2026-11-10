@@ -32,6 +32,7 @@ import type {
   WeeklyFrequency,
 } from '@/types/database';
 import { captureError } from '@/lib/sentry';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 const SEX_OPTIONS = [
   { value: 'm', label: 'Masc' },
@@ -117,7 +118,7 @@ export default function EditarAlunoScreen() {
           captureError(err, { feature: 'coach_update_student' });
           Alert.alert(
             'Não consegui salvar',
-            err instanceof Error ? err.message : 'Tenta de novo.',
+            friendlyMessage(err),
           );
         }
       }}

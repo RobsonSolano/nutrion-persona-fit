@@ -44,6 +44,7 @@ import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { MODALITY_LABELS } from '@/types/database';
 import { toExerciseInsert } from '@/lib/exerciseInsert';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function RotinaDetalheScreen() {
   const router = useRouter();
@@ -119,7 +120,7 @@ export default function RotinaDetalheScreen() {
             } catch (err) {
               Alert.alert(
                 'Não consegui excluir',
-                err instanceof Error ? err.message : 'Tenta de novo.',
+                friendlyMessage(err),
               );
             }
           },

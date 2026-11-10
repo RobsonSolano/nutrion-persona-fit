@@ -32,3 +32,13 @@ export function parseDailyLimit(
   }
   return null;
 }
+
+/** Aviso amigável de cota diária de análise de prato esgotada — mesmo texto no
+ *  check proativo (antes de tentar) e no reativo (429 daily_limit do servidor),
+ *  na tela de sanity check e no formulário de refeição. */
+export const sanityDoneAlert = (limit: number) =>
+  ({
+    title: 'Análises de hoje concluídas ✅',
+    message: `Você já usou suas ${limit} análises de prato de hoje. Elas renovam amanhã — te espero lá! 🙌`,
+    type: 'info',
+  }) as const;

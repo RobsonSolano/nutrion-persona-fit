@@ -2,6 +2,21 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### Hotfix 1.28.1: análise de refeição com "Failed to validate JSON" (2026-11-10)
+
+Usuário viu "502 · 400: Failed to validate JSON..." no formulário de refeição. **Causa medida** (reprodução com o
+prompt real e a chave de produção): o `gpt-oss-120b` é modelo de raciocínio, e o raciocínio sai do mesmo `max_tokens`.
+No default ele gastou 1247 de 1400, o JSON truncava → `json_validate_failed` (geração vazia) ou 200 cortado. O código
+supunha "llama no texto, não raciocina", o que deixou de valer quando o llama-3.3 saiu do ar.
+**Correção:** `reasoningEffortFor` (low no gpt-oss, none no qwen) aplicado em toda chamada via `groqBody`;
+`max_tokens` do texto 1400 → 2000 (pior caso medido em `low`: 1451); `groqFetchWithFailover` em `_shared/groqRetry.ts`
+(texto 120b → 20b, 1 tentativa por modelo; 429 pula de modelo; foto 3 tentativas no qwen). Validado 7/7 contra o Groq.
+**Por que vazou:** `MealForm` montava o alerta com `err.message` em vez de `showError`. `parseError` foi para
+`src/lib/friendlyError.ts` (testável) com guarda contra texto técnico; ~18 telas trocaram `err.message` por
+`friendlyMessage(err)`. Alerta de cota unificado em `sanityDoneAlert` (`src/lib/dailyLimit.ts`).
+**Limite que segue:** plano gratuito do Groq ≈ 1 análise/min por modelo (backlog: Dev Tier).
+**Deploy:** edge `chat-ai` (`supabase functions deploy chat-ai`) + OTA da branch `hotfix/1.28.1` (sem migration).
+
 ### Plano Elite e Pessoal Premium (2026-11-04)
 
 Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).
