@@ -157,16 +157,20 @@ Antes: medir o uso de tokens de raciocínio com um plano real.
 pelo código. Uma regra de lint contra `err.message` dentro de `Alert.alert`/`showAlert` evita a próxima tela vazar.
 **Gravidade:** baixa (o hotfix já cobre as telas). **Esforço:** horas.
 
-## Crons de push duplicados em produção (podem mandar notificação em dobro)
-**Origem:** visto em 2026-11-10, no hotfix 1.28.2 (consulta a `cron.job`).
-**Onde:** pg_cron de produção.
-**O que é:** cada lembrete aparece duas vezes com horários diferentes: `cron-daily-workout-check` (23:30) e
-`nutrion-daily-workout-check` (23:30); `cron-protein-reminder` (00:00) e `nutrion-protein-reminder` (00:15);
-`cron-streak-celebrations` (23:30) e `nutrion-streak-celebrations` (22:00); `cron-streak-warning` (00:30) e
-`nutrion-streak-warning` (21:00); `cron-water-reminder` (23:00) e `nutrion-water-reminder` (22:45);
-`cron-inactivity-reminders` e `inactivity-reminders-daily` (12:00). Conferir se as functions têm anti-duplicado
-(push_history/cooldown) antes de concluir que o usuário recebe dois avisos; depois, remover um de cada par.
-**Gravidade:** média (push repetido irrita e leva a desligar notificações). **Esforço:** minutos para conferir.
+## Lembretes de push (água, proteína, sequência, treino) não chegam: gateway responde 401
+**Origem:** visto em 2026-11-10, no hotfix 1.28.3 (investigando por que o alerta de IA nunca rodou).
+**Onde:** `supabase/config.toml` + jobs `nutrion-*` de `20261001000000_agenda_crons_de_push.sql`.
+**O que é:** os `nutrion-*` mandam só o `X-Cron-Secret` (do Vault), sem `Authorization`. As functions
+`cron-water-reminder`, `cron-protein-reminder`, `cron-streak-warning`, `cron-streak-celebrations` e
+`cron-daily-workout-check` não têm `verify_jwt = false` no `config.toml` (só a de inatividade tem), então o gateway
+responde `401 UNAUTHORIZED_NO_AUTH_HEADER` antes da function. Prova: o mesmo formato chamando o `cron-ai-quota-alert`
+deu 401, e o `push_history` dos últimos 7 dias só tem `inactivity_reminder`. O pg_cron marca "succeeded" porque só
+enfileira a requisição. Os `cron-*` manuais (que tinham Authorization) estavam com JSON quebrado e foram removidos no
+1.28.3. **Correção:** `verify_jwt = false` nas 5 no `config.toml` + redeploy delas. **Decisão de produto antes:**
+liga lembretes que os usuários nunca receberam (teto de 3 pushes/dia do `pushAi` continua valendo).
+Também: `cron-inactivity-reminders` e `inactivity-reminders-daily` chamam a mesma function às 12:00; uma das chamadas
+deu 403 em 2026-11-10 — conferir e deixar uma só.
+**Gravidade:** alta (feature de engajamento parada). **Esforço:** minutos + teste.
 
 ## Envio de e-mail por Gmail SMTP duplicado em duas functions
 **Origem:** hotfix 1.28.2 (2026-11-10).

@@ -45,6 +45,11 @@ verify_jwt = false
 # fica no X-Cron-Secret check da propria function.
 verify_jwt = false
 
+[functions.cron-ai-quota-alert]
+# Mesmo caso: chamado pelo pg_cron sem usuário. Com verify_jwt ligado o gateway
+# respondia 401 antes da function e o alerta nunca rodou (visto em 2026-11-10).
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 policy = "oneshot"
