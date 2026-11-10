@@ -15,6 +15,7 @@ import { useWaterToday, useUpsertWater } from '@/hooks/useWaterToday';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 const QUICK_PRESETS = [1000, 2000, 3000, 4000, 5000];
 
@@ -58,7 +59,7 @@ export default function WaterForm() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        friendlyMessage(err),
       );
     }
   }

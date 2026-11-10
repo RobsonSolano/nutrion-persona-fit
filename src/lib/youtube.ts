@@ -1,5 +1,6 @@
 import { Alert, Linking } from 'react-native';
 import { resolveExerciseVideoUrl } from './youtubeUrl';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 /**
  * Abre a demonstração do exercício: o vídeo que o professor salvou e, na
@@ -25,7 +26,7 @@ export async function openExerciseVideo(params: {
     // componente e não alcança o GlobalAlertProvider.
     Alert.alert(
       'Não consegui abrir',
-      err instanceof Error ? err.message : 'Tente novamente.',
+      friendlyMessage(err),
     );
   }
 }

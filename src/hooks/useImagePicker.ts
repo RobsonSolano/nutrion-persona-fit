@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { compressImageForAI, ImageTooLargeError } from '@/lib/imageCompress';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 type Source = 'camera' | 'library';
 
@@ -59,12 +60,10 @@ export function useImagePicker(options: Options = {}) {
       setBase64(compressed.base64);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (err) {
+      // ImageTooLargeError já traz texto nosso; o resto (erro do
+      // ImageManipulator, do FS) passa pela tradução.
       const message =
-        err instanceof ImageTooLargeError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Não consegui preparar essa foto. Tenta outra.';
+        err instanceof ImageTooLargeError ? err.message : friendlyMessage(err);
       Alert.alert('Foto muito pesada', message);
     } finally {
       setPreparing(false);

@@ -5,6 +5,7 @@ import { Camera, ImageIcon, Trash2 } from 'lucide-react-native';
 import { Avatar } from '@/components/ui';
 import { useRemoveAvatar, useUploadAvatar } from '@/hooks/useAvatar';
 import { colors } from '@/lib/theme';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 type Props = {
   avatarUrl: string | null;
@@ -54,7 +55,7 @@ export default function AvatarPicker({
     } catch (err) {
       Alert.alert(
         'Não consegui atualizar',
-        err instanceof Error ? err.message : 'Tente novamente.',
+        friendlyMessage(err),
       );
     } finally {
       setPicking(false);
@@ -76,7 +77,7 @@ export default function AvatarPicker({
             } catch (err) {
               Alert.alert(
                 'Não consegui remover',
-                err instanceof Error ? err.message : 'Tente novamente.',
+                friendlyMessage(err),
               );
             }
           },

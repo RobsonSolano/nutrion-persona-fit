@@ -33,6 +33,8 @@ import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { runSanityCheck } from '@/services/sanityCheck';
 import { derivarMacrosSource } from '@/lib/macrosSource';
 import { captureError } from '@/lib/sentry';
+import { DailyLimitError, sanityDoneAlert } from '@/lib/dailyLimit';
+import { handleNeedsUpgrade } from '@/lib/paywall';
 import { Button, Card, Input } from '@/components/ui';
 import { CharCounter } from '@/components/onboarding';
 import { useAlert } from '@/components/GlobalAlertProvider';
@@ -98,11 +100,7 @@ export default function MealForm() {
   async function handleAnalyze() {
     if (!canAnalyze) return;
     if (sanityUsage.limitReached) {
-      alert.showAlert({
-        type: 'warning',
-        title: 'Limite diário',
-        message: `Você já usou as ${sanityUsage.limit} análises de IA hoje. Volta amanhã!`,
-      });
+      alert.showAlert(sanityDoneAlert(sanityUsage.limit));
       return;
     }
     if (!description.trim() && !photo.base64) {
@@ -147,19 +145,16 @@ export default function MealForm() {
         });
       }
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Falha ao consultar a IA. Tenta de novo.';
-      const isQuotaError = /limite/i.test(message);
-      if (!isQuotaError) {
-        captureError(err, { feature: 'meal_analyze' });
+      // Mesmo tratamento da tela de sanity check: paywall, cota e o resto pelo
+      // showError, que traduz erro técnico. Antes o alerta usava err.message
+      // cru e o "502 · 400: Failed to validate JSON" do Groq chegou à tela.
+      if (handleNeedsUpgrade(err)) return;
+      if (err instanceof DailyLimitError) {
+        alert.showAlert(sanityDoneAlert(err.limit ?? sanityUsage.limit));
+        return;
       }
-      alert.showAlert({
-        type: 'error',
-        title: 'Não consegui analisar',
-        message,
-      });
+      captureError(err, { feature: 'meal_analyze' });
+      alert.showError(err);
     } finally {
       setAnalyzing(false);
     }

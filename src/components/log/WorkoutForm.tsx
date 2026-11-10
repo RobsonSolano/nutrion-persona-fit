@@ -34,6 +34,7 @@ import type {
   WorkoutRoutine,
   WorkoutSession,
 } from '@/types/database';
+import { friendlyMessage } from '@/lib/friendlyError';
 
 export default function WorkoutForm() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function WorkoutForm() {
     } catch (err) {
       Alert.alert(
         'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        friendlyMessage(err),
       );
     }
   }
@@ -96,7 +97,7 @@ export default function WorkoutForm() {
     } catch (err) {
       Alert.alert(
         'Não consegui remover',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        friendlyMessage(err),
       );
     }
   }
