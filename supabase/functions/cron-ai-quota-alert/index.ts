@@ -132,7 +132,7 @@ serve(async (req: Request) => {
     //    habilitado no celular (em 2026-11-10 o único admin não tinha token,
     //    e este alerta nunca tinha sido entregue a ninguém).
     const { title, body } = alert;
-    const emailed = await emailAdmins(supa, adminIds, title, body);
+    const { emailed, emailError } = await emailAdmins(supa, adminIds, title, body);
 
     // 5. Push direto (sem sendPushAi: alerta crítico, sem opt-out, sem
     //    cooldown, sem IA). Toda linha vai para push_history, com ou sem
@@ -166,6 +166,7 @@ serve(async (req: Request) => {
       sent: true,
       test: isTest,
       emailed,
+      emailError,
       pushed: sent,
     });
   } catch (err) {
@@ -178,25 +179,27 @@ serve(async (req: Request) => {
 });
 
 /** Manda o alerta por e-mail (Gmail SMTP, mesmos secrets do
- *  coach-send-credentials) para o e-mail de conta de cada admin. Devolve
- *  quantos saíram. Falha de SMTP não derruba o cron: o push ainda tenta. */
+ *  coach-send-credentials) para o e-mail de conta de cada admin, um envio por
+ *  destinatário como lá. Falha de SMTP não derruba o cron (o push ainda
+ *  tenta), mas volta em `emailError` na resposta para dar pra diagnosticar
+ *  sem acesso aos logs. */
 async function emailAdmins(
   // deno-lint-ignore no-explicit-any
   supa: any,
   adminIds: string[],
   title: string,
   body: string,
-): Promise<number> {
+): Promise<{ emailed: number; emailError: string | null }> {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.warn('[cron-ai-quota-alert] sem GMAIL_USER/GMAIL_APP_PASSWORD, e-mail pulado');
-    return 0;
+    return { emailed: 0, emailError: 'missing_smtp_secret' };
   }
   const emails: string[] = [];
   for (const id of adminIds) {
-    const { data } = await supa.auth.admin.getUserById(id);
+    const { data, error } = await supa.auth.admin.getUserById(id);
+    if (error) return { emailed: 0, emailError: `get_user: ${error.message}` };
     if (data?.user?.email) emails.push(data.user.email);
   }
-  if (emails.length === 0) return 0;
+  if (emails.length === 0) return { emailed: 0, emailError: 'no_admin_email' };
 
   const client = new SMTPClient({
     connection: {
@@ -206,17 +209,22 @@ async function emailAdmins(
       auth: { username: GMAIL_USER, password: GMAIL_APP_PASSWORD },
     },
   });
+  let emailed = 0;
+  let emailError: string | null = null;
   try {
-    await client.send({
-      from: `Persona Fit <${GMAIL_USER}>`,
-      to: emails,
-      subject: title,
-      content: body,
-    });
-    return emails.length;
+    for (const to of emails) {
+      await client.send({
+        from: `Persona Fit <${GMAIL_USER}>`,
+        to,
+        subject: title,
+        content: body,
+        html: `<p>${body}</p>`,
+      });
+      emailed++;
+    }
   } catch (err) {
     console.error('[cron-ai-quota-alert] falha no e-mail:', err);
-    return 0;
+    emailError = `smtp: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300);
   } finally {
     // close() pode ser void ou Promise conforme a versão, e pode lançar.
     try {
@@ -225,6 +233,7 @@ async function emailAdmins(
       // conexão já fechada — nada a fazer
     }
   }
+  return { emailed, emailError };
 }
 
 function json(body: unknown, status = 200): Response {
