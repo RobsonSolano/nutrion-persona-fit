@@ -86,6 +86,7 @@ export function GlobalAlertProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{ showAlert, showError }}>
       {children}
       <ConfirmModal
+        overlay
         visible={!!alert}
         onClose={() => setAlert(null)}
         title={alert?.title ?? ''}

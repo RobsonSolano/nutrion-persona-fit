@@ -265,8 +265,12 @@ export async function deleteMyAccount(reason: string | null): Promise<void> {
   if (res.ok) return;
 
   const payload = await res.json().catch(() => ({}));
+  // 401 vem com error: 'unauthorized' (código cru). "Sessão expirada" é o texto que o
+  // friendlyError traduz para a mensagem de entrar de novo.
   const err = new Error(
-    payload?.detail || payload?.error || 'Falha ao excluir conta.',
+    res.status === 401
+      ? 'Sessão expirada.'
+      : payload?.detail || payload?.error || 'Falha ao excluir conta.',
   ) as Error & { info?: DeleteMyAccountError };
   if (res.status === 409 && payload?.error === 'has_students') {
     err.info = {

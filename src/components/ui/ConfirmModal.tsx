@@ -5,9 +5,11 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { FullWindowOverlay } from 'react-native-screens';
 import Button from './Button';
 
 type ActionVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -35,6 +37,14 @@ type Props = {
   actions: ConfirmAction[];
   /** Se false, fechar pelo backdrop é bloqueado (forçar uso dos botões). */
   dismissable?: boolean;
+  /**
+   * Para modal montado na raiz do app (alerta global). No iOS, o <Modal> é apresentado
+   * a partir da tela raiz e falha quando há uma tela modal aberta (paywall, editar
+   * perfil, registro): não aparece e deixa uma camada invisível bloqueando os toques.
+   * Com overlay, o iOS desenha numa janela própria acima de tudo (FullWindowOverlay).
+   * Modais montados dentro de uma tela não precisam disto.
+   */
+  overlay?: boolean;
 };
 
 export default function ConfirmModal({
@@ -46,15 +56,10 @@ export default function ConfirmModal({
   icon,
   actions,
   dismissable = true,
+  overlay = false,
 }: Props) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
+  const body = (
+    <>
       {/* Modal não herda o adjustResize da janela: sem isto, um campo de
           texto no `content` (motivo, confirmação) sobe o teclado por cima
           dos botões. O ScrollView centraliza quando cabe e rola quando o
@@ -116,6 +121,27 @@ export default function ConfirmModal({
       </Pressable>
       </ScrollView>
       </KeyboardAvoidingView>
+    </>
+  );
+
+  if (overlay && Platform.OS === 'ios') {
+    if (!visible) return null;
+    return (
+      <FullWindowOverlay unstable_accessibilityContainerViewIsModal>
+        <View style={StyleSheet.absoluteFill}>{body}</View>
+      </FullWindowOverlay>
+    );
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      {body}
     </Modal>
   );
 }
