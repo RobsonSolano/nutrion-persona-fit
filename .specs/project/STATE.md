@@ -36,6 +36,13 @@ análise de prato). A apresentação agora é declarada nos layouts (raiz e prof
 (`presentation`, `animation`) vão no layout, nunca em `<Stack.Screen>` dentro da tela. Achado no ensaio do vídeo pedido
 pela Apple (Guideline 2.1).
 
+**Hotfix 1.29.2 (2026-11-25):** o plano com IA do onboarding (e o do professor) saía sempre em "modo de segurança".
+O `ai_usage_log` marcava `groq_api_error`; reproduzido com o gerador real: o gpt-oss devolve 400 `json_validate_failed`
+em ~1 de cada 4 planos, e o `plan-generator` tinha a própria cópia do retry, que tratava isso como erro definitivo.
+Passou a usar o `groqFetchWithFailover`. **Lição:** toda chamada à Groq passa pelo `groqRetry.ts`; cópia local de
+retry fica para trás quando a compartilhada aprende um caso novo. Hipótese descartada no caminho: limite de 8000
+tokens/min da conta (o pedido do plano tem ~3.400 tokens de prompt, cabe com os 3.500 de resposta).
+
 ### Plano Elite e Pessoal Premium (2026-11-04)
 
 Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).
