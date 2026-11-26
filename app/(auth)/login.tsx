@@ -313,8 +313,8 @@ export default function LoginScreen() {
           {mode === 'login' && showIosPasswordHint && (
             <View className="mt-4 rounded-2xl bg-violet/10 border border-violet/30 px-4 py-3">
               <Text className="text-violet-soft text-[11px] leading-relaxed">
-                Criou a conta com o Google no Android? Toque em “Esqueci a senha” e
-                use o mesmo e-mail para criar uma senha.
+                Entrou com o Google antes? Toque em “Esqueci a senha” e use o
+                mesmo e-mail para criar uma senha.
               </Text>
             </View>
           )}

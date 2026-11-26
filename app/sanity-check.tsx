@@ -162,7 +162,7 @@ export default function SanityCheckScreen() {
             >
               <X size={18} color={colors.textDim} />
             </Pressable>
-            <Text className="text-text font-semibold">Sanity Check</Text>
+            <Text className="text-text font-semibold">Análise do prato</Text>
             <View
               className="rounded-full border px-2.5 py-1"
               style={{
