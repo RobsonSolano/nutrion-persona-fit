@@ -18,7 +18,9 @@ import {
 } from './bodyRestrictions.ts';
 import {
   FALLBACK_TEXT_MODELS,
+  groqBody,
   isRetryableGroqStatus,
+  maxTokensToFitTpm,
 } from './groqRetry.ts';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -638,6 +640,15 @@ export type GeneratePlanResponse =
  * loga, não persiste. Caller decide cota, log e save. As referências
  * bibliográficas são injetadas no system prompt automaticamente.
  */
+/** Mensagem de erro da Groq (`error.message`), ou o corpo cru. */
+function groqErrorMessage(errText: string): string {
+  try {
+    return JSON.parse(errText)?.error?.message ?? errText;
+  } catch {
+    return errText;
+  }
+}
+
 /** Uma chamada ao Groq com retry no MESMO modelo, para soluço momentâneo. */
 async function fetchWithRetry(
   body: string,
@@ -694,8 +705,10 @@ async function fetchGroqPlan(
   for (let i = 0; i < chain.length; i++) {
     const model = chain[i];
     const isPrimary = i === 0;
+    // groqBody põe o reasoning_effort da família (gpt-oss: low). Sem ele o
+    // raciocínio "medium" come o mesmo max_tokens da resposta.
     res = await fetchWithRetry(
-      JSON.stringify({ ...payload, model }),
+      groqBody(payload, model),
       groqApiKey,
       isPrimary ? 2 : 1,
     );
@@ -758,24 +771,31 @@ export async function generatePlan(
     ],
     temperature: 0.4,
     // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
-    // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
-    // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
+    // truncar. prompt + max_tokens tem que caber no TPM da conta (8000 em
+    // 2026-11); se não couber, o 413 abaixo refaz com um max_tokens menor.
     max_tokens: 3500,
     top_p: 0.9,
     response_format: { type: 'json_object' },
   };
 
-  const groqRes = await fetchGroqPlan(payload, model, groqApiKey);
+  let groqRes = await fetchGroqPlan(payload, model, groqApiKey);
+
+  // 413: prompt + max_tokens passou do TPM da conta (free tier: 8000). Sem
+  // isto, o onboarding e o plano do professor caem no plano de segurança.
+  // Uma nova tentativa com o max_tokens que cabe, lido da mensagem da Groq.
+  if (groqRes.status === 413) {
+    const detail = groqErrorMessage(await groqRes.text());
+    const fitted = maxTokensToFitTpm(detail, payload.max_tokens);
+    if (fitted) {
+      console.warn(`[plan-generator] 413 TPM, repetindo com max_tokens=${fitted}`);
+      groqRes = await fetchGroqPlan({ ...payload, max_tokens: fitted }, model, groqApiKey);
+    } else {
+      return { error: { kind: 'groq_api_error', status: 413, detail } };
+    }
+  }
 
   if (!groqRes.ok) {
-    const errText = await groqRes.text();
-    let detail = errText;
-    try {
-      const parsed = JSON.parse(errText);
-      detail = parsed?.error?.message ?? errText;
-    } catch {
-      // raw
-    }
+    const detail = groqErrorMessage(await groqRes.text());
     if (groqRes.status === 429) {
       const retryAfterSeconds = parseRetryAfter(
         groqRes.headers.get('Retry-After'),

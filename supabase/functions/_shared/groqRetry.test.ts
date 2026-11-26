@@ -5,6 +5,7 @@ import {
   groqFetchWithFailover,
   isJsonValidateFailed,
   isRetryableGroqStatus,
+  maxTokensToFitTpm,
   reasoningEffortFor,
   textModelChain,
 } from './groqRetry.ts';
@@ -255,5 +256,34 @@ describe('groqFetchWithFailover', () => {
     const { res } = await run(['v']);
     expect(res.status).toBe(429);
     expect(calls.models).toEqual(['v']);
+  });
+});
+
+describe('maxTokensToFitTpm', () => {
+  // Mensagem real da Groq (2026-11-25): o pedido soma prompt + max_tokens.
+  const msg = (limit: number, requested: number) =>
+    `Request too large for model \`openai/gpt-oss-120b\` in organization \`org_x\` service tier \`on_demand\` on tokens per minute (TPM): Limit ${limit}, Requested ${requested}, please reduce your message size and try again.`;
+
+  it('devolve um max_tokens que faz prompt + resposta caber no limite', () => {
+    // prompt = 9450 - 3500 = 5950; cabe 8000 - 5950 = 2050, menos a folga
+    const next = maxTokensToFitTpm(msg(8000, 9450), 3500);
+    expect(next).not.toBeNull();
+    expect(5950 + (next as number)).toBeLessThan(8000);
+    expect(next as number).toBeGreaterThan(1500);
+  });
+
+  it('null quando o que sobra não dá para uma resposta útil', () => {
+    // prompt = 11000 - 3500 = 7500; sobra 500
+    expect(maxTokensToFitTpm(msg(8000, 11000), 3500)).toBeNull();
+  });
+
+  it('null quando a mensagem não é de limite de TPM', () => {
+    expect(maxTokensToFitTpm('model not found', 3500)).toBeNull();
+    expect(maxTokensToFitTpm('', 3500)).toBeNull();
+  });
+
+  it('null quando a redução não diminui nada', () => {
+    // pediu menos que o limite (não é este o problema)
+    expect(maxTokensToFitTpm(msg(8000, 7000), 3500)).toBeNull();
   });
 });

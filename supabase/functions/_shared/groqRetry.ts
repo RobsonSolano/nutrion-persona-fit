@@ -74,6 +74,29 @@ export function reasoningEffortFor(model: string): 'low' | 'none' | undefined {
   return undefined;
 }
 
+/** Folga sob o limite de TPM: a contagem da Groq e a nossa nunca batem exato. */
+const TPM_MARGIN = 200;
+/** Abaixo disso a resposta (plano em JSON + raciocínio) sai truncada. */
+const MIN_USEFUL_MAX_TOKENS = 1200;
+
+/**
+ * A Groq soma prompt + `max_tokens` e recusa com 413 o que passa do TPM da
+ * conta ("Limit 8000, Requested 9450"). Lê os dois números da mensagem e devolve
+ * um `max_tokens` que faz o pedido caber, ou null se a mensagem não é dessa
+ * recusa ou se o que sobra não dá para uma resposta útil.
+ */
+export function maxTokensToFitTpm(message: string, currentMaxTokens: number): number | null {
+  const m = /tokens per minute \(TPM\): Limit (\d+), Requested (\d+)/.exec(message ?? '');
+  if (!m) return null;
+  const limit = Number(m[1]);
+  const requested = Number(m[2]);
+  if (requested <= limit) return null;
+  const promptTokens = requested - currentMaxTokens;
+  const next = limit - promptTokens - TPM_MARGIN;
+  if (next < MIN_USEFUL_MAX_TOKENS || next >= currentMaxTokens) return null;
+  return next;
+}
+
 /** Cadeia de modelos de texto: o primário e os fallbacks, sem repetir. Não
  *  inclui o modelo de visão de propósito: foto não tem fallback, e gastar a
  *  cota dele com texto derruba a próxima análise com foto. */
