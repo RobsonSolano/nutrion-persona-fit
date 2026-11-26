@@ -2,6 +2,24 @@
 
 > Coisas erradas encontradas fora do escopo da tarefa em andamento. Ver skill fora-do-escopo.
 
+## Build com o SDK do iOS 27 (Xcode 27) fecha ao abrir: falta adotar UIScene
+**Origem:** visto em 2026-11-25, no hotfix 1.29.1 (build de Simulador feito localmente com Xcode 27).
+**Onde:** app iOS nativo (AppDelegate do Expo/React Native).
+**O que é:** no iOS 27 o app quebra na abertura com `EXC_BREAKPOINT` em
+`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`: apps linkados no SDK 27 precisam adotar o ciclo de
+vida UIScene. O build do EAS (SDK anterior) não é afetado hoje; quando o EAS passar para o Xcode 27 (ou a Apple exigir
+o SDK novo), o app deixa de abrir no iOS 27. Caminho provável: subir Expo SDK/React Native para a versão com suporte a
+UIScene, ou config plugin com `UIApplicationSceneManifest`.
+**Gravidade:** alta (quebra no próximo build nativo com Xcode 27). **Esforço:** horas, talvez spec.
+
+## Plano do onboarding caiu no "modo de segurança" com a IA no ar
+**Origem:** visto em 2026-11-25 ~20:40, no ensaio do vídeo da Apple (conta nova em produção).
+**Onde:** edge function `onboarding-plan`.
+**O que é:** a conta recebeu "Plano gerado em modo de segurança… instabilidade momentânea na IA", mas o chat e a
+análise de refeição responderam minutos depois. Conferir no `ai_usage_log` o `error_code` (rate_limit ou
+groq_api_error) e se o modelo da geração do plano está na cadeia certa.
+**Gravidade:** média (primeiro plano do usuário sai genérico). **Esforço:** minutos para diagnosticar.
+
 ## pushAi.ts usa modelo Groq descontinuado como fallback
 **Origem:** encontrado em 2026-09-15, durante a feature de exercícios em conjunto.
 **Onde:** `supabase/functions/_shared/pushAi.ts:19`

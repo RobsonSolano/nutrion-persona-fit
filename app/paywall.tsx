@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, Text, View, Pressable } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Check, Crown, X } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -182,9 +182,6 @@ export default function PaywallScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
-      />
       <Screen variant="violet" edges={['top', 'bottom']}>
         <View className="flex-row items-center justify-between px-5 py-3">
           <Pressable

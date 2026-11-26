@@ -28,6 +28,14 @@ segredo do Vault) e remove os `cron-*` quebrados (guardavam service role key em 
 `verify_jwt = false` para a function; falha de SMTP volta em `emailError`. Achado maior no backlog: os lembretes
 `nutrion-*` também tomam 401 e nunca chegaram aos usuários.
 
+**Hotfix 1.29.1 (2026-11-25):** o app iOS fechava ao abrir **Editar perfil** (caminho de Excluir conta, exigido pela
+Apple). Crash nativo no Hermes (SIGSEGV), reproduzido sempre no Simulador com o build Release de produção. Causa: as
+telas modais trocavam a apresentação com `<Stack.Screen options={{ presentation: 'modal' }}>` dentro da própria tela;
+o mesmo padrão deixava a próxima tela modal sem reagir depois de salvar um registro (a foto da galeria não entrava na
+análise de prato). A apresentação agora é declarada nos layouts (raiz e professor). **Lição:** opções de navegação
+(`presentation`, `animation`) vão no layout, nunca em `<Stack.Screen>` dentro da tela. Achado no ensaio do vídeo pedido
+pela Apple (Guideline 2.1).
+
 ### Plano Elite e Pessoal Premium (2026-11-04)
 
 Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).

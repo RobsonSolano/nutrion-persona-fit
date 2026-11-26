@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   X,
@@ -148,13 +148,6 @@ export default function SanityCheckScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-        }}
-      />
       <Screen variant="violet" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"
