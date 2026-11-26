@@ -43,6 +43,15 @@ Passou a usar o `groqFetchWithFailover`. **Lição:** toda chamada à Groq passa
 retry fica para trás quando a compartilhada aprende um caso novo. Hipótese descartada no caminho: limite de 8000
 tokens/min da conta (o pedido do plano tem ~3.400 tokens de prompt, cabe com os 3.500 de resposta).
 
+**Correções de assinatura no iOS (2026-11-26, feature/correcoes-assinatura-ios):** achadas na gravação do vídeo da
+Apple. (1) O alerta global (`GlobalAlertProvider` → `ConfirmModal`, um `<Modal>` na raiz) **não aparece no iOS com uma
+tela modal aberta** (paywall, editar perfil, registro, análise de prato) e deixa uma camada invisível bloqueando os
+toques: era o "app travado" depois da compra. Agora o alerta global usa `FullWindowOverlay` no iOS (`overlay` no
+`ConfirmModal`). **Lição:** `<Modal>` montado fora da tela ativa não se apresenta por cima de tela modal nativa no iOS;
+alerta de raiz vai em overlay. (2) Webhook do RevenueCat passou a tratar `TRANSFER` (mesmo Apple ID assinando ou
+restaurando numa conta nova): antes a conta nova pagava e ficava sem plano. Usa a API do RevenueCat com
+`RC_SECRET_API_KEY` (secret do Supabase); sem ela, copia o plano da conta de origem.
+
 ### Plano Elite e Pessoal Premium (2026-11-04)
 
 Ordem dos tiers: free < pro < premium < elite (SQL `_tier_rank`, app `src/lib/tier.ts`).
