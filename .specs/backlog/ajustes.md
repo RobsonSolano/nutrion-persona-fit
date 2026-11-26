@@ -12,6 +12,15 @@ o SDK novo), o app deixa de abrir no iOS 27. Caminho provável: subir Expo SDK/R
 UIScene, ou config plugin com `UIApplicationSceneManifest`.
 **Gravidade:** alta (quebra no próximo build nativo com Xcode 27). **Esforço:** horas, talvez spec.
 
+## iOS: erro da exclusão de conta não aparece (alerta abre enquanto o modal fecha)
+**Origem:** visto em 2026-11-25, no hotfix 1.29.2 (exclusão com sessão expirada no Simulador).
+**Onde:** `src/components/DangerZone.tsx` (`confirmDelete`: `setConfirmOpen(false)` + `alert.showError(err)` juntos).
+**O que é:** quando a exclusão falha, o modal de motivo fecha e o alerta de erro (outro `<Modal>` do
+GlobalAlertProvider) é pedido no mesmo instante. No iOS, um modal apresentado enquanto outro está saindo não aparece:
+para o usuário, tocar em "Excluir conta" parece não fazer nada. Mostrar o erro dentro do próprio modal, ou abrir o
+alerta depois do `onDismiss`. Provável que o mesmo padrão exista em outros modais com alerta no catch.
+**Gravidade:** média (falha silenciosa num fluxo exigido pela Apple). **Esforço:** minutos.
+
 ## pushAi.ts usa modelo Groq descontinuado como fallback
 **Origem:** encontrado em 2026-09-15, durante a feature de exercícios em conjunto.
 **Onde:** `supabase/functions/_shared/pushAi.ts:19`
