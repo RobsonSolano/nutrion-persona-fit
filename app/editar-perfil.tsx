@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { X, Save, User as UserIcon, Mail, Wand2 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -120,13 +120,6 @@ export default function EditarPerfilScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-        }}
-      />
       <Screen variant="violet" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"

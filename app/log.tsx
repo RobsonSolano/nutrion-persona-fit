@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { Screen, SegmentedControl } from '@/components/ui';
 import MealForm from '@/components/log/MealForm';
@@ -34,13 +34,6 @@ export default function LogScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-        }}
-      />
       <Screen variant="hero" edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior="padding"

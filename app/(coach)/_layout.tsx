@@ -28,6 +28,9 @@ export default function CoachLayout() {
         contentStyle: { backgroundColor: '#000000' },
         animation: 'fade',
       }}
-    />
+    >
+      <Stack.Screen name="aluno/[id]/rotina/nova" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="templates/novo" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+    </Stack>
   );
 }

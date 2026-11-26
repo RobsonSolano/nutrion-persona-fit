@@ -88,6 +88,11 @@ function Providers({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Telas abertas como modal. Declarar a apresentação aqui, e não com <Stack.Screen>
+// dentro da própria tela: trocar para modal depois de montada derrubava o app no iOS
+// (crash nativo ao abrir Editar perfil) e deixava modais sem reagir depois de salvar.
+const MODAL_OPTIONS = { presentation: 'modal', animation: 'slide_from_bottom' } as const;
+
 function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -102,7 +107,13 @@ function RootLayout() {
                   contentStyle: { backgroundColor: '#000000' },
                   animation: 'fade',
                 }}
-              />
+              >
+                <Stack.Screen name="editar-perfil" options={MODAL_OPTIONS} />
+                <Stack.Screen name="paywall" options={MODAL_OPTIONS} />
+                <Stack.Screen name="log" options={MODAL_OPTIONS} />
+                <Stack.Screen name="sanity-check" options={MODAL_OPTIONS} />
+                <Stack.Screen name="rotina/nova" options={MODAL_OPTIONS} />
+              </Stack>
             </Providers>
           </GlobalAlertProvider>
         </SafeAreaProvider>
