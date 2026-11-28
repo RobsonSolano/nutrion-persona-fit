@@ -10,7 +10,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     // src/lib + lógica pura das edges (módulos TS sem imports Deno, ex: mapEvent).
-    include: ['src/lib/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
+    include: ['src/lib/**/*.test.ts', 'supabase/functions/**/*.test.ts', 'scripts/lib/**/*.test.mjs'],
     passWithNoTests: true,
   },
 });

@@ -16,6 +16,7 @@
     "seed:user": "node --env-file=.env.local scripts/seed-user.mjs",
     "seed:test-users": "node --env-file=.env.local scripts/seed-test-users.mjs",
     "seed:aluno-historico": "node --env-file=.env.local scripts/seed-historico-aluno.mjs",
+    "instagram:fila": "node --env-file=.env.local scripts/instagram-fila.mjs",
     "audit:exercise-images": "node --env-file=.env.local scripts/audit-exercise-images.mjs",
     "audit:ai-usage": "node --env-file=.env.local scripts/audit-ai-usage.mjs",
     "gerar:descricoes": "node --env-file=.env.local scripts/gerar-descricoes-exercicios.mjs",
