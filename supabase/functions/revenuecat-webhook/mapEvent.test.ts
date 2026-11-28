@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapRevenueCatEvent, storeToSource } from './mapEvent';
+import { mapRevenueCatEvent, stateFromSubscriber, storeToSource, transferIds } from './mapEvent';
 
 const ev = (type: string, extra: Record<string, unknown> = {}) => ({
   event: {
@@ -99,5 +99,92 @@ describe('mapRevenueCatEvent', () => {
       expect(mapRevenueCatEvent(ev(t, { store: 'APP_STORE' }))?.source).toBe('store_apple');
       expect(mapRevenueCatEvent(ev(t))?.source).toBe('store_play');
     }
+  });
+});
+
+const U1 = '11111111-1111-4111-8111-111111111111';
+const U2 = '22222222-2222-4222-8222-222222222222';
+
+describe('transferIds', () => {
+  it('TRANSFER → contas de origem e destino (só ids de usuário do app)', () => {
+    const r = transferIds({
+      event: {
+        type: 'TRANSFER',
+        transferred_from: [U1, '$RCAnonymousID:abc'],
+        transferred_to: [U2],
+      },
+    });
+    expect(r).toEqual({ from: [U1], to: [U2] });
+  });
+
+  it('null para outros eventos ou sem destino', () => {
+    expect(transferIds({ event: { type: 'RENEWAL', app_user_id: U1 } })).toBeNull();
+    expect(transferIds({ event: { type: 'TRANSFER', transferred_from: [U1], transferred_to: [] } })).toBeNull();
+    expect(transferIds(null)).toBeNull();
+  });
+});
+
+describe('stateFromSubscriber', () => {
+  const NOW = Date.parse('2026-11-26T12:00:00Z');
+  const future = '2026-12-26T12:00:00Z';
+  const past = '2026-11-01T12:00:00Z';
+
+  it('entitlement ativo da App Store → tier, active, period_end e store_apple', () => {
+    const r = stateFromSubscriber(
+      {
+        entitlements: { premium: { expires_date: future, product_identifier: 'nutrion_comum_premium' } },
+        subscriptions: { nutrion_comum_premium: { store: 'app_store', expires_date: future, period_type: 'normal', unsubscribe_detected_at: null } },
+      },
+      NOW,
+    );
+    expect(r).toEqual({
+      source: 'store_apple',
+      state: { tier: 'premium', status: 'active', period_end: new Date(future).toISOString() },
+    });
+  });
+
+  it('cancelada mas ainda no período → canceled (acesso até period_end)', () => {
+    const r = stateFromSubscriber(
+      {
+        entitlements: { premium: { expires_date: future, product_identifier: 'p' } },
+        subscriptions: { p: { store: 'app_store', expires_date: future, period_type: 'normal', unsubscribe_detected_at: past } },
+      },
+      NOW,
+    );
+    expect(r.state.status).toBe('canceled');
+  });
+
+  it('período de teste da loja → in_trial; Play → store_play', () => {
+    const r = stateFromSubscriber(
+      {
+        entitlements: { pro: { expires_date: future, product_identifier: 'p' } },
+        subscriptions: { p: { store: 'play_store', expires_date: future, period_type: 'trial', unsubscribe_detected_at: null } },
+      },
+      NOW,
+    );
+    expect(r).toMatchObject({ source: 'store_play', state: { tier: 'pro', status: 'in_trial' } });
+  });
+
+  it('prioridade elite > premium > pro entre os ativos', () => {
+    const r = stateFromSubscriber(
+      {
+        entitlements: {
+          pro: { expires_date: future, product_identifier: 'a' },
+          elite: { expires_date: future, product_identifier: 'b' },
+        },
+        subscriptions: { b: { store: 'app_store', expires_date: future, period_type: 'normal', unsubscribe_detected_at: null } },
+      },
+      NOW,
+    );
+    expect(r.state.tier).toBe('elite');
+  });
+
+  it('sem entitlement ativo → free/expired', () => {
+    const r = stateFromSubscriber(
+      { entitlements: { premium: { expires_date: past, product_identifier: 'p' } }, subscriptions: {} },
+      NOW,
+    );
+    expect(r.state).toEqual({ tier: 'free', status: 'expired', period_end: new Date(past).toISOString() });
+    expect(stateFromSubscriber({}, NOW).state.tier).toBe('free');
   });
 });
