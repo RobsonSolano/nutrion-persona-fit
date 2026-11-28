@@ -1543,3 +1543,37 @@ entitlements no RevenueCat devem se chamar `pro`/`premium` (o `mapEvent.ts` deci
 - Troca de plano entre lojas diferentes (comprou na Play, quer mudar no iPhone, ou o inverso) não é tratada: cada loja só gerencia a própria assinatura.
 - "Gerenciar assinatura" abre a loja da plataforma atual, não a loja de origem da compra.
 - Teste do reset de senha usou usuário simulado pela admin API (sem identity Google real).
+
+## Instagram automático (2026-11-28)
+
+Spec `2026-11-28-instagram-autopost`, branch `feature/instagram-autopost`. Publica no @personafitapp 1 post no
+feed (12h) e 2 stories (10h e 19h, Brasília) a partir da fila `instagram_posts`.
+
+### Como funciona
+- **Fila:** tabela `instagram_posts` (RLS sem policies, só service role). Um por dia BRT + slot
+  (`feed`, `story-1`, `story-2`). CHECKs barram carrossel fora de 2–10, story com legenda e legenda > 2.200.
+- **Disparo:** job `nutrion-instagram-publish` a cada 5 min, que só chama a edge function
+  `cron-instagram-publish` quando há linha pendente vencida. Linha vencida há mais de 6h vira `skipped`;
+  erro da Meta vira `failed`. Admins recebem um e-mail + push por execução com os problemas.
+- **Carga:** `npm run instagram:fila -- <manifesto.json> [--dry-run]`. O manifesto e as artes ficam no repo
+  `nutrion-brand/instagram/<período>/` (feed exportado do Figma pela API REST; stories gerados por
+  `nutrion-brand/instagram/ferramentas/render-story.swift`). Idempotente: só reescreve linha `pending`.
+
+### Credenciais (fora do git)
+- **Meta:** app "PersonaFit Publisher" na conta pessoal do dev (sem portfólio da Nano), Página do Facebook
+  PersonaFit ligada ao @personafitapp. Token **de Página, sem expiração** em `.env.local`
+  (`INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_USER_ID`, `FACEBOOK_PAGE_ID`, `META_APP_ID`, `META_APP_SECRET`) e nos
+  secrets do Supabase (`INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_USER_ID`).
+- **Figma:** `FIGMA_TOKEN` (só `file_content:read`) da conta pessoal, **vence por volta de 26/02/2027**. Só a
+  carga da fila usa; a publicação diária não depende dele. Arquivo: `XjSn4KQQQlzkOTy1gE3SrC` (Drafts pessoais).
+
+### Lições
+- A API do Instagram não coloca figurinha (enquete, link) em story nem mexe em destaques: isso é manual.
+- O MCP do Figma em assento View tem cota mensal pequena (estourou em 28/11 no plano da Nano). Exportar
+  artes sempre pela API REST com token pessoal, não pelo MCP.
+- Bucket público `instagram` (só JPEG): a Meta baixa a imagem pela URL na hora de criar o container.
+
+### Pendências
+- Semana 2 da fila precisa entrar antes de sáb 05/12.
+- Gravar os avisos do Instagram em `push_history` e unificar o envio de Gmail com o `coach-send-credentials`
+  ficaram fora do escopo (achados do /simplify).

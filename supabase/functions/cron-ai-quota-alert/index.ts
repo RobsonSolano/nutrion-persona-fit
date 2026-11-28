@@ -12,14 +12,12 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { sendExpoPush } from '../_shared/expoPush.ts';
-import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import { emailAdmins, listAdminIds } from '../_shared/adminAlert.ts';
 import { FAILURE_CODES, aiAlertFor } from './alertRule.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET');
-const GMAIL_USER = Deno.env.get('GMAIL_USER');
-const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -100,15 +98,10 @@ serve(async (req: Request) => {
     // 3. Lista admins. NÃO existe FK direta entre admin_users e profiles
     //    (ambas referenciam auth.users) — então PostgREST não consegue
     //    inferir o join. Faz em 2 etapas: IDs dos admins, depois profiles.
-    const { data: adminRows, error: admErr } = await supa
-      .from('admin_users')
-      .select('id');
+    const { ids: adminIds, error: admErr } = await listAdminIds(supa);
     if (admErr) {
-      return json({ error: 'admins_fetch_failed', detail: admErr.message }, 500);
+      return json({ error: 'admins_fetch_failed', detail: admErr }, 500);
     }
-    const adminIds = (adminRows ?? [])
-      .map((a: { id: string }) => a.id as string)
-      .filter(Boolean);
     if (adminIds.length === 0) {
       return json({ ok: true, ...counts, sent: false, reason: 'no_admins' });
     }
@@ -177,64 +170,6 @@ serve(async (req: Request) => {
     );
   }
 });
-
-/** Manda o alerta por e-mail (Gmail SMTP, mesmos secrets do
- *  coach-send-credentials) para o e-mail de conta de cada admin, um envio por
- *  destinatário como lá. Falha de SMTP não derruba o cron (o push ainda
- *  tenta), mas volta em `emailError` na resposta para dar pra diagnosticar
- *  sem acesso aos logs. */
-async function emailAdmins(
-  // deno-lint-ignore no-explicit-any
-  supa: any,
-  adminIds: string[],
-  title: string,
-  body: string,
-): Promise<{ emailed: number; emailError: string | null }> {
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    return { emailed: 0, emailError: 'missing_smtp_secret' };
-  }
-  const emails: string[] = [];
-  for (const id of adminIds) {
-    const { data, error } = await supa.auth.admin.getUserById(id);
-    if (error) return { emailed: 0, emailError: `get_user: ${error.message}` };
-    if (data?.user?.email) emails.push(data.user.email);
-  }
-  if (emails.length === 0) return { emailed: 0, emailError: 'no_admin_email' };
-
-  const client = new SMTPClient({
-    connection: {
-      hostname: 'smtp.gmail.com',
-      port: 465,
-      tls: true,
-      auth: { username: GMAIL_USER, password: GMAIL_APP_PASSWORD },
-    },
-  });
-  let emailed = 0;
-  let emailError: string | null = null;
-  try {
-    for (const to of emails) {
-      await client.send({
-        from: `Persona Fit <${GMAIL_USER}>`,
-        to,
-        subject: title,
-        content: body,
-        html: `<p>${body}</p>`,
-      });
-      emailed++;
-    }
-  } catch (err) {
-    console.error('[cron-ai-quota-alert] falha no e-mail:', err);
-    emailError = `smtp: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300);
-  } finally {
-    // close() pode ser void ou Promise conforme a versão, e pode lançar.
-    try {
-      await client.close();
-    } catch {
-      // conexão já fechada — nada a fazer
-    }
-  }
-  return { emailed, emailError };
-}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

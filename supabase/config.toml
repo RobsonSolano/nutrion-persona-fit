@@ -50,6 +50,10 @@ verify_jwt = false
 # respondia 401 antes da function e o alerta nunca rodou (visto em 2026-11-10).
 verify_jwt = false
 
+[functions.cron-instagram-publish]
+# Chamado pelo pg_cron sem usuário (fila do Instagram). A proteção é o X-Cron-Secret.
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 policy = "oneshot"
